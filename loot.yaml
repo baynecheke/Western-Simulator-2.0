@@ -1,0 +1,77 @@
+# data/items.yaml
+
+#–– Player rarity buckets ––
+common:
+  - bread
+  - rope
+  - lantern
+  - knife
+  - pistol_ammo
+  - rifle_ammo
+  - shotgun_ammo
+  - boots
+  - small hide
+  - fire cracker
+
+uncommon:
+  - lasso
+  - antivenom
+  - revolver
+  - colt pistol
+  - rifle
+  - ammo cartridge
+  - derringer pistol
+  - colt navy revolver
+  - sawed-off shotgun
+
+rare:
+  - winchester barrel
+  - winchester stock
+  - henry rifle
+  - carbine rifle
+  - double barrel shotgun
+  - remington
+  - lever-action rifle
+  - sharps rifle
+  - tomahawk
+  - bowie knife
+  - cavalry saber
+  - medium hide
+  - ammo cartridge
+  - leather armor
+
+ultra_rare:
+  - winchester rifle
+  - gold nugget
+  - large hide
+  - carved horn
+  - horn
+  - chain mail
+  - sharps rifle
+  - silver bar
+  - gold bar
+  - ammo belt
+
+# #–– Combat‐specific loot categories ––
+# small:
+#   - small hide
+#   - small meat
+
+# medium:
+#   - medium hide
+#   - medium meat
+
+# large:
+#   - large hide
+#   - large meat
+#   - horn
+
+# bandit:
+#   - revolver
+#   - pistol_ammo
+#   - bread
+
+# townsperson:
+#   - whiskey
+#   - knife
+#   - antivenom
