@@ -854,7 +854,7 @@ class Player:
             
         elif roll == 2:
             print("A heated card game ends abruptly; someone storms out in a rage.")
-            print("A coin rolls toward you and you pick it up.")
+            print("A coin rolls toward you and you pick it up. +5 gold.")
             self.gold += 5
         elif roll == 3:
             print("A piano player strikes up a ragtime tune; toes tap in time.")
@@ -1204,7 +1204,7 @@ class Player:
         if self.Hostility == 1:
             print("The people are suspicious that you were unharmed during the attack.")
             if self.gold >= 3:
-                print("It appears that someone snuck a couple gold coins from your purse.")
+                print("It appears that someone snuck a couple gold coins from your purse. -3 gold")
                 self.gold = self.gold - 3
             else:
                 return
