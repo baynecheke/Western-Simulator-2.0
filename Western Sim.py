@@ -1269,6 +1269,39 @@ class Player:
             print("The sheriff throws you into the musty jail, not believing your pleas of innocence.")
             self.jail_penalty()
 
+    def Death(self, death_cause):
+        print("You fall to the ground, your vision fading...")
+        time.sleep(3,)
+        print(death_cause)
+        print("Your stats:")
+        print(f"Days survived: {self.Day}")
+        print(f"Score: {self.score}")
+        input("Press Enter to continue...")
+        self.Statcheck()
+        input("Press Enter to continue...")
+        print("You have come so far, would you like to respawn at your current position? (yes/no)")
+        print("You will no longer track score.")
+        choice = input(": ").strip().lower()
+        if choice == "yes":
+            self.lose_random_item(1)
+            self.gold -= self.gold/2
+            print("You feel a strange sensation, as if you are being pulled back to life...")
+            self.Health = self.MaxHealth/2
+        print("Credits: Bayne Cheke, Designer and Programmer.")
+        time.sleep(1,)
+        print("Music/audio effects: Freesound.com")
+        time.sleep(1,)
+        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke")
+        time.sleep(1,)
+        print("Other contributions: ChatGPT")
+        time.sleep(1,)
+        print("Thank you for playing!")
+        print("Until next time...")
+        exit()
+
+        
+
+
     #RunDay
     def RunDay(self):
         
@@ -1286,10 +1319,10 @@ class Player:
             if self.Health > self.MaxHealth:
                 self.Health = self.MaxHealth
             if self.Health <= 0:
-                break
+                self.Death("You have succumbed to your injuries during the day.")
         time.sleep(1)
         if self.Health <= 0:
-            return
+            self.Death("You have succumbed to your injuries during the day.")
 
         self.change_music("night_sounds.mp3", -1)
         if self.invillage == True:
@@ -1911,7 +1944,7 @@ class Player:
         if self.Health <= 0:
             print("The rattlesnake was too much for you. The challenge ends.")
             print("The hermit heals you just enough to continue on your journey.")
-            self.Health += 5
+            self.Health += 50
             return
         print("You successfully made it through the first trial, 2 more continue.")
         time.sleep(2,)
@@ -1931,7 +1964,7 @@ class Player:
                 if self.Health <= 0:
                     print("You succumb to your injuries.")
                     print("The hermit heals you just enough to continue on your journey.")
-                    self.Health += 5
+                    self.Health += 50
                     return
             else:
                 print("You manage to cross safely.")
@@ -1941,7 +1974,9 @@ class Player:
 
         print("\nFinal Trial: The Night of Wild Beasts.")
         self.loot_drop("bandage")
-        print("You think the bandage is a reward from the hermit for getting this far.")
+        self.loot_drop("bandage")
+        self.loot_drop("bandage")
+        print("You think the bandages are a reward from the hermit for getting this far.")
         if random.randint(1, 2) == 1:
             print("You are attacked by wolves during the night!")
             combat = Combat(self)
@@ -1950,7 +1985,7 @@ class Player:
             if self.Health <= 0:
                 print("The wolves overwhelmed you. The challenge ends.")
                 print("The hermit heals you just enough to continue on your journey.")
-                self.Health += 5
+                self.Health += 50
                 return
         else:
             print("You pass the night in peace under the stars.")
@@ -2102,8 +2137,7 @@ class Player:
                 self.Health -= 10
                 print("-10 health.")
                 if self.Health <= 0:
-                    print("Your injuries prove fatal.")
-                    return
+                    self.Death("You succumbed to your injuries in the dark cave.")
 
         time.sleep(1)
         print("\nDeeper inside, you find a split: (1) Left tunnel (2) Right tunnel")
@@ -2116,14 +2150,13 @@ class Player:
                 print("-10 health.")
                 if self.Health <= 0:
                     print("You collapse, never to leave the cave.")
-                    return
+                    self.Death("You succumbed to your injuries in the dark cave.")
             print("A bear emerges from the shadows!")
             combat = Combat(self)
             combat.FindAttacker("bear")
             combat.Attack()
             if self.Health <= 0:
-                print("You fall in battle within the cave.")
-                return
+                self.Death("The bear has defeated you in the cave.")
         else:
             print("You take the right tunnel...")
             print("A pack of wolves lurks here!")
@@ -2131,8 +2164,7 @@ class Player:
             combat.FindAttacker("pack of wolves")
             combat.Attack()
             if self.Health <= 0:
-                print("The wolves overwhelm you in the dark.")
-                return
+                self.Death("The wolves have defeated you in the cave.")
 
         time.sleep(1)
         print("\nAt last, you find a hidden chamber filled with glinting treasures!")
@@ -2994,7 +3026,7 @@ class Combat:
                             miss_threshold = 5
 
                     if miss_threshold > 0 and random.randint(1, 15) <= miss_threshold:
-                        print("Miss / Clumsy Strike! The enemy swings wildly but misses you entirely.")
+                        print(f"The {self.Enemy} attacks but you manage to dodge it.")
                         continue
                     Nenemy_damage = enemy_damage*self.player.Armor_Boost
                     self.player.Health -= Nenemy_damage
@@ -3004,7 +3036,7 @@ class Combat:
                     if self.EnemyCombatant.get("special") == "venomous":
                         self.player.poisoned = 1
                     if self.player.Health <= 0:
-                        return
+                        self.player.Death("You have been defeated by the " + self.Enemy + ".")
                     time.sleep(2,)
 
 
