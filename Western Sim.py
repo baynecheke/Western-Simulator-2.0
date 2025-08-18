@@ -265,11 +265,15 @@ class Player:
 
     def loot_drop(self, item):
         loot = item
-        self.add_item(loot)
-        self.day_memory["loot"] = item
-        if self.difficulty == 'adventure' and loot in self.common_loot:
-            print(f"You found extra {loot} due to adventure mode!")
+        if item in ["pistol_ammo", "rifle_ammo", "shotgun_ammo"]:
+            self.itemsinventory[item] = self.itemsinventory.get(item, 0) + 3
+            print(f"You found 3 x {item}!")
+        else:
             self.add_item(loot)
+            if self.difficulty == 'adventure' and loot in self.common_loot:
+                print(f"You found extra {loot} due to adventure mode!")
+                self.add_item(loot)
+        self.day_memory["loot"] = item
 
     def Number(self, Choice):
         mapping = {
@@ -637,13 +641,13 @@ class Player:
             print("You don't have any items to sell.")
             return
         prices = {
-            "small hide": 5,
-            "medium hide": 10,
-            "large hide": 25,
-            "small meat": 5,
-            "medium meat": 10,
-            "large meat": 20,
-            "horn": 30,
+            "small hide": 10,
+            "medium hide": 15,
+            "large hide": 30,
+            "small meat": 10,
+            "medium meat": 15,
+            "large meat": 25,
+            "horn": 35,
             "bread": 2,
             "knife": 5,
             "revolver": 20,
@@ -672,20 +676,20 @@ class Player:
                 price = prices.get(item, 1)
                 print(f"{idx}. {item} (x{qty}) - Sell Price: ${price}")
 
-            print(f"{len(self.itemsinventory) + 1}. Exit Trading Post")
+            print(f"{len(self.itemsinventory)}")
 
-            choice = input("Enter the number of the item you want to sell: ").strip()
+            choice = input("Enter the number of the item you want to sell or 'q' to leave: ").strip()
 
+            if choice == "q":
+                return
+            
             if not choice.isdigit():
                 print("Invalid input.")
                 continue
 
-            choice = int(choice)
 
-            if choice == len(self.itemsinventory) + 1:
-                print("You leave the trading post.")
-                time.sleep(2,)
-                break
+
+            choice = int(choice)
 
             if 1 <= choice <= len(self.itemsinventory):
                 item_to_sell = list(self.itemsinventory.keys())[choice - 1]
@@ -1345,7 +1349,7 @@ class Player:
                     time.sleep(2,)
                     print("Out of the darkness a blade hits you.")
                     print("You stumble out of the building.")
-                    print("You need to watch out for those booby traps.")
+                    print("There must be a way to disable the traps...")
                     self.Health -= 20
                     time.sleep(3,)
                 else:
@@ -1359,7 +1363,7 @@ class Player:
                     time.sleep(2,)
                     print("Out of the darkness a blade hits you.")
                     print("You stumble out of the building.")
-                    print("You need to watch out for those booby traps.")
+                    print("There must be a way to disable the traps...")
                     self.Health -= 10
                     time.sleep(3,)
                 else:
@@ -1370,14 +1374,17 @@ class Player:
                 time.sleep(2,)
                 Random = random.randint(1, self.shadow_skill)
                 if Random == 1:
-                    print("You accidentally trigger the trap!")
+                    print("You accidentally trigger the trap attached to the painting!")
                     print("Out of the darkness a blade hits you.")
                     print("You stumble out of the building.")
-                    print("You need to watch out for those booby traps.")
+                    print("You were, close, if your shadow skill was higher you have had a better chance of disarming it.")
                     time.sleep(4,)
                 else:
-                    print("You disarm the trap, then loot the room.")
+                    print("You notice the elaborate trap around the painting, and streching around the room.")
+                    print("You carefully disarm the trap, glad your shadow skills have served you.")
+                    time.sleep(3,)
                     print("You find a crate behind the painting.")
+                    print("Now that the trap is disarmed, you can loot the room safely.")
                     print("(1), On the wall hangs a dusty rifle,(2), on the table lies a bundle, and (3), there is a crate behind the painting.")
                     time.sleep(3,)
                     choice = input(": ")
@@ -1415,7 +1422,8 @@ class Player:
             time.sleep(3,)
         else:
             print("Invalid")
-            return
+        print("Suddenly, you here someone approaching the house.")
+        print("You quickly exit the house and get back on the road.")
         time.sleep(3,)
 
     def encounter_stage_coach(self):
@@ -1442,12 +1450,13 @@ class Player:
                         del self.itemsinventory["rope"]
                     print(f"+{reward} gold")
             else:
-                print("You have no rope! You watch helplessly as the coach tips over.")
+                print("You rummage through your bag, but realize you have no rope!")
+                print("You try to pull the coach back but you are too late and it slips over the edge.")
                 self.Time += 1
 
         elif choice == "2":
             print("You brace yourself and try to push the stagecoach back...")
-            if random.randint(1, self.strength_skill) >= 2:
+            if random.randint(1, self.strength_skill) > 2:
                 print("Your strength prevails! You save the stagecoach and earn a reward.")
                 reward = random.randint(10, 30)
                 self.gold += reward
@@ -1535,7 +1544,7 @@ class Player:
         Choice = input(": ").strip()
         if Choice == "1":
             print("You tend his wounds and give him water.")
-            gold = 30
+            gold = random.randint(5, 15)
             self.gold += gold
             print(f"He thanks you and staggers off. +{gold} gold.")
             if Random <= 50:
@@ -1572,6 +1581,8 @@ class Player:
                 reward = random.randint(15, 30)
                 self.gold += reward
                 print(f"The grateful merchants reward you with {reward} gold.")
+                print("They also give you some supplies.")
+                self.loot_drop("bandage")
         elif Choice == "2":
             print("You stay hidden until it's over. No one notices you.")
         else:
@@ -2692,9 +2703,6 @@ class Combat:
                     print(f"{self.Enemy.capitalize()} is dead.")
                     loot_item = random.choice(self.loots[enemy_loot])
                     self.player.loot_drop(loot_item)
-                    if "ammo" in loot_item:
-                        self.player.itemsinventory[loot_item] = self.player.itemsinventory.get(loot_item, 0) + 3
-                        print(f"You gained 3 x {loot_item}s!")
                     self.player.score = self.player.score + 5
                     self.player.Health = round(self.player.Health)
                     self.player.Armor_Boost = 1
