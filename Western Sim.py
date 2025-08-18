@@ -27,6 +27,8 @@ class Player:
         self.Hostility = 0
         self.invillage = True
         self.save_name = ""
+        self.rumors = {}  # key: topic, value: count
+
 
         self.score = 0
         self.poisoned = 0
@@ -111,7 +113,7 @@ class Player:
             "town_event": None   # e.g. "rebuilding Dust Camp"
         }
         self.music = True
-        self.quest = "None"
+
         self.caravan = []
         self.world_events = [
         "A sandstorm rolls in, making travel harder.",
@@ -123,8 +125,8 @@ class Player:
 
 
         self.cheat_code = False
-
-        self.quest = "None"
+        self.Tquest = "None"  
+        self.quest = []
         self.boots_used = False
         self.town_defense_outcome   = None
         self.town_aftermath_outcome = None
@@ -204,6 +206,9 @@ class Player:
         player.difficulty = save_data.get("difficulty", [])
         player.MaxHealth = save_data.get("MaxHealth", 0)
         player.TownUpgrades = save_data.get("TownUpgrades", [])
+        player.Tquest = save_data.get("Tquest", "None")
+        player.quest = save_data.get("quest", [])
+        player.rumors = save_data.get("rumors", {})
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -245,6 +250,9 @@ class Player:
                 "MaxHealth": self.MaxHealth,
                 "save_name": self.save_name,
                 "TownUpgrades": self.TownUpgrades,
+                "Tquest": self.Tquest,
+                "quest": self.quest,
+                "rumors": self.rumors,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -867,6 +875,8 @@ class Player:
                     self.poisoned = 1
                 else:
                     print("You feel a warm buzz. +5 health.")
+                    print("You feel faster.")
+                    self.Temporaryspdboost += 1
                     self.Health = min(self.Health + 5, self.MaxHealth)
             else:
                 print("You decline and step aside.")
@@ -877,28 +887,32 @@ class Player:
         print("\nThe barkeeper polishes a glass and nods.")
         print("1) Ask about rumors")
         print("2) Buy a drink (5 gold)")
-        print("3) Ask about work")
         choice = input("Choice: ").strip()
         if choice == "1":
-            rumor = random.choice([
-                "Bandits spotted near Coyote Camp.",
-                "Strange lights seen in the old mine.",
-                "A lost prospector buried gold east of here.",
-                "Sheriff is looking for a runaway stagecoach."
-            ])
+            rumor_topics = {
+            "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
+            "old_mine_lights": "Strange lights seen in the old mine.",
+            "buried_gold_east": "A lost prospector buried gold east of here.",
+            }
+            topic, rumor = random.choice(list(rumor_topics.items()))
             print(f"He leans in: \"{rumor}.\"")
+            self.rumors[topic] = self.rumors.get(topic, 0) + 1
+            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+            # Example: trigger a quest after hearing a rumor 2 times
+            if self.rumors[topic] == 3:
+                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+
+            self.quest.append(topic)
         elif choice == "2":
             if self.gold >= 5:
                 self.gold -= 5
                 print("You pay 5 gold and down a shot. +5 health.")
+                print("You feel a warm buzz, and faster.")
                 self.Health = min(self.Health + 5, self.MaxHealth)
                 self.Temporaryspdboost += 1
             else:
                 print("You check your pouch—you don't have enough gold.")
-        elif choice == "3":
-            print("He slides you a wanted poster: bandits at Dust Camp.")
-            print("You feel a bounty quest has begun.")
-            self.quest = True
+
         else:
             print("He shrugs: \"Suit yourself.\"")
 
@@ -914,7 +928,9 @@ class Player:
         # chance of free drink
         if random.randint(1,10) <= 3:
             print("The barkeeper is impressed and slides you a free drink. +5 health.")
+            print("You feel a warm buzz, and faster.")
             self.Health = min(self.Health + 5, self.MaxHealth)
+            self.Temporaryspdboost += 1
         # small chance of brawl
         elif random.randint(1,10) <= 2:
             print("A drunk patron doesn't like your song and swings at you!")
@@ -974,12 +990,19 @@ class Player:
         print("3) Arm-wrestling contest")
         choice = input("Choice: ").strip()
         if choice == "1":
-            info = random.choice([
-                "They whisper of a hidden stash under the sheriff's office.",
-                "They say the old mine has a collapsed tunnel full of ore.",
-                "Rumor has it the rustlers are planning a big raid soon."
-            ])
-            print(f"A patron murmurs: \"{info}\"")
+            rumor_topics = {
+            "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+            "old_mine_lights": "Nobody goes near the old mine anymore.",
+            "buried_gold_east": "Legend has it that there is gold east of here.",
+            }
+            topic, rumor = random.choice(list(rumor_topics.items()))
+            print(f"A patron murmurs: \"{rumor}\"")
+            self.rumors[topic] = self.rumors.get(topic, 0) + 1
+            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+            # Example: trigger a quest after hearing a rumor 2 times
+            if self.rumors[topic] == 3:
+                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                self.quest.append(topic)
         elif choice == "2":
             bet = input("Enter bet amount: ").strip()
             if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
@@ -1073,14 +1096,29 @@ class Player:
             if input(": ").strip().lower() == "yes":
                 print("You ride with the sheriff to confront the bandits!")
                 self.Speed += 1
+                print("The sheriff tosses you a revolver and some ammo.")
+                item_name = "revolver"
+                self.itemsinventory[item_name] = self.itemsinventory.get(item_name, 0) + 1
+                item_name = "pistol_ammo"
+                self.itemsinventory[item_name] = self.itemsinventory.get(item_name, 0) + 3
                 combat = Combat(self)
                 combat.FindAttacker("bandit")
                 combat.Attack()
+                
                 self.Speed -= 1
                 if self.Health > 0:
                     loot = random.choice(["ammo cartridge", "bread", "tobacco pouch", "gold nugget"])
                     self.loot_drop(loot)
+                    print("As the final bandit falls under you and the sherrifs fury, you breath a sigh of relief.")
                     print("The sheriff slaps your back and thanks you.")
+                    print("You return his revolver, and he gives you a pouch of gold.")
+                    self.gold += 15
+                    selected_item = "revolver"
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+                    
+
             else:
                 print("You stay back, watching from a safe distance.")
 
@@ -1139,14 +1177,14 @@ class Player:
                 self.Interaction()
 
     def town_encounter(self):
-        if self.quest == "None":
+        if self.Tquest == "None":
             Random = random.choice("defend town")
             if Random == "defend town":
                 # Episode 1 not done yet?
                 if self.town_defense_outcome is None:
                     self.encounter_town_part1()
                     return
-        if self.quest ==  "defend town":
+        if self.Tquest ==  "defend town":
             # Episode 2 pending?
             if self.town_defense_outcome and self.town_aftermath_outcome is None:
                 self.encounter_town_part2()
@@ -1188,12 +1226,12 @@ class Player:
             1: {'name': 'lantern', 'price': 3, 'quantity': 10},
             2: {'name': 'bread', 'price': 5, 'quantity': 30},
             3: {'name': 'rope', 'price': 3, 'quantity': 20},
-            4: {'name': 'lasso', 'price': 10, 'quantity': 10},
+            4: {'name': 'lasso', 'price': 7, 'quantity': 10},
             5: {'name': 'fire cracker', 'price': 5, 'quantity': 10},
-            6: {'name': 'antivenom', 'price': 10, 'quantity': 10},
-            7: {'name': 'tobacco pouch', 'price': 10, 'quantity': 7},
-            8: {'name': 'gun oil', 'price': 10, 'quantity': 3},
-            9: {'name': 'coffee tin', 'price': 15, 'quantity': 5},}
+            6: {'name': 'antivenom', 'price': 5, 'quantity': 10},
+            7: {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
+            8: {'name': 'gun oil', 'price': 7, 'quantity': 3},
+            9: {'name': 'coffee tin', 'price': 5, 'quantity': 5},}
         gen_shop = GenericStore(self, "General Store", general_inventory)
         gen_shop.run_shop()
 
@@ -1295,7 +1333,13 @@ class Player:
         elif Random <= 60:
             self.encounter_hermit_challenge()
         else:
-            self.encounter_cave_of_shadows()
+            random_event = random.choice(["haunted_house", "cave_of_shadows", "hermit challenge"])
+            if random_event == "haunted_house":
+                self.encounter_haunted_house()
+            elif random_event == "cave_of_shadows":
+                self.encounter_cave_of_shadows()
+            elif random_event == "hermit challenge":
+                self.encounter_hermit_challenge()
 
     def encounter_hunter(self):
         rand = random.randint(1,2)
@@ -1654,7 +1698,7 @@ class Player:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
         time.sleep(2)
-        self.quest == "defend town"
+        self.Tquest == "defend town"
 
     def encounter_town_part2(self):
         if self.town_defense_outcome is None:
@@ -1753,7 +1797,7 @@ class Player:
         else:
             self.town_final_outcome = "abandoned"
             print("You ride away, leaving the town to its fate.")
-        self.quest = "None"
+        self.Tquest = "None"
 
         time.sleep(2)
 
