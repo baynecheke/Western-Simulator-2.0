@@ -256,6 +256,107 @@ class Player:
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
+    def main_game_loop(self):
+        global player
+        print("Would you like to (1) Start New Game or (2) Load a Save?")
+        choice = input("Enter 1 or 2: ").strip()
+        if choice == "2":
+            player = Player.load_game()
+        else:
+            print("Would you like the instructions?")
+            Choice = input("Yes/No:").strip().lower()
+            if Choice == "yes":
+                print("Welcome to Western Simulator!")
+                time.sleep(2,)
+                print("In this game you will try and survive the western life and complete quests.")
+                time.sleep(2,)
+                print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
+                time.sleep(3,)
+                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
+                choice = input(": ").strip()
+                if choice == "1":
+                    player.difficulty = 'adventure'
+                elif choice == "3":
+                    player.difficulty = 'savage'
+                else:
+                    player.difficulty = 'frontier'
+                time.sleep(3,)
+                print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
+                time.sleep(2,)
+                print("Others like the knife and armor have unlimited uses.")
+                time.sleep(2,)
+                print("Now let's start your journey.")
+                print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
+                time.sleep(1,)
+                Location = ["Dustbowl, a tough town in the South Dakota territory.", 
+                            "Rust Ridge, a thriving town in the eastern half of Colorado.", 
+                            "Quarry Town, a large mining town on the banks of the Missouri River."]
+                print("You wake up in the town of " + Location[random.randint(0,2)])
+                print("The people greet you with nods as you walk down the mainstreet.")
+                time.sleep(4,)
+                player.change_music("Town.mp3", -1)
+                player.add_item("diary")
+                
+            else:
+                player.change_music("Town.mp3", -1)
+                player.add_item("diary")
+                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
+                choice = input(": ").strip()
+                if choice == "1":
+                    player.difficulty = 'adventure'
+                elif choice == "3":
+                    player.difficulty = 'savage'
+                else:
+                    player.difficulty = 'frontier'
+
+
+        while not player.Health <= 0:
+            if player.invillage == True:
+                player.HostilityFunc()
+                player.change_music("Town.mp3", -1)
+            else:
+                player.change_music("game_theme.mp3", -1)
+            player.RunDay()
+            player.counter = 0
+            player.Day += 1
+            if player.Temporaryspdboost > 0:
+                player.Speed -= player.Temporaryspdboost
+                player.Temporaryspdboost = 0
+            if player.Health <= 0:
+                break
+            player.Hunger = player.Hunger + 1
+            print("You feel hungrier...")
+            time.sleep(3,)
+            if player.Hunger >= 3:
+                print("You stagger, feeling the effects of your ravenous hunger.")
+                hunger_damage = player.Hunger*5
+                lost_health = hunger_damage
+                player.Health -= lost_health
+                print(f"You lost {lost_health} health of hunger.")
+            if player.poisoned > 0:
+                print("Your stomach churns.")
+                damage = player.poisoned*5
+                player.Health -=  damage
+                player.Hunger += 1
+                print(f"You suddenly feel sick and vomit on the ground.")
+                time.sleep(2,)
+                print(f"It feels unnatural; you conclude that you must be poisoned.")
+                print(f"Your health has been reduced by {damage}.")
+                print("You feel hungrier...")
+                time.sleep(3,)
+            print(f"Your health is: {player.Health}.")
+            if player.Health <= 0:
+                break
+            player.save_game()
+            choice = input("Would you like to quit? (yes/no): ").strip().lower()
+            if choice == 'yes':
+                print("Thanks for playing! See you next time.")
+                pygame.mixer.music.stop()
+                exit()
+            else:
+                print("Continuing your adventure...")
+                time.sleep(4,)
+
     def lose_random_item(self, amount):
         if not self.itemsinventory:
             print("You have no items to lose.")
@@ -1287,6 +1388,11 @@ class Player:
             self.gold -= self.gold/2
             print("You feel a strange sensation, as if you are being pulled back to life...")
             self.Health = self.MaxHealth/2
+            return
+        print("Would you like to restart the game? (yes/no)")
+        choice = input(": ").strip().lower()
+ 
+
         print("Credits: Bayne Cheke, Designer and Programmer.")
         time.sleep(1,)
         print("Music/audio effects: Freesound.com")
@@ -1295,9 +1401,17 @@ class Player:
         time.sleep(1,)
         print("Other contributions: ChatGPT")
         time.sleep(1,)
-        print("Thank you for playing!")
-        print("Until next time...")
-        exit()
+        if choice == "yes":
+            print("Restarting game...")
+            global player
+            player = Player()
+            player.main_game_loop()
+            exit()
+        else:
+            print("Thank you for playing!")
+            print("Until next time...")
+            time.sleep(2,)
+            exit()
 
         
 
@@ -3136,104 +3250,5 @@ else:
         player.music = False
 
 
-print("Would you like to (1) Start New Game or (2) Load a Save?")
-choice = input("Enter 1 or 2: ").strip()
-if choice == "2":
-    player = Player.load_game()
-else:
-    print("Would you like the instructions?")
-    Choice = input("Yes/No:").strip().lower()
-    if Choice == "yes":
-        print("Welcome to Western Simulator!")
-        time.sleep(2,)
-        print("In this game you will try and survive the western life and complete quests.")
-        time.sleep(2,)
-        print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
-        time.sleep(3,)
-        print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-        choice = input(": ").strip()
-        if choice == "1":
-            player.difficulty = 'adventure'
-        elif choice == "3":
-            player.difficulty = 'savage'
-        else:
-            player.difficulty = 'frontier'
-        time.sleep(3,)
-        print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
-        time.sleep(2,)
-        print("Others like the knife and armor have unlimited uses.")
-        time.sleep(2,)
-        print("Now let's start your journey.")
-        print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
-        time.sleep(1,)
-        Location = ["Dustbowl, a tough town in the South Dakota territory.", 
-                    "Rust Ridge, a thriving town in the eastern half of Colorado.", 
-                    "Quarry Town, a large mining town on the banks of the Missouri River."]
-        print("You wake up in the town of " + Location[random.randint(0,2)])
-        print("The people greet you with nods as you walk down the mainstreet.")
-        time.sleep(4,)
-        player.change_music("Town.mp3", -1)
-        player.add_item("diary")
-        
-    else:
-        player.change_music("Town.mp3", -1)
-        player.add_item("diary")
-        print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-        choice = input(": ").strip()
-        if choice == "1":
-            player.difficulty = 'adventure'
-        elif choice == "3":
-            player.difficulty = 'savage'
-        else:
-            player.difficulty = 'frontier'
-
-
-while not player.Health <= 0:
-    if player.invillage == True:
-        player.HostilityFunc()
-        player.change_music("Town.mp3", -1)
-    else:
-        player.change_music("game_theme.mp3", -1)
-    player.RunDay()
-    player.counter = 0
-    player.Day += 1
-    if player.Temporaryspdboost > 0:
-        player.Speed -= player.Temporaryspdboost
-        player.Temporaryspdboost = 0
-    if player.Health <= 0:
-        break
-    player.Hunger = player.Hunger + 1
-    print("You feel hungrier...")
-    time.sleep(3,)
-    if player.Hunger >= 3:
-        print("You stagger, feeling the effects of your ravenous hunger.")
-        hunger_damage = player.Hunger*5
-        lost_health = hunger_damage
-        player.Health -= lost_health
-        print(f"You lost {lost_health} health of hunger.")
-    if player.poisoned > 0:
-        print("Your stomach churns.")
-        damage = player.poisoned*5
-        player.Health -=  damage
-        player.Hunger += 1
-        print(f"You suddenly feel sick and vomit on the ground.")
-        time.sleep(2,)
-        print(f"It feels unnatural; you conclude that you must be poisoned.")
-        print(f"Your health has been reduced by {damage}.")
-        print("You feel hungrier...")
-        time.sleep(3,)
-    print(f"Your health is: {player.Health}.")
-    if player.Health <= 0:
-        break
-    player.save_game()
-    choice = input("Would you like to quit? (yes/no): ").strip().lower()
-    if choice == 'yes':
-        print("Thanks for playing! See you next time.")
-        pygame.mixer.music.stop()
-        exit()
-    else:
-        print("Continuing your adventure...")
-        time.sleep(4,)
+player.main_game_loop()
 pygame.mixer.music.stop()
-print(f"You died...")
-print(f"Your final score is {player.score}.")
