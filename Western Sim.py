@@ -1200,6 +1200,20 @@ class Player:
         self.play_sound("horse_neigh.mp3")
         print(f"You arrive in the town of {name}!")
         self.change_music("Town.mp3", -1)
+        if "outlaw" in self.caravan:
+            print("You turn in the outlaw you captured.")
+            print("The sheriff approaches you.")
+            print("How can we reward you for bringing in this outlaw? (1) Gold (2) Supplies?")
+            choice = input(": ").strip()
+            if choice == "1":
+                reward = random.randint(20, 40)
+                self.gold += reward
+                print(f"The sheriff thanks you and gives you {reward} gold as a reward.")
+            else:
+                supply = random.choice(self.rare_loot)
+                self.add_item(supply)
+                print(f"The sheriff thanks you and gives you some supplies: {supply}.")
+            self.caravan.remove("outlaw")
         if "family" in self.caravan:
             self.travel_bonus += 1
             print("The family thanks you sincerely for allowing them to travel with you, and gives you a handsome reward.")
@@ -1308,6 +1322,31 @@ class Player:
     def PossibleQuest(self):
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
+            # --- Rumor quest handler ---
+        if self.quest:
+            quest_topic = self.quest.pop(0)  # Remove and get the oldest quest
+            print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
+            # Trigger a special event based on the quest topic
+            if quest_topic == "bandits_coyote_camp":
+                print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
+                combat = Combat(self)
+                combat.FindAttacker("bandit")
+                combat.Attack()
+                if self.Health > 0:
+                    print("You defeat the bandits and find some loot.")
+                    self.loot_drop("gold nugget")
+                    self.loot_drop("pistol_ammo")
+            elif quest_topic == "old_mine_lights":
+                self.encounter_haunted_mine()
+            elif quest_topic == "buried_gold_east":
+                print("You search east of town and, after some digging, uncover a buried chest!")
+                self.loot_drop("gold bar")
+                self.gold += 25
+                print("You gain 25 gold!")
+            else:
+                print("You follow the rumor, but nothing comes of it this time.")
+            return  # Only do one quest per call
+        
         if Random <= 5:
             self.encounter_abandoned_wagon()
         elif Random <= 10:
@@ -2107,8 +2146,177 @@ class Player:
         self.shadow_skill += 1
         print("Navigating the cave improved your shadow skill! +1 shadow_skill.")
 
+    def encounter_haunted_mine(self):
+        print("\nYou have followed the rumors to the old mine.")
+        print("They say it was abandoned after a tragic accident, but treasure might still lie within.")
+        print("1) Enter the mine cautiously")
+        print("2) Walk away")
+        choice = input("Choice: ").strip()
+        if choice == "2":
+            print("You decide it's not worth the risk. You lose an hour.")
+            self.Time += 1
+            return
 
-    #Generic
+        print("You step into the mine. The air is cold and heavy with dust.")
+        time.sleep(2)
+        print("\nYou see two tunnels branching ahead:")
+        print("1) The left tunnel, with old tracks")
+        print("2) The center tunnel, faintly lit by a lantern")
+        path = input("Choose a tunnel (1/2): ").strip()
+
+        # Stage 1: Tunnel choice
+        if path == "1":
+            print("\nYou follow the tracks deeper into the mine.")
+            print("You inspect an abandoned minecart on the side of the tracks.")
+            loot = random.choice(["gold nugget", "lantern", "rope", "rifle"])
+            self.loot_drop(loot)
+            print("Suddenly, you hear the rumble of a minecart approaching!")
+            print("A minecart is barreling down the tracks straight at you!")
+            print("You have only a split second to react!")
+            time.sleep(2)
+            
+            print("What do you do?")
+            options = ["1) Try to stop the minecart with your strength",
+                    "2) Dodge out of the way",
+                    "3) Use your rope to snag the cart"]
+            while True:
+                for o in options:
+                    print(o)
+                action = input("Choose (1/2/3): ").strip()
+                if action == "3" and "rope" not in self.itemsinventory:
+                    print("You reach for your rope, but realize you don't have one!")
+                    options = [o for o in options if not o.startswith("3)")]
+                    continue
+                break
+
+            # Minecart outcome
+            if action == "1":
+                if self.strength_skill >= 4:
+                    print("You brace yourself and stop the minecart just in time! Your strength saves you.")
+                    self.strength_skill += 1
+                    print("+1 Strength Skill.")
+                else:
+                    print("You try to stop the minecart, but it's too heavy! It knocks you aside.")
+                    dmg = random.randint(10, 20)
+                    self.Health -= dmg
+                    print(f"-{dmg} health.")
+            elif action == "2":
+                if self.Speed >= 4:
+                    print("You leap aside with quick reflexes, narrowly avoiding the cart.")
+                    self.shadow_skill += 1
+                    print("+1 Shadow Skill.")
+                else:
+                    print("You try to dodge, but the cart clips you as it passes.")
+                    dmg = random.randint(15, 25)
+                    self.Health -= dmg
+                    print(f"-{dmg} health.")
+            elif action == "3":
+                print("You expertly lasso the minecart, slowing it enough to avoid harm.")
+                self.itemsinventory["rope"] -= 1
+                if self.itemsinventory["rope"] <= 0:
+                    del self.itemsinventory["rope"]
+                print("Your rope is lost in the process.")
+
+            time.sleep(2)
+            print("You get up, shaken. The burning lantern and pickaxe make you suspicious—someone else is here.")
+        elif path == "2":
+            print("\nYou follow the faint light. The tunnel twists and you find a lantern and a pickaxe, both recently used.")
+            print("Suddenly, a minecart comes flying out of the darkness!")
+            print("Because you noticed the clues, you have a better chance to avoid the minecart.")
+            options = ["1) Try to stop the minecart with your strength",
+                    "2) Dodge out of the way",
+                    "3) Use your rope to snag the cart"]
+            while True:
+                for o in options:
+                    print(o)
+                action = input("Choose (1/2/3): ").strip()
+                if action == "3" and "rope" not in self.itemsinventory:
+                    print("You reach for your rope, but realize you don't have one!")
+                    options = [o for o in options if not o.startswith("3)")]
+                    continue
+                break
+
+            # Minecart outcome with bonus
+            if action == "1":
+                if self.strength_skill >= 3:
+                    print("You brace yourself and stop the minecart just in time! Your strength saves you.")
+                    self.strength_skill += 1
+                    print("+1 Strength Skill.")
+                else:
+                    print("You try to stop the minecart, but it's too heavy! It knocks you aside.")
+                    dmg = random.randint(5, 12)
+                    self.Health -= dmg
+                    print(f"-{dmg} health.")
+            elif action == "2":
+                if self.Speed >= 3:
+                    print("You leap aside with quick reflexes, narrowly avoiding the cart.")
+                    self.shadow_skill += 1
+                    print("+1 Shadow Skill.")
+                else:
+                    print("You try to dodge, but the cart clips you as it passes.")
+                    dmg = random.randint(5, 10)
+                    self.Health -= dmg
+                    print(f"-{dmg} health.")
+            elif action == "3":
+                print("You expertly lasso the minecart, slowing it enough to avoid harm.")
+                self.itemsinventory["rope"] -= 1
+                if self.itemsinventory["rope"] <= 0:
+                    del self.itemsinventory["rope"]
+                print("Your rope is lost in the process.")
+
+            time.sleep(2)
+            print("You get up, shaken. The burning lantern and pickaxe make you suspicious—someone else is here.")
+        else:
+            print("\nYou squeeze through the collapsed tunnel. It's slow going, but you avoid any immediate danger.")
+            print("You find a side passage and hear faint footsteps echoing deeper in the mine.")
+            time.sleep(2)
+
+        # Stage 2: Suspicion and final event
+        print("\nYou press on, more cautious now. The tunnel opens into a large chamber.")
+        print("You spot a shadowy figure digging at the far wall. He turns, startled by your presence.")
+        print("1) Call out to him")
+        print("2) Sneak closer")
+        print("3) Leave quietly")
+        final = input("What do you do? (1/2/3): ").strip()
+        if final == "1":
+            print("You call out. The figure panics and drops a small sack as he flees into the darkness.")
+            self.loot_drop("gold nugget")
+            print("You pick up the sack and find a gold nugget inside!")
+        elif final == "2":
+            if self.shadow_skill >= 4:
+                print("You sneak closer and see the figure uncovering a hidden stash.")
+                print("He flees, leaving the loot behind. You claim it for yourself!")
+                self.loot_drop("gold nugget")
+                self.loot_drop("silver bar")
+            else:
+                print("You try to sneak, but stumble on loose gravel.")
+                print("The figure hears you and throws a lighted match on some barrels nearby.")
+                print("You realize he is about to blow up the entire mine!")
+                print("You run for your life, with only seconds to spare.")
+                time.sleep(2)
+                dmg = random.randint(10, 20)
+                self.Health -= dmg
+                print(f"You barely escape the blast, but some shrapnel hits your back. -{dmg} health.")
+                time.sleep(2)
+                print("Running quickly, you find the manage to catch the looter outside the mine.")
+                print("He surrenders, begging for mercy.")
+                print("Do you take him with you? (yes/no)")
+                choice = input(": ").strip().lower()
+                if choice == "yes":
+                    self.caravan.append("outlaw")
+                    print("You take the outlaw with you, hoping to turn him in for a reward.")
+                if choice == "no":
+                    print("In gratitude, he gives you a small pouch of gold before running off.")
+                    self.gold += 20
+                
+        else:
+            print("You decide not to risk it and leave the mine quietly, but you feel you missed out on something valuable.")
+            self.Time += 1
+            return
+
+        print("You leave the haunted mine, feeling both richer and a little uneasy about what you found.")
+        time.sleep(2)
+
     def change_music(self, filename, loop):
         music_path = os.path.join(os.path.dirname(__file__), filename)
         if self.music == False:
@@ -2826,7 +3034,6 @@ class GenericStore:
             return int(base_price * 1.1)  # 10% more expensive
         return base_price
         
-
     def show_inventory(self):
         print(f"\n--- {self.store_name} Inventory ---")
         for item_id, item in self.inventory.items():
