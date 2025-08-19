@@ -104,7 +104,7 @@ class Player:
         ]
         self.medical_loot = [
                             "bandage", 
-                             "bandage"]
+                            "bandage"]
 
 
         self.day_memory = {
@@ -136,7 +136,7 @@ class Player:
         self.diary_entries = []
 
         self.BasePossibleActions = [
-            "(A) Enter the Townhall", 
+            "(A) Enter the TownJail", 
             "(B) Enter the Doctor's office", 
             "(C) Enter the General Store", 
             "(D) Enter the Gunsmith's Shop", 
@@ -397,7 +397,7 @@ class Player:
         for action in self.possibleactions:
             print(action)
 
-        # Extract the valid letter keys from each action, e.g., "(A) Enter the Townhall" -> "A"
+        # Extract the valid letter keys from each action, e.g., "(A) Enter the TownJail" -> "A"
         valid_choices = [action.strip()[1].upper() for action in self.possibleactions]
 
         while True:
@@ -426,7 +426,7 @@ class Player:
 
     def ActionFunction(self, index):
         actions = [
-            self.TownHall, self.DoctorOffice, self.GeneralStore, self.Gunsmiths,
+            self.TownJail, self.DoctorOffice, self.GeneralStore, self.Gunsmiths,
             self.Bank, self.Saloon, self.Townspeople, self.TradingPost, self.Blacksmith, self.LeaveTown, self.use_item1, self.Statcheck,
             self.Explore
         ]
@@ -557,7 +557,7 @@ class Player:
 
                 elif selected_item == "boots":
                     if self.boots_used == False:
-                        print("You put on you boots, you feel faster.")
+                        print("You put on you boots, you feel faster. +1 speed")
                         self.Speed += 1
                         self.itemsinventory[selected_item] -= 1
                         if self.itemsinventory[selected_item] <= 0:
@@ -596,7 +596,7 @@ class Player:
 
                 elif selected_item == "tobacco pouch":
                     print("You puff on the tobacco pouch and feel emboldened.")
-                    print("You will be faster and stronger in the fight to come.")
+                    print("You will be faster and stronger in the fight to come. +1 damage, +1 speed")
                     self.damage_modifier += 5
                     self.Temporaryspdboost += 1
                     self.itemsinventory[selected_item] -= 1
@@ -708,7 +708,7 @@ class Player:
         print(f"Your health is {self.Health}.")
         input("Press enter to continue:")
 
-    def TownHall(self):
+    def TownJail(self):
         upgrades = {
             "doctor": ("Upgrade the Doctor's Office.", 25),
             "gunsmith": ("Upgrade the Gunsmith.", 40),
@@ -976,7 +976,7 @@ class Player:
                     self.poisoned = 1
                 else:
                     print("You feel a warm buzz. +5 health.")
-                    print("You feel faster.")
+                    print("You feel faster. +1 speed.")
                     self.Temporaryspdboost += 1
                     self.Health = min(self.Health + 5, self.MaxHealth)
             else:
@@ -1008,7 +1008,7 @@ class Player:
             if self.gold >= 5:
                 self.gold -= 5
                 print("You pay 5 gold and down a shot. +5 health.")
-                print("You feel a warm buzz, and faster.")
+                print("You feel a warm buzz, and faster. +1 speed.")
                 self.Health = min(self.Health + 5, self.MaxHealth)
                 self.Temporaryspdboost += 1
             else:
@@ -1029,7 +1029,7 @@ class Player:
         # chance of free drink
         if random.randint(1,10) <= 3:
             print("The barkeeper is impressed and slides you a free drink. +5 health.")
-            print("You feel a warm buzz, and faster.")
+            print("You feel a warm buzz, and faster. +1 speed.")
             self.Health = min(self.Health + 5, self.MaxHealth)
             self.Temporaryspdboost += 1
         # small chance of brawl
@@ -1066,7 +1066,7 @@ class Player:
                 print("Will you surrender? (yes/no)")
                 Choice = input(": ").strip().lower()
                 if Choice == "yes":
-                    print("You surrender to the sheriff, and he takes you to the townhall, doubling as the jail")
+                    print("You surrender to the sheriff, and he takes you to the Town Jail.")
                     self.jail_penalty()
 
                 else:
@@ -1253,7 +1253,7 @@ class Player:
     def Interaction(self):
         Random = random.randint(1,50)
         if Random <= 5:
-            print("You find some gold on the path!")
+            print("You find some gold on the path! +10 gold.")
             self.gold += 10
         elif Random <= 25:
             combat = Combat(self)
@@ -1346,7 +1346,8 @@ class Player:
             6: {'name': 'antivenom', 'price': 5, 'quantity': 10},
             7: {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
             8: {'name': 'gun oil', 'price': 7, 'quantity': 3},
-            9: {'name': 'coffee tin', 'price': 5, 'quantity': 5},}
+            9: {'name': 'coffee tin', 'price': 5, 'quantity': 5},
+            10: {'name': 'diary', 'price': 5, 'quantity': 5},}
         gen_shop = GenericStore(self, "General Store", general_inventory)
         gen_shop.run_shop()
 
@@ -1371,6 +1372,7 @@ class Player:
             self.jail_penalty()
 
     def Death(self, death_cause):
+        player.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
         time.sleep(3,)
         print(death_cause)
@@ -1828,7 +1830,7 @@ class Player:
         Choice = input(": ").strip()
         if Choice == "1":
             if "lasso" in self.itemsinventory:
-                print("You manage to lasso the stallion! Your travels feel faster now.")
+                print("You manage to lasso the stallion! Your travels feel faster now. +1 travel speed.")
                 self.travelspeed += 1
             else:
                 print("It throws you off with a vicious kick!")
@@ -2114,7 +2116,7 @@ class Player:
         loot_item = random.choice(["carved horn", "ammo belt", "gold nugget", "winchester barrel"])
         self.loot_drop(loot_item)
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
-        print("You have learned from this adventure, you become more agile.")
+        print("You have learned from this adventure, you become more agile. +1 speed.")
         time.sleep(3,)
 
     def encounter_haunted_house(self):
