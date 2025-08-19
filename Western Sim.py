@@ -788,7 +788,7 @@ class Player:
             
         elif choice == "5":
             print("You leave the jail.")
-            
+
     def TradingPost(self):
         if not self.itemsinventory:
             print("You don't have any items to sell.")
@@ -2712,7 +2712,7 @@ class Player:
         # Reset for next day
         self.day_memory = {k: None for k in self.day_memory}
         # Passive bonus check
-        entry_count = len(self.diary_entries)
+        entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
         for milestone, (title, bonus) in diary_milestones.items():
             if entry_count >= milestone and title not in self.diary_bonuses:
                 print(f"\nAs you close your journal, you feel a change within you…")
