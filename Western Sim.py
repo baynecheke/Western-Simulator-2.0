@@ -709,42 +709,86 @@ class Player:
         input("Press enter to continue:")
 
     def TownJail(self):
-        upgrades = {
-            "doctor": ("Upgrade the Doctor's Office.", 25),
-            "gunsmith": ("Upgrade the Gunsmith.", 40),
-            "saloon": ("Upgrade the Blacksmith.", 30)
-        }
-
-        print("\nYou enter the Town Hall, a quiet place where town plans are made.")
-        print("You may invest in local buildings to improve their services.")
-        print("Your investment in the chain of establishments will add up.")
-
-        while True:
-            print("\nAvailable Upgrades:")
-            for i, (key, (desc, cost)) in enumerate(upgrades.items(), 1):
-                status = " (Done)" if f"upgrade_{key}" in self.diary_bonuses else ""
-                print(f"{i}) {desc} - {cost} gold{status}")
-            print("4) Leave Town Hall")
-
-            choice = input("Choice: ").strip()
-            if choice in ["1", "2", "3"]:
-                key = list(upgrades.keys())[int(choice)-1]
-                desc, cost = upgrades[key]
-                if f"upgrade_{key}" in self.diary_bonuses:
-                    print("That building is already upgraded.")
-                    continue
-                if self.gold >= cost:
-                    self.gold -= cost
-                    self.diary_bonuses.append(f"upgrade_{key}")
-                    print(f"You invest {cost} gold into {key}. {desc}")
+        print("You walk into the town jail.")
+        print("The sheriff greets you.")
+        print("Would you like to: ")
+        print("(1) Pay a fine to reduce hostility.")
+        print("(2) Return a criminal or loot to the sheriff.")
+        print("(3) Ask the sheriff about rumors.")
+        print("(4) Ask the sheriff to teach you some skills.")
+        print("(5) Leave the jail.")
+        choice = input("Enter your choice (1-5): ").strip()
+        if choice == "1":
+            if self.Hostility > 0:
+                fine = self.Hostility * 5
+                print(f"The sheriff says, 'Your current hostility level is {self.Hostility}.")
+                print(f"To reduce it, you need to pay a fine of ${fine}.")
+                if self.gold >= fine:
+                    self.gold -= fine
+                    self.Hostility = 0
+                    print(f"You paid the fine. Your hostility is now reduced to {self.Hostility}.")
                 else:
-                    print("You don't have enough gold.")
-            elif choice == "4":
-                print("You leave the Town Hall.")
-                break
+                    print("You don't have enough gold to pay the fine.")
+            else:
+                print("You have no hostility towards the town.")
+        elif choice == "2":
+            print("You can return a criminal or loot to the sheriff.")
+        elif choice == "3":
+            print()
+        elif choice == "4":
+            print("The sheriff can teach you some skills.")
+            print("Choose a skill to learn:")
+            print("(1) Shadow Skill - Improves stealth and tracking.")
+            print("(2) Trail Skill - Improves navigation and survival.")
+            print("(3) Strength Skill - Improves combat effectiveness.")
+            print("(4) Durability Skill - Improves max Health.")
+            skill_choice = input("Enter your choice (1-3): ").strip()
+            if skill_choice == "1":
+                gold = self.shadow_skill * 5
+                print(f"The sheriff agrees to teach you for {gold}.")
+                print("Will you pay? (yes/no)")
+                choice = input(": ").strip().lower()
+                if choice == "yes":
+                    self.shadow_skill += 1
+                    print("Your shadow skill has improved! +1 shadow skill.")
+                else:
+                    print("You decided not to pay for the lesson.")
+            elif skill_choice == "2":
+                gold = self.trail_skill * 5
+                print(f"The sheriff agrees to teach you for {gold}.")
+                print("Will you pay? (yes/no)")
+                choice = input(": ").strip().lower()
+                if choice == "yes":
+                    self.trail_skill += 1
+                    print("Your trail skill has improved! +1 trail skill.")
+                else:
+                    print("You decided not to pay for the lesson.")
+            elif skill_choice == "3":
+                gold = self.strength_skill * 5
+                print(f"The sheriff agrees to teach you for {gold}.")
+                print("Will you pay? (yes/no)")
+                choice = input(": ").strip().lower()
+                if choice == "yes":
+                    self.strength_skill += 1
+                    print("Your strength skill has improved!")
+                else:
+                    print("You decided not to pay for the lesson.")
+            elif skill_choice == "4":
+                gold = (self.MaxHealth-95)/5 * 10
+                print(f"The sheriff agrees to teach you for {gold}.")
+                print("Will you pay? (yes/no)")
+                choice = input(": ").strip().lower()
+                if choice == "yes":
+                    self.MaxHealth += 5
+                    print("Your durability skill has improved! +5 max Health.")
+                else:
+                    print("You decided not to pay for the lesson.")
             else:
                 print("Invalid choice.")
-
+            
+        elif choice == "5":
+            print("You leave the jail.")
+            
     def TradingPost(self):
         if not self.itemsinventory:
             print("You don't have any items to sell.")
