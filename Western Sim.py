@@ -1399,7 +1399,7 @@ class Player:
 
     def town_encounter(self):
         if self.Tquest == "None":
-            Random = random.choice("defend town")
+            Random = random.choice(["defend town"])
             if Random == "defend town":
                 # Episode 1 not done yet?
                 if self.town_defense_outcome is None:
