@@ -211,6 +211,7 @@ class Player:
         player.quest = save_data.get("quest", [])
         player.rumors = save_data.get("rumors", {})
         player.diary_bonuses = save_data.get("diary_bonuses", [])
+        player.rumors_heard = save_data.get("rumors_heard", [])
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -255,7 +256,8 @@ class Player:
                 "Tquest": self.Tquest,
                 "quest": self.quest,
                 "rumors": self.rumors,
-                "diary_bonuses": self.diary_bonuses
+                "diary_bonuses": self.diary_bonuses,
+                "rumors_heard": self.rumors_heard,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -750,7 +752,24 @@ class Player:
             else:
                 print("You have no criminals to turn in.")
         elif choice == "3":
-            print()
+            if "sheriff_rumor" not in self.rumors_heard:
+                self.rumors_heard.append("sheriff_rumor")
+                rumor_topics = {
+                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                "old_mine_lights": "Nobody goes near the old mine anymore.",
+                "buried_gold_east": "Legend has it that there is gold east of here.",
+                }
+                topic, rumor = random.choice(list(rumor_topics.items()))
+                print(f"A patron murmurs: \"{rumor}\"")
+                self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                # Example: trigger a quest after hearing a rumor 2 times
+                if self.rumors[topic] == 5:
+                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                    self.quest.append(topic)
+            else:
+                print("He shrugs: \"I told you all that a know.\"")
+            time.sleep(2)
         elif choice == "4":
             print("The sheriff can teach you some skills.")
             print("Choose a skill to learn:")
@@ -1049,6 +1068,7 @@ class Player:
         choice = input("Choice: ").strip()
         if choice == "1":
             if "barkeeper_rumor" not in self.rumors_heard:
+                self.rumors_heard.append("barkeeper_rumor")
                 rumor_topics = {
                 "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
                 "old_mine_lights": "Strange lights seen in the old mine.",
@@ -1151,40 +1171,47 @@ class Player:
         print("3) Arm-wrestling contest")
         choice = input("Choice: ").strip()
         if choice == "1":
-            rumor_topics = {
-            "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-            "old_mine_lights": "Nobody goes near the old mine anymore.",
-            "buried_gold_east": "Legend has it that there is gold east of here.",
-            }
-            topic, rumor = random.choice(list(rumor_topics.items()))
-            print(f"A patron murmurs: \"{rumor}\"")
-            self.rumors[topic] = self.rumors.get(topic, 0) + 1
-            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-            # Example: trigger a quest after hearing a rumor 2 times
-            if self.rumors[topic] == 3:
-                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                self.quest.append(topic)
+            if "patron_rumor" not in self.rumors_heard:
+                self.rumors_heard.append("patron_rumor")
+                rumor_topics = {
+                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                "old_mine_lights": "Nobody goes near the old mine anymore.",
+                "buried_gold_east": "Legend has it that there is gold east of here.",
+                }
+                topic, rumor = random.choice(list(rumor_topics.items()))
+                print(f"A patron murmurs: \"{rumor}\"")
+                self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                # Example: trigger a quest after hearing a rumor 2 times
+                if self.rumors[topic] == 5:
+                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                    self.quest.append(topic)
+            else:
+                print("They shrug: \"We'll let you know if something happens.\"")
+            time.sleep(2)
         elif choice == "2":
             bet = input("Enter bet amount: ").strip()
             if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
                 bet = int(bet)
                 self.gold -= bet
                 if random.randint(1, self.shadow_skill) >= 3:
-                    winnings = bet * 4
+                    winnings = bet * 3
                     self.gold += winnings
                     print(f"You win! You gain {winnings} gold.")
                 else:
                     print("You lose the hand and your bet.")
+                    print("If you had been more stealthy, you might have won.")
             else:
                 print("Invalid bet.")
         elif choice == "3":
             print("You grip a burly patron's hand and push...")
             if random.randint(1, self.strength_skill) > 2:
-                prize = 15
+                prize = 5
                 print(f"You win the arm-wrestle! +{prize} gold.")
                 self.gold += prize
             else:
                 print("You lose and take a punch. -5 health.")
+                print("If you had been stronger, you might have won.")
                 self.Health -= 5
         else:
             print("No one notices your hesitation.")
