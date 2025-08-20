@@ -846,11 +846,11 @@ class Player:
 
         # --- NEW predetermined trades ---
         trade_offers = [
-            {"give": "bread", "get": "bandage"},
-            {"give": "rope", "get": "lasso"},
-            {"give": "gold nugget", "get": "silver bar"},
-            {"give": "small hide", "get": "medium hide"},
-            {"give": "rifle_ammo", "get": "shotgun_ammo"},
+            {"give": "bandage", "get": "bread"},
+            {"give": "lasso", "get": "rope"},
+            {"give": "gold nugget", "get": "field dressing kit"},
+            {"give": "medium hide", "get": "bandage"},
+            {"give": "shotgun_ammo", "get": "rifle_ammo"},
         ]
 
         self.play_sound("store_bell.mp3")
@@ -891,7 +891,7 @@ class Player:
                 # --- Swap logic (predetermined) ---
                 print("\nAvailable trades:")
                 for idx, trade in enumerate(trade_offers, 1):
-                    print(f"{idx}. Give {trade['give']} → Receive {trade['get']}")
+                    print(f"{idx}. Give {trade['give']}, Receive {trade['get']}")
 
                 trade_choice = input("Pick a trade (or 'q' to cancel): ").strip()
                 if trade_choice.lower() == "q":
@@ -1036,6 +1036,7 @@ class Player:
         print("\nYou step out of the Armory, ready for what comes next.")
 
     def Saloon(self):
+        self.play_sound("saloon door.mp3")
         print("You push open the swinging saloon doors.")
         print("The saloon is alive with music and conversation.")
         time.sleep(1)
