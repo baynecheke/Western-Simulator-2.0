@@ -10,7 +10,6 @@ pygame.mixer.init()
 class Player:
     def __init__(self):
         #Basic player stuff
-        self.applied_diary_bonuses = set()
         self.Day = 1
         self.Time = 9
         self.Speed = 3
@@ -28,7 +27,7 @@ class Player:
         self.Hostility = 0
         self.invillage = True
         self.save_name = ""
-        self.rumors = {}  # key: topic, value: count
+        self.rumors_collected = 0
 
 
         self.score = 0
@@ -449,25 +448,25 @@ class Player:
         while use_continue == True:
             print("\nYour Inventory:")
             item_descriptions = {
-                "bread": "Restores 5 health or reduces 1 hunger.",
-                "antivenom": "Cures poison if poisoned.",
-                "lantern": "Gives you 1 extra hour of time.",
-                "boots": "Increases travel speed by 1.",
-                "leather armor": "Reduces combat damage taken (90%).",
-                "chain mail": "Greatly reduces combat damage taken (70%).",
-                "lasso": "Halves the health of animal-type enemies.",
-                "fire cracker": "Halves health of pack-type enemies and stuns them.",
-                "rope": "Could be used during events.",
-                "ammo cartridge": "Gives 5 of a given ammo.",
-                "tobacco pouch": "Boosts morale: +5 to your next attack.",
-                "gun oil":       "Apply to weapon: +5 damage on next attack.",
-                "coffee tin":    "Drink for a speed boost: +1 travel speed in next combat.",
-                "gold nugget":   "A heavy nugget. Sell for a high price.",
-                "bandit's map":  "Study to reveal a hidden stash.",
-                "diary": "Open your journal and read past entries.",
-                "flashbang": "Can be thrown at enemies.",
-                "bandage": "Heals 25 health.",
-                "field dressing kit": "prevents 50% of next damage"
+                "bread": "Restores 5 health or reduces 1 hunger. Can be used outside of combat.",
+                "antivenom": "Cures poison if poisoned. Only usable outside of combat.",
+                "lantern": "Gives you 1 extra hour of time. Only usable outside of combat.",
+                "boots": "Increases travel speed by 1. Only usable outside of combat.",
+                "leather armor": "Reduces combat damage taken (90%). Only usable in combat.",
+                "chain mail": "Greatly reduces combat damage taken (70%). Only usable in combat.",
+                "lasso": "Halves the health of animal-type enemies. Only usable in combat.",
+                "fire cracker": "Halves health of pack-type enemies and stuns them. Only usable in combat.",
+                "rope": "Could be used during events. Only usable outside of combat.",
+                "ammo cartridge": "Gives 5 of a given ammo. Only usable outside of combat.",
+                "tobacco pouch": "Boosts morale: +5 to your next attack. Only usable in combat.",
+                "gun oil":       "Apply to weapon: +5 damage on next attack. Only usable in combat.",
+                "coffee tin":    "Drink for a speed boost: +1 travel speed in next combat. Only usable outside of combat.",
+                "gold nugget":   "A heavy nugget. Sell for a high price. Only usable outside of combat.",
+                "bandit's map":  "Study to reveal a hidden stash. Only usable outside of combat.",
+                "diary": "Open your journal and read past entries. Only usable outside of combat.",
+                "flashbang": "Can be thrown at enemies. Stuns them for one turn. Only usable in combat.",
+                "bandage": "Heals 25 health. Only usable outside of combat.",
+                "field dressing kit": "prevents 50% of next damage. Only usable in combat.",
             }
 
             for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
@@ -919,7 +918,7 @@ class Player:
             else:
                 print("You do not have enough gold.")
         doctor_inventory = {
-            1: {'name': 'bandage', 'price': 20, 'quantity': 5},
+            1: {'name': 'bandage', 'price': 10, 'quantity': 5},
             2: {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
             3: {'name': 'antivenom', 'price': 10, 'quantity': 5},
         }
@@ -2339,14 +2338,16 @@ class Player:
             print("An unearthly light seeps from the entire room, collecting in front of you.")
             combat = Combat(self)
             combat.FindAttacker("phantom gunslinger")
-            combat.Attack()
-            if self.Health > 0:
+            escape = combat.Attack()
+            if escape == True:
+                print("You manage to escape the Phantom Gunslinger, fleeing the building.")
+            else:
                 print("You defeated the Phantom Gunslinger! You claim his ghostly treasure.")
                 self.gold += 75
                 self.loot_drop("winchester rifle")
                 self.loot_drop("ultra_rare")
-            self.loot_drop(random.choice(self.uncommon_loot))
-            self.loot_drop(random.choice(self.common_loot))
+                self.loot_drop(random.choice(self.uncommon_loot))
+                self.loot_drop(random.choice(self.common_loot))
         time.sleep(2)
 
     def encounter_cave_of_shadows(self):
@@ -2995,7 +2996,7 @@ class Combat:
             "looter": {"health": 90, "damage": 10, "speed": 5, "loot": "rare",  "type": "human"},
             "bandit leader": {"health": 100, "damage": 35, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True},
             "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True},
-            "phantom gunslinger": {"health": 100, "damage": 25, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form"},
+            "phantom gunslinger": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form"},
             }
         self.loots = {
             "small": ["small hide", "small meat"],
