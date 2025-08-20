@@ -209,6 +209,7 @@ class Player:
         player.Tquest = save_data.get("Tquest", "None")
         player.quest = save_data.get("quest", [])
         player.rumors = save_data.get("rumors", {})
+        player.diary_bonuses = save_data.get("diary_bonuses", [])
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -253,6 +254,7 @@ class Player:
                 "Tquest": self.Tquest,
                 "quest": self.quest,
                 "rumors": self.rumors,
+                "diary_bonuses": self.diary_bonuses
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
