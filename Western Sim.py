@@ -10,6 +10,7 @@ pygame.mixer.init()
 class Player:
     def __init__(self):
         #Basic player stuff
+        self.rumors = {}
         self.Day = 1
         self.Time = 9
         self.Speed = 3
