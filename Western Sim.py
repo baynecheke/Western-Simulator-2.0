@@ -10,6 +10,7 @@ pygame.mixer.init()
 class Player:
     def __init__(self):
         #Basic player stuff
+        self.applied_diary_bonuses = set()
         self.Day = 1
         self.Time = 9
         self.Speed = 3
@@ -2777,11 +2778,11 @@ class Player:
             print("  " + l)
 
         diary_milestones = {
-            6:  ("Hopeful Spirit", "Max health +5"),
-            10:  ("Sharpened Mind", "Shadow skill +1"),
-            16:  ("Strong Constitution", "Hunger reduced by 2."),
-            20: ("Frontier Wisdom", "Travel speed +1"),
-            30: ("Iron Will", "Max health increased by 10."),
+            10:  ("Hopeful Spirit", "Max health +5"),
+            20:  ("Sharpened Mind", "Shadow skill +1"),
+            35:  ("Strong Constitution", "Hunger reduced by 2."),
+            50: ("Frontier Wisdom", "Travel speed +1"),
+            75: ("Iron Will", "Max health increased by 10."),
             }
 
 
@@ -2790,8 +2791,10 @@ class Player:
         # Passive bonus check
         entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
         for milestone, (title, bonus) in diary_milestones.items():
+            bonus = f"day_{self.Day}_bonus"
             if entry_count >= milestone and title not in self.diary_bonuses:
                 print(f"\nAs you close your journal, you feel a change within you…")
+                
                 print(f"[Diary Bonus] {title}: {bonus}")
                 self.diary_bonuses.append(title)
 
@@ -3017,6 +3020,7 @@ class Combat:
         print(f"Along the path, you spot a {self.Enemy}.")
 
     def Attack(self):
+        escape = False
         player.change_music("combat.mp3", -1)
         self.player.day_memory["encounter"] = f"a {self.Enemy}"
         if "ammo belt" in self.player.itemsinventory:
@@ -3201,6 +3205,7 @@ class Combat:
                             continue
                         if enemy_speed <= new_speed:
                             print("You manage to escape!")
+                            escape = True
                             escape_boost = 0
                             self.player.Health = round(self.player.Health)
                             self.player.Armor_Boost = 1
@@ -3209,7 +3214,8 @@ class Combat:
                                 player.change_music("Town.mp3", -1)
                             else:
                                 player.change_music("game_theme.mp3", -1)
-                            return
+                                
+                            return escape
                         else:
                             escape_boost += 1
                             print("You failed to escape!")
@@ -3234,7 +3240,7 @@ class Combat:
                         player.change_music("Town.mp3", -1)
                     else:
                         player.change_music("game_theme.mp3", -1)
-                    return
+                    return escape
                 # Enemy's turn
                 elif turn == "enemy":
                     print(f"\n--- {self.Enemy.capitalize()}'s Turn ---")
