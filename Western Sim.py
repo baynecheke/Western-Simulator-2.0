@@ -28,6 +28,7 @@ class Player:
         self.invillage = True
         self.save_name = ""
         self.rumors_collected = 0
+        self.rumors_heard = []
 
 
         self.score = 0
@@ -1047,20 +1048,22 @@ class Player:
         print("2) Buy a drink (5 gold)")
         choice = input("Choice: ").strip()
         if choice == "1":
-            rumor_topics = {
-            "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
-            "old_mine_lights": "Strange lights seen in the old mine.",
-            "buried_gold_east": "A lost prospector buried gold east of here.",
-            }
-            topic, rumor = random.choice(list(rumor_topics.items()))
-            print(f"He leans in: \"{rumor}.\"")
-            self.rumors[topic] = self.rumors.get(topic, 0) + 1
-            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+            if "barkeeper_rumor" not in self.rumors_heard:
+                rumor_topics = {
+                "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
+                "old_mine_lights": "Strange lights seen in the old mine.",
+                "buried_gold_east": "A lost prospector buried gold east of here.",
+                }
+                topic, rumor = random.choice(list(rumor_topics.items()))
+                print(f"He leans in: \"{rumor}.\"")
+                self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
             # Example: trigger a quest after hearing a rumor 2 times
-            if self.rumors[topic] == 3:
-                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-
-            self.quest.append(topic)
+                if self.rumors[topic] == 5:
+                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                    self.quest.append(topic)
+            else:
+                print("He shrugs: \"Nothing new to tell ya.\"")
         elif choice == "2":
             if self.gold >= 5:
                 self.gold -= 5
@@ -1361,7 +1364,7 @@ class Player:
 
         if "family" in self.caravan:
             self.travel_bonus += 1
-            print("The family thanks you sincerely for allowing them to travel with you, and gives you a handsome reward.")
+            print("The family thanks you sincerely for allowing them to travel with you, and gives you a handsome reward. +20 gold.")
             self.gold += 20
             self.caravan.remove("family")
         self.gold += 10
@@ -1554,7 +1557,7 @@ class Player:
         elif Random <= 15:
             self.encounter_stage_coach()
         elif Random <= 20:
-            self.encounter_hunter()
+            self.encounter_caravan()
         elif Random <= 25:
             self.encounter_abandoned_house()
         elif Random <= 30:
@@ -1580,19 +1583,29 @@ class Player:
             elif random_event == "hermit challenge":
                 self.encounter_hermit_challenge()
 
-    def encounter_hunter(self):
+    def encounter_caravan(self):
         rand = random.randint(1,2)
-        if "hunter" not in self.caravan and rand == 2:
-            print("A hunter asks if he can join your caravan.")
-            print("Will you let him? (yes/no)")
+        if "outlaw" not in self.caravan and rand == 2:
+            print("A outlaw appears on the road.")
+            print("Will you try and capture him? (yes/no)")
             choice = input(": ").strip().capitalize()
             time.sleep(2,)
             if choice == "Yes":
-                print("You accept his request and you continue down the road")
-                self.caravan.append("hunter")
+                print("You attempt to capture the outlaw.")
+                if self.strength_skill + self.Speed >= 7:
+                    print("You successfully capture the outlaw.")
+                    print("Go to the next town's jail to turn him in.")
+                else: 
+                    print("The outlaw overpowers you and escapes.")
+                    self.Health -= 10
+                    self.Hostility += 1
+                    print("You are injured in the scuffle. -10 health.")
+                    print("The townsfolk are suspicious that you 'let' him go. +1 Hostility.")
                 time.sleep(2,)
             else:
-                print("You decide to pass them by.")
+                print("You decide to ignore him.")
+                print("The townsfolk are suspicious that you let him go. +1 Hostility.")
+                self.Hostility += 1
                 time.sleep(3,)
         elif "family" not in self.caravan and rand == 1:
             print("A family is travelling in their wagon, but it appears that they have a broken wheel.")
