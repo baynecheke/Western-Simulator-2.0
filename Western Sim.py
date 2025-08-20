@@ -826,68 +826,98 @@ class Player:
 
     def TradingPost(self):
         if not self.itemsinventory:
-            print("You don't have any items to sell.")
+            print("You don't have any items to trade or sell.")
             return
+
         prices = {
-            "small hide": 5,
-            "medium hide": 10,
-            "large hide": 25,
-            "small meat": 5,
-            "medium meat": 10,
-            "large meat": 20,
-            "horn": 35,
-            "bread": 2,
-            "knife": 5,
-            "revolver": 20,
-            "colt pistol": 20,
-            "sharps rifle": 40,
-            "rifle": 15,
-            "shotgun": 25,
-            "pistol_ammo": 1,
-            "rifle_ammo": 2,
-            "shotgun_ammo": 3,
-            "lasso": 5,
-            "winchester rifle": 50,
-            "carved horn": 40,
+            "small hide": 5, "medium hide": 10, "large hide": 25,
+            "small meat": 5, "medium meat": 10, "large meat": 20,
+            "horn": 35, "bread": 2, "knife": 5,
+            "revolver": 20, "colt pistol": 20, "sharps rifle": 40,
+            "rifle": 15, "shotgun": 25,
+            "pistol_ammo": 1, "rifle_ammo": 2, "shotgun_ammo": 3,
+            "lasso": 5, "winchester rifle": 50, "carved horn": 40,
             "gold nugget": random.randint(10, 40),
             "silver watch": random.randint(5, 15),
             "silver bar": random.randint(30, 40),
-            "gold bar": random.randint(45, 75),}
+            "gold bar": random.randint(45, 75)
+        }
+
+        # --- NEW predetermined trades ---
+        trade_offers = [
+            {"give": "bread", "get": "bandage"},
+            {"give": "rope", "get": "lasso"},
+            {"give": "gold nugget", "get": "silver bar"},
+            {"give": "small hide", "get": "medium hide"},
+            {"give": "rifle_ammo", "get": "shotgun_ammo"},
+        ]
+
         self.play_sound("store_bell.mp3")
         print("You walk into the trading post.")
         print("The trader greets you.")
-        time.sleep(3,)
+        time.sleep(2)
+
         while True:
             print("\n--- Trading Post ---")
-            print("Your Inventory:")
-            for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
-                price = prices.get(item, 1)
-                print(f"{idx}. {item} (x{qty}) - Sell Price: ${price}")
+            print("1) Sell items")
+            print("2) Swap items (predetermined trades)")
+            print("3) Leave")
 
-            choice = input("Enter the number of the item you want to sell or 'q' to leave: ").strip()
+            choice = input("What would you like to do? ").strip()
 
-            if choice == "q":
+            if choice == "1":
+                # --- Sell logic ---
+                print("Your Inventory:")
+                for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
+                    price = prices.get(item, 1)
+                    print(f"{idx}. {item} (x{qty}) - Sell Price: ${price}")
+
+                sell_choice = input("Enter the number of the item you want to sell or 'q' to cancel: ").strip()
+                if sell_choice.lower() == "q":
+                    continue
+                if sell_choice.isdigit():
+                    idx = int(sell_choice)
+                    if 1 <= idx <= len(self.itemsinventory):
+                        item_to_sell = list(self.itemsinventory.keys())[idx - 1]
+                        price = prices.get(item_to_sell, 1) + self.trade_bonus
+                        self.gold += price
+                        self.itemsinventory[item_to_sell] -= 1
+                        print(f"You sold 1 {item_to_sell} for ${price}. Current gold: ${self.gold}")
+                        if self.itemsinventory[item_to_sell] <= 0:
+                            del self.itemsinventory[item_to_sell]
+
+            elif choice == "2":
+                # --- Swap logic (predetermined) ---
+                print("\nAvailable trades:")
+                for idx, trade in enumerate(trade_offers, 1):
+                    print(f"{idx}. Give {trade['give']} → Receive {trade['get']}")
+
+                trade_choice = input("Pick a trade (or 'q' to cancel): ").strip()
+                if trade_choice.lower() == "q":
+                    continue
+                if not trade_choice.isdigit():
+                    continue
+
+                trade_choice = int(trade_choice)
+                if 1 <= trade_choice <= len(trade_offers):
+                    offer = trade_offers[trade_choice - 1]
+                    if offer["give"] in self.itemsinventory:
+                        print(f"The trader will give you {offer['get']} in exchange for your {offer['give']}. Accept? (yes/no)")
+                        if input(": ").strip().lower() == "yes":
+                            # remove the offered item
+                            self.itemsinventory[offer["give"]] -= 1
+                            if self.itemsinventory[offer["give"]] <= 0:
+                                del self.itemsinventory[offer["give"]]
+                            # give the new item
+                            self.add_item(offer["get"])
+                            print(f"You traded {offer['give']} for {offer['get']}.")
+                        else:
+                            print("Trade declined.")
+                    else:
+                        print(f"You don't have a {offer['give']} to trade.")
+
+            elif choice == "3":
                 return
-            
-            if not choice.isdigit():
-                print("Invalid input.")
-                continue
-
-
-
-            choice = int(choice)
-
-            if 1 <= choice <= len(self.itemsinventory):
-                item_to_sell = list(self.itemsinventory.keys())[choice - 1]
-                price = prices.get(item_to_sell, 1)
-                price = price + self.trade_bonus
-                self.gold += price
-                self.itemsinventory[item_to_sell] -= 1
-                print(f"You sold 1 {item_to_sell} for ${price}.")
-                print(f"Current gold: ${self.gold}")
-
-                if self.itemsinventory[item_to_sell] <= 0:
-                    del self.itemsinventory[item_to_sell]
             else:
                 print("Invalid choice.")
 
