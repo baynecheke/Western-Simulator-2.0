@@ -846,7 +846,8 @@ class Player:
 
         # --- NEW predetermined trades ---
         trade_offers = [
-            {"give": "bandage", "get": "bread"},
+            {"give": "winchester barrel", "get": "winchester stock"},
+            {"give": "winchester stock", "get": "winchester barrel"},
             {"give": "lasso", "get": "rope"},
             {"give": "gold nugget", "get": "field dressing kit"},
             {"give": "medium hide", "get": "bandage"},
