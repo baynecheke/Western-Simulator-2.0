@@ -3,7 +3,6 @@ import time
 import json
 import os
 import pygame
-import yaml
 
 pygame.mixer.init()
 
