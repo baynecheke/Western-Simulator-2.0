@@ -1039,6 +1039,7 @@ class Player:
         self.play_sound("saloon door.mp3")
         print("You push open the swinging saloon doors.")
         print("The saloon is alive with music and conversation.")
+        self.change_music("Saloon_music.mp3", -1)
         time.sleep(1)
         self.saloon_entry_event()
 
@@ -1061,6 +1062,7 @@ class Player:
                 break
             time.sleep(1)
         print("You have gathered all new information.")
+        self.change_music("Town.mp3", -1)
 
     def saloon_entry_event(self):
         roll = random.randint(1,5)
