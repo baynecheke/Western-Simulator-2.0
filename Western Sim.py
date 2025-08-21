@@ -3194,9 +3194,8 @@ class Player:
                 print("\nChoose your action:")
                 print("1) Climb onto the roof and shoot at mounted bandits.")
                 print("2) Defend inside the passenger cars.")
-                print("3) Take cover behind crates.")
+                print("3) Take cover and heal behind crates.")
                 print("4) Rush forward and fight in melee.")
-                print("5) Rest and heal.")
 
                 choice = input(": ").strip()
 
@@ -3259,6 +3258,8 @@ class Player:
                 # --- Option 3: Take cover ---
                 elif choice == "3":
                     print("You duck behind heavy crates in the cargo car.")
+                    print("You tend to your wounds.")
+                    self.Health += 15
                     if random.randint(1, 10) <= self.shadow_skill + 2:
                         print("Bullets ping off the steel — you stay safe for now.")
                     else:
