@@ -128,6 +128,8 @@ class Player:
         self.cheat_code = False
         self.Tquest = "None"  
         self.quest = []
+        self.Tquest = "None"
+        self.iron_stage = None
         self.boots_used = False
         self.town_defense_outcome   = None
         self.town_aftermath_outcome = None
@@ -1415,6 +1417,25 @@ class Player:
             if self.town_aftermath_outcome and self.town_final_outcome is None:
                 self.encounter_town_part3()
                 return
+            if self.Tquest == "iron_tracks":
+                if self.iron_stage == 1:
+                    self.encounter_iron_stage1()
+                    return
+                elif self.iron_stage == 2:
+                    self.encounter_iron_stage2()
+                    return
+                elif self.iron_stage == 3:
+                    self.encounter_iron_stage3()
+                    return
+                elif self.iron_stage == 4:
+                    self.encounter_iron_stage4()
+                    return
+                elif self.iron_stage == 5:
+                    self.encounter_iron_stage5()
+                    return
+                else:
+                    self.encounter_iron_intro()
+                    return
 
     def ArriveTown(self):
         name = f"{random.choice(self.TownNames1)} {random.choice(self.TownNames2)}"
@@ -3037,6 +3058,8 @@ class Player:
         print(f"You lose {health_loss} health from poor conditions in the cell.")
 
         time.sleep(2)
+
+
 
 
 class Combat:
