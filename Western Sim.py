@@ -3211,7 +3211,7 @@ class Player:
                             print("A rider drops, his horse veering off!")
                             mounted_bandits -= 1
                         else:
-                            print("You miss! A shot grazes you.")
+                            print("You miss! A shot grazes you. -8hp")
                             self.Health -= 8
                     elif any(item in self.weapons["shotgun"] for item in self.itemsinventory):
                         print("You blast your shotgun downward at the riders!")
@@ -3219,7 +3219,7 @@ class Player:
                             print("A rider is blown clean off his saddle!")
                             mounted_bandits -= 1
                         else:
-                            print("Pellets scatter wide. A return shot hits your arm!")
+                            print("Pellets scatter wide. A return shot hits your arm! -6hp")
                             self.Health -= 6
                     elif any(item in self.weapons["revolver"] for item in self.itemsinventory):
                         print("You fire your revolver rapidly!")
@@ -3227,10 +3227,10 @@ class Player:
                             print("One rider tumbles off his horse!")
                             mounted_bandits -= 1
                         else:
-                            print("You miss under pressure. A rider's bullet clips you!")
+                            print("You miss under pressure. A rider's bullet clips you! -5hp")
                             self.Health -= 5
                     else:
-                        print("You have no gun! The riders fire at you mercilessly.")
+                        print("You have no gun! The riders fire at you mercilessly. -10 hp")
                         self.Health -= 10
 
                 # --- Option 2: Defend inside cars ---
@@ -3245,14 +3245,14 @@ class Player:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
                         else:
-                            print("The bandit shoots first, grazing your shoulder.")
+                            print("The bandit shoots first, grazing your shoulder! -8hp")
                             self.Health -= 8
                     else:
                         if random.randint(1, 10) <= self.strength + 1:
                             print("You wrestle a bandit to the ground and knock him cold!")
                             bandits_in_car -= 1
                         else:
-                            print("He clubs you with his revolver butt!")
+                            print("He clubs you with his revolver butt! -6hp")
                             self.Health -= 6
 
                 # --- Option 3: Take cover ---
@@ -3263,7 +3263,7 @@ class Player:
                     if random.randint(1, 10) <= self.shadow_skill + 2:
                         print("Bullets ping off the steel — you stay safe for now.")
                     else:
-                        print("A stray shot punches through, grazing you!")
+                        print("A stray shot punches through, grazing you! -4hp")
                         self.Health -= 4
 
                 # --- Option 4: Melee rush ---
@@ -3274,12 +3274,12 @@ class Player:
                             print("You knock a bandit out cold in brutal close combat!")
                             bandits_in_car -= 1
                         else:
-                            print("He smashes you with the butt of his gun!")
+                            print("He smashes you with the butt of his gun! -7hp")
                             self.Health -= 7
                     else:
                         print("There's nobody nearby to fight in melee!")
                 elif choice == "5":
-                    print("You take a moment to catch your breath and tend to your wounds.")
+                    print("You take a moment to catch your breath and tend to your wounds. +15hp")
                     self.Health += 15
                 else:
                     print("Invalid choice.")
@@ -3295,7 +3295,7 @@ class Player:
                     bandits_in_car += 1
                 elif mounted_bandits > 0 and Random == 3:
                     print("The bandits attempt to shoot you while riding.")
-                    self.Health -= 5
+                    self.Health -= 10
                     print("You lost 10 health.")
                 else:
                     print("You gain a moment of respite.")
@@ -3305,23 +3305,28 @@ class Player:
                     car_health -= 15
 
                 # --- Check for defeat ---
-                if self.Health <= 0:
-                    print("You collapse on the train floor. The bandits overrun it.")
-                    print("A passenger revives you.")
-                    self.Health = 20
+                if self.Health <= 0 or car_health <= 0:
+                    if self.Health <= 0:
+                        print("You collapse on the train floor. The bandits overrun it.")
+                        print("A passenger revives you, but the bandits have already left with the loot.")
+                        self.Health = 20
+                        self.iron_bonus -= 2
+                    else:
+                        self.iron_bonus -= 1
+                        print("The car burns around you.")
+                        print("The bandits have already taken everything of value.")
                     return
 
                 # --- Check for victory ---
                 if mounted_bandits <= 0 and bandits_in_car <= 0:
                     print("\nThe last bandit falls! The train passengers cheer your bravery!")
-                    self.gold += 50
-                    self.loot_drop("revolver")
-                    self.iron_stage = 4
-                    return
+                    break
 
             else:
-                print("The bandits overwhelm the train. You are cast into the dust.")
-                self.Tquest = "None"
+                self.gold += 50
+                self.loot_drop("revolver")
+                self.iron_stage = 4
+                
         else:
             print("You stay behind. The train arrives looted, passengers shaken.")
             self.Hostility += 2
