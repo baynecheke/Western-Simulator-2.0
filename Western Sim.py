@@ -47,6 +47,7 @@ class Player:
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
         self.enemy_effects = []
+        self.player_effects = []
         self.TownUpgrades = []
 
     #loots
@@ -212,6 +213,8 @@ class Player:
         player.rumors = save_data.get("rumors", {})
         player.diary_bonuses = save_data.get("diary_bonuses", [])
         player.rumors_heard = save_data.get("rumors_heard", [])
+        player.enemy_effects = save_data.get("enemy_effects", [])
+        player.player_effects = save_data.get("player_effects", [])
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -258,6 +261,8 @@ class Player:
                 "rumors": self.rumors,
                 "diary_bonuses": self.diary_bonuses,
                 "rumors_heard": self.rumors_heard,
+                "enemy_effects": self.enemy_effects,
+                "player_effects": self.player_effects,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -680,7 +685,7 @@ class Player:
 
                 elif selected_item == "field dressing kit":
                     print("You quickly apply a field dressing, bracing for the next attack.")
-                    self.Armor_Boost = 0.5  # halves incoming damage
+                    self.player_effects.append("half_incoming_damage")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
