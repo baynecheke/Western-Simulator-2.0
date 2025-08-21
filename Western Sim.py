@@ -3150,14 +3150,139 @@ class Player:
 
         if choice == "1":
             print("You climb aboard as the train whistles into the valley...")
-            combat = Combat(self)
-            combat.FindAttacker("bandit leader")
-            combat.Attack()
-            if self.Health > 0:
-                print("You hold the line as the bandits swarm the cars.")
-                self.gold += 50
-                self.loot_drop("revolver")
-                self.iron_stage = 4
+            mounted_bandits = 5   # riders outside
+            bandits_in_car = 2    # already onboard
+            car_health = 100
+            turns_elapsed = 0
+            while car_health > 0 and turns_elapsed < 5:
+                print(f"\nMounted bandits outside: {mounted_bandits}")
+                print(f"Bandits in passenger cars: {bandits_in_car}")
+                print(f"Your Health: {self.Health}")
+
+                print("\nChoose your action:")
+                print("1) Climb onto the roof and shoot at mounted bandits.")
+                print("2) Defend inside the passenger cars.")
+                print("3) Take cover behind crates.")
+                print("4) Rush forward and fight in melee.")
+
+                choice = input(": ").strip()
+
+                # --- Option 1: Shoot from roof ---
+                if choice == "1":
+                    if mounted_bandits <= 0:
+                        print("No mounted bandits left to shoot at!")
+                        continue
+
+                    if "rifle" in self.itemsinventory or "winchester rifle" in self.itemsinventory:
+                        print("You fire your rifle from the rooftop!")
+                        if random.randint(1, 10) <= self.trail_skill + 3:
+                            print("A rider drops, his horse veering off!")
+                            mounted_bandits -= 1
+                        else:
+                            print("You miss! A shot grazes you.")
+                            self.Health -= 8
+                    elif "shotgun" in self.itemsinventory:
+                        print("You blast your shotgun downward at the riders!")
+                        if random.randint(1, 10) <= self.trail_skill + 2:
+                            print("A rider is blown clean off his saddle!")
+                            mounted_bandits -= 1
+                        else:
+                            print("Pellets scatter wide. A return shot hits your arm!")
+                            self.Health -= 6
+                    elif "revolver" in self.itemsinventory or "colt pistol" in self.itemsinventory:
+                        print("You fire your revolver rapidly!")
+                        if random.randint(1, 10) <= self.trail_skill + 1:
+                            print("One rider tumbles off his horse!")
+                            mounted_bandits -= 1
+                        else:
+                            print("You miss under pressure. A rider's bullet clips you!")
+                            self.Health -= 5
+                    else:
+                        print("You have no gun! The riders fire at you mercilessly.")
+                        self.Health -= 10
+
+                # --- Option 2: Defend inside cars ---
+                elif choice == "2":
+                    if bandits_in_car <= 0:
+                        print("No bandits are inside the cars right now.")
+                        continue
+
+                    print("You rush into the passenger car where bandits terrorize civilians!")
+                    if "knife" in self.itemsinventory:
+                        if random.randint(1, 10) <= self.speed + 2:
+                            print("You slash a bandit and throw him out the window!")
+                            bandits_in_car -= 1
+                        else:
+                            print("The bandit shoots first, grazing your shoulder.")
+                            self.Health -= 8
+                    else:
+                        if random.randint(1, 10) <= self.strength + 1:
+                            print("You wrestle a bandit to the ground and knock him cold!")
+                            bandits_in_car -= 1
+                        else:
+                            print("He clubs you with his revolver butt!")
+                            self.Health -= 6
+
+                # --- Option 3: Take cover ---
+                elif choice == "3":
+                    print("You duck behind heavy crates in the cargo car.")
+                    if random.randint(1, 10) <= self.shadow_skill + 2:
+                        print("Bullets ping off the steel — you stay safe for now.")
+                    else:
+                        print("A stray shot punches through, grazing you!")
+                        self.Health -= 4
+
+                # --- Option 4: Melee rush ---
+                elif choice == "4":
+                    print("You charge forward, fists swinging!")
+                    if bandits_in_car > 0:
+                        if random.randint(1, 10) <= self.strength + 2:
+                            print("You knock a bandit out cold in brutal close combat!")
+                            bandits_in_car -= 1
+                        else:
+                            print("He smashes you with the butt of his gun!")
+                            self.Health -= 7
+                    else:
+                        print("There's nobody nearby to fight in melee!")
+
+                else:
+                    print("Invalid choice.")
+                    turns_elapsed -= 1
+                    continue
+                turns_elapsed += 1
+
+                # --- Bandit boarding mechanic ---
+                Random = random.randint(1, 4)
+                if mounted_bandits > 0 and Random <= 2:
+                    print("A rider leaps onto the train roof and drops into a car!")
+                    mounted_bandits -= 1
+                    bandits_in_car += 1
+                elif mounted_bandits > 0 and Random == 3:
+                    print("The bandits attempt to shoot you while riding.")
+                    self.Health -= 5
+                    print("You lost 10 health.")
+                else:
+                    print("You gain a moment of respite.")
+
+                if bandits_in_car > 0:
+                    print("Bandits are still looting the car!")
+                    car_health -= 15
+
+                # --- Check for defeat ---
+                if self.Health <= 0:
+                    print("You collapse on the train floor. The bandits overrun it.")
+                    print("A passenger revives you.")
+                    self.Health = 20
+                    return
+
+                # --- Check for victory ---
+                if mounted_bandits <= 0 and bandits_in_car <= 0:
+                    print("\nThe last bandit falls! The train passengers cheer your bravery!")
+                    self.gold += 50
+                    self.loot_drop("revolver")
+                    self.iron_stage = 4
+                    return
+
             else:
                 print("The bandits overwhelm the train. You are cast into the dust.")
                 self.Tquest = "None"
