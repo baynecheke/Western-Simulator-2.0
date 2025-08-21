@@ -129,8 +129,7 @@ class Player:
         self.cheat_code = False
         self.Tquest = "None"  
         self.quest = []
-        self.Tquest = "None"
-        self.iron_stage = None
+        self.iron_stage = 0
         self.boots_used = False
         self.town_defense_outcome   = None
         self.town_aftermath_outcome = None
@@ -3064,7 +3063,162 @@ class Player:
 
         time.sleep(2)
 
+    def encounter_iron_intro(self):
+        print("At the saloon, you overhear a group of railroad men talking.")
+        print("'Tracks are coming through this territory... but bandits don't like progress.'")
+        choice = input("Do you agree to help the railroad? (yes/no): ").strip().lower()
+        if choice == "yes":
+            print("You agree to aid the foreman in keeping the line safe.")
+            self.Tquest = "iron_tracks"
+            self.iron_stage = 1
+            print("They give you a reward of 10 gold and a box of ammo cartridges.")
+            self.gold += 10
+            self.loot_drop("ammo cartridge")
+            self.iron_bonus += 2
+        else:
+            print("You shake your head. The railroad men mutter that you're missing an opportunity.")
+            self.Tquest = "None"
 
+    def encounter_iron_stage1(self):
+        print("The railroad foreman storms into town.")
+        print("'A wagon full of steel rails and tools never arrived. Bandits must've taken it!'")
+        print("Options:")
+        print("1) Track the missing wagon.")
+        print("2) Refuse to help.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            print("You ride out and find the wagon under bandit guard!")
+            combat = Combat(self)
+            combat.FindAttacker("bandit")
+            escape = combat.Attack()
+            if escape == False:
+                print("You defeat the bandits and recover the supplies.")
+                self.gold += 20
+                self.loot_drop("ammo cartridge")
+                self.iron_bonus += 1
+            else:
+                print("You retreat to save yourself.")
+                self.Tquest = "None"
+                self.iron_bonus -= 1
+        else:
+            print("The foreman scowls. 'Fine, I'll find someone else.'")
+            self.iron_bonus -= 2
+        self.iron_stage = 2
+            
+
+    def encounter_iron_stage2(self):
+        print("Night falls. You hear shouting at the new train depot!")
+        print("Options:")
+        print("1) Investigate the depot.")
+        print("2) Stay away.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            print("You sneak into the depot and spot saboteurs planting dynamite.")
+            if random.randint(1,10) <= self.shadow_skill + 2:
+                print("You catch one saboteur alive. He blurts out about a coming train heist.")
+                self.iron_stage = 3
+            else:
+                print("The saboteurs notice you! A fight breaks out.")
+                combat = Combat(self)
+                combat.FindAttacker("saboteur")
+                combat.Attack()
+                if self.Health > 0:
+                    print("You stop the sabotage, but the plot deepens.")
+                    self.iron_stage = 3
+                else:
+                    print("You fall at the depot. The railroad effort is doomed.")
+                    self.Tquest = "None"
+        else:
+            print("You ignore the commotion. In the morning, the depot lies in ruins.")
+            self.Hostility += 1
+            self.Tquest = "None"
+
+    def encounter_iron_stage3(self):
+        print("Word spreads: the first train is rolling in with gold and passengers.")
+        print("Bandits plan a heist! The foreman begs for your help.")
+        print("Options:")
+        print("1) Defend the train.")
+        print("2) Let the bandits have it.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            print("You climb aboard as the train whistles into the valley...")
+            combat = Combat(self)
+            combat.FindAttacker("bandit leader")
+            combat.Attack()
+            if self.Health > 0:
+                print("You hold the line as the bandits swarm the cars.")
+                self.gold += 50
+                self.loot_drop("revolver")
+                self.iron_stage = 4
+            else:
+                print("The bandits overwhelm the train. You are cast into the dust.")
+                self.Tquest = "None"
+        else:
+            print("You stay behind. The train arrives looted, passengers shaken.")
+            self.Hostility += 2
+            self.Tquest = "None"
+
+    def encounter_iron_stage4(self):
+        print("The railroad foreman rushes to you. 'They're going to blow the bridge!'")
+        print("Options:")
+        print("1) Race ahead with guards to stop the dynamite gang.")
+        print("2) Ignore it.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("saboteur chief")
+            combat.Attack()
+            if self.Health > 0:
+                print("You save the bridge! The train can continue.")
+                self.iron_stage = 5
+            else:
+                print("You fall. The bridge collapses. The railroad halts here forever.")
+                self.Tquest = "None"
+        else:
+            print("You turn away. Hours later, the bridge collapses with a thunderous roar.")
+            self.Hostility += 2
+            self.Tquest = "None"
+
+    def encounter_iron_stage5(self):
+        print("A notorious outlaw, the Dynamite Kid, rides into town with crates of explosives.")
+        print("He plans to stop the railroad once and for all.")
+        print("Options:")
+        print("1) Confront him in the streets.")
+        print("2) Try to ambush him.")
+        print("3) Walk away.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("dynamite kid")
+            combat.Attack()
+            if self.Health > 0:
+                print("You defeat the Dynamite Kid in a blazing showdown!")
+                self.gold += 100
+                self.loot_drop("railway rifle")
+                print("The railroad is saved. Fast travel between towns is now safer!")
+            else:
+                print("The Dynamite Kid plants his bombs. The town burns.")
+                self.Hostility += 3
+        elif choice == "2":
+            if random.randint(1,10) <= self.shadow_skill:
+                print("You ambush him successfully, taking his explosives.")
+                self.loot_drop("ammo belt")
+                self.gold += 75
+            else:
+                print("The ambush fails. You're caught in a blast!")
+                self.Health -= 30
+        else:
+            print("You walk away. By dusk, explosions echo across the prairie.")
+            self.Hostility += 2
+
+        # Quest complete
+        self.Tquest = "None"
+        self.iron_stage = None
 
 
 class Combat:
