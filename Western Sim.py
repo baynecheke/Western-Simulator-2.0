@@ -49,6 +49,38 @@ class Player:
         self.enemy_effects = []
         self.player_effects = []
         self.TownUpgrades = []
+        #classifications
+        weapons = {
+            "melee": [
+                "knife",
+                "tomahawk",
+                "cavalry saber"
+            ],
+            "revolver": [
+                "revolver",
+                "colt pistol",
+                "derringer pistol",
+                "colt navy revolver",
+                "remington pistol"
+            ],
+            "rifle": [
+                "rifle",
+                "winchester rifle",
+                "henry rifle",
+                "carbine rifle",
+                "sharps rifle",
+                "lever-action rifle"
+            ],
+            "shotgun": [
+                "shotgun",
+                "double barrel shotgun",
+                "sawed-off shotgun"
+            ]
+        }
+
+
+
+
 
     #loots
         self.common_loot = [
@@ -3154,7 +3186,7 @@ class Player:
             bandits_in_car = 2    # already onboard
             car_health = 100
             turns_elapsed = 0
-            while car_health > 0 and turns_elapsed < 5:
+            while car_health > 0 and turns_elapsed < 7:
                 print(f"\nMounted bandits outside: {mounted_bandits}")
                 print(f"Bandits in passenger cars: {bandits_in_car}")
                 print(f"Your Health: {self.Health}")
@@ -3164,6 +3196,7 @@ class Player:
                 print("2) Defend inside the passenger cars.")
                 print("3) Take cover behind crates.")
                 print("4) Rush forward and fight in melee.")
+                print("5) Rest and heal.")
 
                 choice = input(": ").strip()
 
@@ -3173,7 +3206,7 @@ class Player:
                         print("No mounted bandits left to shoot at!")
                         continue
 
-                    if "rifle" in self.itemsinventory or "winchester rifle" in self.itemsinventory:
+                    if any(item in self.weapons["rifle"] for item in self.itemsinventory):
                         print("You fire your rifle from the rooftop!")
                         if random.randint(1, 10) <= self.trail_skill + 3:
                             print("A rider drops, his horse veering off!")
@@ -3181,7 +3214,7 @@ class Player:
                         else:
                             print("You miss! A shot grazes you.")
                             self.Health -= 8
-                    elif "shotgun" in self.itemsinventory:
+                    elif any(item in self.weapons["shotgun"] for item in self.itemsinventory):
                         print("You blast your shotgun downward at the riders!")
                         if random.randint(1, 10) <= self.trail_skill + 2:
                             print("A rider is blown clean off his saddle!")
@@ -3189,7 +3222,7 @@ class Player:
                         else:
                             print("Pellets scatter wide. A return shot hits your arm!")
                             self.Health -= 6
-                    elif "revolver" in self.itemsinventory or "colt pistol" in self.itemsinventory:
+                    elif any(item in self.weapons["revolver"] for item in self.itemsinventory):
                         print("You fire your revolver rapidly!")
                         if random.randint(1, 10) <= self.trail_skill + 1:
                             print("One rider tumbles off his horse!")
@@ -3208,7 +3241,7 @@ class Player:
                         continue
 
                     print("You rush into the passenger car where bandits terrorize civilians!")
-                    if "knife" in self.itemsinventory:
+                    if any(item in self.weapons["melee"] for item in self.itemsinventory):
                         if random.randint(1, 10) <= self.speed + 2:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
@@ -3244,7 +3277,9 @@ class Player:
                             self.Health -= 7
                     else:
                         print("There's nobody nearby to fight in melee!")
-
+                elif choice == "5":
+                    print("You take a moment to catch your breath and tend to your wounds.")
+                    self.Health += 15
                 else:
                     print("Invalid choice.")
                     turns_elapsed -= 1
