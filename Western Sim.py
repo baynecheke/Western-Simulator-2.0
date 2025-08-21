@@ -130,6 +130,7 @@ class Player:
         self.Tquest = "None"  
         self.quest = []
         self.iron_stage = 0
+        self.iron_bonus = 0
         self.boots_used = False
         self.town_defense_outcome   = None
         self.town_aftermath_outcome = None
@@ -216,6 +217,8 @@ class Player:
         player.rumors_heard = save_data.get("rumors_heard", [])
         player.enemy_effects = save_data.get("enemy_effects", [])
         player.player_effects = save_data.get("player_effects", [])
+        player.iron_bonus = save_data.get("iron_bonus", 0)
+        player.iron_stage = save_data.get("iron_stage", 0)
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -264,6 +267,8 @@ class Player:
                 "rumors_heard": self.rumors_heard,
                 "enemy_effects": self.enemy_effects,
                 "player_effects": self.player_effects,
+                "iron_bonus": self.iron_bonus,
+                "iron_stage": self.iron_stage,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
