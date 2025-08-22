@@ -29,6 +29,7 @@ class Player:
         self.save_name = ""
         self.rumors_collected = 0
         self.rumors_heard = []
+        self.rebirth = False
 
 
         self.score = 0
@@ -221,6 +222,7 @@ class Player:
         player = cls()
 
         # Restore saved data
+        player.rebirth = save_data.get("rebirth", False)
         player.gold = save_data.get("gold", 0)
         player.itemsinventory = save_data.get("itemsinventory", {})
         player.distancenext = save_data.get("distancenext", 0)
@@ -301,6 +303,7 @@ class Player:
                 "player_effects": self.player_effects,
                 "iron_bonus": self.iron_bonus,
                 "iron_stage": self.iron_stage,
+                "rebirth": self.rebirth,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -1547,20 +1550,25 @@ class Player:
         print("You fall to the ground, your vision fading...")
         time.sleep(3,)
         print(death_cause)
-        print("Your stats:")
-        print(f"Days survived: {self.Day}")
-        print(f"Score: {self.score}")
-        input("Press Enter to continue...")
-        self.Statcheck()
-        print("You have come so far, would you like to respawn at your current position? (yes/no)")
-        print("You will no longer track score.")
-        choice = input(": ").strip().lower()
-        if choice == "yes":
-            self.lose_random_item(1)
-            self.gold -= self.gold/2
-            print("You feel a strange sensation, as if you are being pulled back to life...")
-            self.Health = self.MaxHealth/2
-            return
+        if self.rebirth == True:
+            print("You have already respawned once.")
+            print("You feel your life slipping away, and you know this is the end.")
+        else:
+            print("Your stats:")
+            print(f"Days survived: {self.Day}")
+            print(f"Score: {self.score}")
+            input("Press Enter to continue...")
+            self.Statcheck()
+            print("You have come so far, would you like to respawn at your current position? (yes/no)")
+            print("You will no longer track score.")
+            choice = input(": ").strip().lower()
+            if choice == "yes":
+                self.lose_random_item(2)
+                self.gold -= self.gold/2
+                print("You feel a strange sensation, as if you are being pulled back to life...")
+                self.Health = self.MaxHealth
+                self.rebirth = True
+                return
         print("Would you like to restart the game? (yes/no)")
         choice = input(": ").strip().lower()
  
@@ -1569,7 +1577,7 @@ class Player:
         time.sleep(1,)
         print("Music/audio effects: Freesound.com")
         time.sleep(1,)
-        print("Playtesters: Deric R Cheke, Dax Cheke me!!!, Jessica Cheke, Silas Cheke")
+        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke")
         time.sleep(1,)
         print("Other contributions: ChatGPT")
         time.sleep(1,)
@@ -2483,7 +2491,7 @@ class Player:
                 print("You defeated the Phantom Gunslinger! You claim his ghostly treasure.")
                 self.gold += 75
                 self.loot_drop("winchester rifle")
-                self.loot_drop("ultra_rare")
+                self.loot_drop(random.choice(self.ultra_rare_loot))
                 self.loot_drop(random.choice(self.uncommon_loot))
                 self.loot_drop(random.choice(self.common_loot))
         time.sleep(2)
@@ -3182,6 +3190,7 @@ class Player:
 
         if choice == "1":
             print("You climb aboard as the train whistles into the valley...")
+            print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
             mounted_bandits = 5   # riders outside
             bandits_in_car = 2    # already onboard
             car_health = 100
@@ -3302,7 +3311,7 @@ class Player:
 
                 if bandits_in_car > 0:
                     print("Bandits are still looting the car!")
-                    car_health -= 15
+                    car_health -= bandits_in_car * 10
 
                 # --- Check for defeat ---
                 if self.Health <= 0 or car_health <= 0:
@@ -3323,8 +3332,10 @@ class Player:
                     break
 
             else:
-                self.gold += 50
-                self.loot_drop("revolver")
+                print("\nThe train arrives safely at the next station.")
+                print("You helped save the railroad! The foreman rewards you handsomely. +35 gold")
+                self.gold += 35
+                self.loot_drop(random.choice(self.rare_loot))
                 self.iron_stage = 4
                 
         else:
