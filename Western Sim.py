@@ -1445,14 +1445,15 @@ class Player:
                 self.Interaction()
 
     def town_encounter(self):
-        if self.Tquest == "None":
-            Random = random.choice(["defend town"])
-            if Random == "defend town":
+        quest_chance = random.randint(1, 3)
+        if self.Tquest == "None" and quest_chance >= 3:
+            Random = random.choice(["defend_town","iron_tracks"])
+            if Random == "defend_town":
                 # Episode 1 not done yet?
                 if self.town_defense_outcome is None:
                     self.encounter_town_part1()
                     return
-        if self.Tquest ==  "defend town":
+        if self.Tquest == "defend_town":
             # Episode 2 pending?
             if self.town_defense_outcome and self.town_aftermath_outcome is None:
                 self.encounter_town_part2()
@@ -1461,25 +1462,25 @@ class Player:
             if self.town_aftermath_outcome and self.town_final_outcome is None:
                 self.encounter_town_part3()
                 return
-            if self.Tquest == "iron_tracks":
-                if self.iron_stage == 1:
-                    self.encounter_iron_stage1()
-                    return
-                elif self.iron_stage == 2:
-                    self.encounter_iron_stage2()
-                    return
-                elif self.iron_stage == 3:
-                    self.encounter_iron_stage3()
-                    return
-                elif self.iron_stage == 4:
-                    self.encounter_iron_stage4()
-                    return
-                elif self.iron_stage == 5:
-                    self.encounter_iron_stage5()
-                    return
-                else:
-                    self.encounter_iron_intro()
-                    return
+        elif self.Tquest == "iron_tracks":
+            if self.iron_stage == 1:
+                self.encounter_iron_stage1()
+                return
+            elif self.iron_stage == 2:
+                self.encounter_iron_stage2()
+                return
+            elif self.iron_stage == 3:
+                self.encounter_iron_stage3()
+                return
+            elif self.iron_stage == 4:
+                self.encounter_iron_stage4()
+                return
+            elif self.iron_stage == 5:
+                self.encounter_iron_stage5()
+                return
+            else:
+                self.encounter_iron_intro()
+                return
 
     def ArriveTown(self):
         name = f"{random.choice(self.TownNames1)} {random.choice(self.TownNames2)}"
@@ -1498,13 +1499,9 @@ class Player:
         self.possibleactions = self.BasePossibleActions[:-1]
         self.score = self.score + 5
         time.sleep(2)
-        Random = random.randint(1,3)
-        if self.town_defense_outcome is not None:
-            self.town_encounter()
-            return
-        elif Random == 1:
-            self.town_encounter()
-            return
+        self.town_encounter()
+
+
           
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
