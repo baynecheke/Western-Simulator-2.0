@@ -467,6 +467,8 @@ class Player:
                 combat = Combat(self)
                 combat.FindAttacker("phantom gunslinger")
                 combat.Attack()
+            if choice == "120":
+                self.town_encounter()
 
             if choice in valid_choices:
                 return self.Number(choice)
@@ -1495,6 +1497,8 @@ class Player:
             self.gold += 20
             self.caravan.remove("family")
         self.gold += 10
+        print("You feel a sense of relief as you enter the town.")
+        print("You gain 10 gold from your travels.")
         self.invillage = True
         self.possibleactions = self.BasePossibleActions[:-1]
         self.score = self.score + 5
