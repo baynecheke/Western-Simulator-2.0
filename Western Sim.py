@@ -1454,6 +1454,8 @@ class Player:
                 # Episode 1 not done yet?
                 if self.town_defense_outcome is None:
                     self.encounter_town_part1()
+            elif Random == "iron_tracks":
+                    self.encounter_iron_intro()
                     return
         if self.Tquest == "defend_town":
             # Episode 2 pending?
@@ -1504,9 +1506,7 @@ class Player:
         self.score = self.score + 5
         time.sleep(2)
         self.town_encounter()
-
-
-          
+      
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
         print("You walk into the general store. A friendly shopkeeper greets you.")
@@ -2082,7 +2082,7 @@ class Player:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
         time.sleep(2)
-        self.Tquest == "defend town"
+        self.Tquest == "defend_town"
 
     def encounter_town_part2(self):
         if self.town_defense_outcome is None:
