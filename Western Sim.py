@@ -468,7 +468,7 @@ class Player:
                 combat.FindAttacker("phantom gunslinger")
                 combat.Attack()
             if choice == "120":
-                self.town_encounter()
+                self.encounter_iron_stage3()
 
             if choice in valid_choices:
                 return self.Number(choice)
@@ -3343,18 +3343,21 @@ class Player:
 
                 # --- Bandit boarding mechanic ---
                 Random = random.randint(1, 4)
-                if mounted_bandits > 0 and Random <= 2:
+                if  Random <= 2:
                     print("A rider leaps onto the train roof and drops into a car!")
-                    if mounted_bandits < 2:
+                    if mounted_bandits > 2:
                         mounted_bandits -= 1
                         bandits_in_car += 1
-                elif mounted_bandits > 0 and Random == 3:
-                    print("The bandits attempt to shoot you while riding.")
-                    if random.randint(1, 10) <= self.shadow_skill:
-                        print("You dodge the bullets!")
+                elif Random == 3:
+                    if mounted_bandits > 0:
+                        print("The bandits attempt to shoot you while riding.")
+                        if random.randint(1, 10) <= self.shadow_skill:
+                            print("You dodge the bullets!")
+                        else:
+                            self.Health -= 15
+                            print("You lost 15 health.")
                     else:
-                        self.Health -= 15
-                        print("You lost 15 health.")
+                        print("No bandits are mounted.")
                 else:
                     print("You gain a moment of respite.")
 
@@ -3389,7 +3392,6 @@ class Player:
                 self.loot_drop(random.choice(self.rare_loot))
                 self.iron_stage = 4
             if bonus_used == True:
-                print("You feel a surge of power from your iron reserves!")
                 self.MaxHealth -= 20
 
         else:
