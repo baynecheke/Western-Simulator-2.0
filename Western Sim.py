@@ -51,7 +51,7 @@ class Player:
         self.player_effects = []
         self.TownUpgrades = []
         #classifications
-        weapons = {
+        self.weapons = {
             "melee": [
                 "knife",
                 "tomahawk",
