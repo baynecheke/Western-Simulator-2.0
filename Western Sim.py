@@ -322,7 +322,7 @@ class Player:
                 print("In this game you will try and survive the western life and complete quests.")
                 time.sleep(2,)
                 print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
-                time.sleep(3,)
+                time.sleep(2,)
                 print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
                 choice = input(": ").strip()
                 if choice == "1":
@@ -331,7 +331,7 @@ class Player:
                     player.difficulty = 'savage'
                 else:
                     player.difficulty = 'frontier'
-                time.sleep(3,)
+                time.sleep(2,)
                 print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
                 time.sleep(2,)
                 print("Others like the knife and armor have unlimited uses.")
@@ -378,7 +378,7 @@ class Player:
                 player.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
             player.Hunger = player.Hunger + 1
             print("You feel hungrier...")
-            time.sleep(3,)
+            time.sleep(2,)
             if player.Hunger >= 3:
                 print("You stagger, feeling the effects of your ravenous hunger.")
                 hunger_damage = player.Hunger*5
@@ -737,7 +737,7 @@ class Player:
                     print(f"You can't use {selected_item} right now.")
                     time.sleep(2,)
                                 
-            time.sleep(3,)
+            time.sleep(2,)
 
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
@@ -974,7 +974,7 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You walk into the blacksmith.")
         print("The smith gives you a nod.")
-        time.sleep(3,)
+        time.sleep(2,)
         inventory = {
             1: {'name': 'leather armor', 'price': 35, 'quantity': 3},
             2: {'name': 'chain mail', 'price': 75, 'quantity': 2},
@@ -986,7 +986,7 @@ class Player:
     def DoctorOffice(self):
         self.play_sound("store_bell.mp3")
         print("You enter the doctor's office. The doctor greets you with a friendly smile.")
-        time.sleep(3,)
+        time.sleep(2,)
         print("The doctor takes your physical.")
         if self.Health >= 100:
             print(f"'You are in great health!' the doctor exclaims.")
@@ -1031,7 +1031,7 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You enter the gunsmith.")
         print("The gunsmith greets you with a nod. Guns line the walls.")
-        time.sleep(3,)
+        time.sleep(2,)
         inventory = {
         1: {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
         2: {'name': 'rifle', 'price': 40, 'damage': (20, 25), 'quantity': 3},
@@ -1417,7 +1417,7 @@ class Player:
         self.invillage = False
         self.Hostility = 0
         self.possibleactions = self.BasePossibleActions[-3:]  
-        time.sleep(3,)
+        time.sleep(2,)
 
     def Interaction(self):
         Random = random.randint(1,50)
@@ -1434,7 +1434,7 @@ class Player:
     def Explore(self):
         print("You travel down the road...")
         self.play_sound("rolling_wheels.mp3")
-        time.sleep(3,)
+        time.sleep(2,)
         travel = self.travelspeed + self.travel_bonus
         if self.distancenext <= travel:
             self.ArriveTown()
@@ -1510,7 +1510,7 @@ class Player:
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
         print("You walk into the general store. A friendly shopkeeper greets you.")
-        time.sleep(3,)
+        time.sleep(2,)
         general_inventory = {            
             1: {'name': 'lantern', 'price': 3, 'quantity': 10},
             2: {'name': 'bread', 'price': 5, 'quantity': 30},
@@ -1540,7 +1540,7 @@ class Player:
             print("The people are sure you have some correlation with the bandits.")
             print("A burly fellow shoves you into a water trough.")
             self.Health = self.Health - 15
-            time.sleep(3,)
+            time.sleep(2,)
         elif self.Hostility >= 3:
             print("The sheriff throws you into the musty jail, not believing your pleas of innocence.")
             self.jail_penalty()
@@ -1549,7 +1549,7 @@ class Player:
         pygame.mixer.music.stop()
         self.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
-        time.sleep(3,)
+        time.sleep(2,)
         print(death_cause)
         if self.rebirth == True:
             print("You have already respawned once.")
@@ -1636,11 +1636,11 @@ class Player:
             if random.randint(0, Day) == 1:
                 print("Gunshots ring out in the night! The town was attacked!")
                 self.play_sound("gunfire.mp3")
-                time.sleep(3,)
+                time.sleep(2,)
                 print("You roll out of bed, but the bandits have already left.")
                 print("You return to you wagon, concerned at what the next day will bring.")
                 self.Hostility += 1
-                time.sleep(3,)
+                time.sleep(2,)
                 self.write_diary_entry()
             else:
                 print("You sleep peacefully in your wagon.")
@@ -1738,7 +1738,7 @@ class Player:
                 print("You decide to ignore him.")
                 print("The townsfolk are suspicious that you let him go. +1 Hostility.")
                 self.Hostility += 1
-                time.sleep(3,)
+                time.sleep(2,)
         elif "family" not in self.caravan and rand == 1:
             print("A family is travelling in their wagon, but it appears that they have a broken wheel.")
             print("Would you like to help, or pass them by? (yes/no)")
@@ -1748,13 +1748,13 @@ class Player:
                 print("The family thanks you for allowing them to travel with them")
                 print("It takes some extra time, but you feel it was worth it.")
                 self.caravan.append("family")
-                time.sleep(3,)
+                time.sleep(2,)
                 print("The family plans to unhook the wagons at the next town.")
                 self.travel_bonus -= 1
                 time.sleep(2,)
         else:
             print("You decide to pass them by.")
-            time.sleep(3,)
+            time.sleep(2,)
 
     def encounter_abandoned_house(self):
         print("You see an abandoned house by the side of the road.")
@@ -1763,11 +1763,11 @@ class Player:
         choice = input(": ")
         if choice == "1":
             print("You decide it is wisest to leave it alone.")
-            time.sleep(3,)
+            time.sleep(2,)
         elif choice == "2":
             print("You enter the door.")
             print("It makes a creaking sound as you walk in.")
-            time.sleep(3,)
+            time.sleep(2,)
             print("(1) On the wall hangs a dusty rifle,(2) on the table lies a bundle, and (3), there is a painting on the far wall.")
             choice = input(": ")
             if choice == "1":
@@ -1779,11 +1779,11 @@ class Player:
                     print("You stumble out of the building.")
                     print("There must be a way to disable the traps...")
                     self.Health -= 20
-                    time.sleep(3,)
+                    time.sleep(2,)
                 else:
                     print("You grab the rifle")
                     self.loot_drop("rifle")
-                    time.sleep(3,)
+                    time.sleep(2,)
             elif choice == "2":
                 Random = random.randint(1,3)
                 if Random == 1:
@@ -1793,7 +1793,7 @@ class Player:
                     print("You stumble out of the building.")
                     print("There must be a way to disable the traps...")
                     self.Health -= 10
-                    time.sleep(3,)
+                    time.sleep(2,)
                 else:
                     print("You rummage around through the table")
                     self.loot_drop(random.choice(self.common_loot))
@@ -1810,11 +1810,11 @@ class Player:
                 else:
                     print("You notice the elaborate trap around the painting, and streching around the room.")
                     print("You carefully disarm the trap, glad your shadow skills have served you.")
-                    time.sleep(3,)
+                    time.sleep(2,)
                     print("You find a crate behind the painting.")
                     print("Now that the trap is disarmed, you can loot the room safely.")
                     print("(1), On the wall hangs a dusty rifle,(2), on the table lies a bundle, and (3), there is a crate behind the painting.")
-                    time.sleep(3,)
+                    time.sleep(2,)
                     choice = input(": ")
                     if choice == "1":
                         print("You grab the rifle")
@@ -1847,12 +1847,12 @@ class Player:
         elif choice == "4":
             print("You loot the garden.")
             self.loot_drop(random.choice(self.common_loot))
-            time.sleep(3,)
+            time.sleep(2,)
         else:
             print("Invalid")
         print("Suddenly, you here someone approaching the house.")
         print("You quickly exit the house and get back on the road.")
-        time.sleep(3,)
+        time.sleep(2,)
 
     def encounter_stage_coach(self):
         print("You come upon a stagecoach dangling over a ravine. The driver pleads for help.")
@@ -1897,7 +1897,7 @@ class Player:
         else:
             print("You decide it's too dangerous and ride on, losing some daylight.")
             self.Time += 1
-        time.sleep(3,)
+        time.sleep(2,)
 
     def encounter_dry_river_bed(self):
         print("A dry river bed lies in your path.")
@@ -1922,10 +1922,10 @@ class Player:
                     print("You cross safely, and the rain starts only after you get across.")
                 else:
                     print("The torrent of water that appears carries you and your wagon down stream.")
-                    time.sleep(3,)
+                    time.sleep(2,)
                     print("After the water, you realize that one of your items is missing.")
                     self.lose_random_item(1)
-                    time.sleep(3,)
+                    time.sleep(2,)
                     print("You get back on the trail, but a lot of time has been wasted.")
                     self.Time += 2
         else:
@@ -1935,7 +1935,7 @@ class Player:
     def encounter_abandoned_wagon(self):
         print(f"You notice an abandoned wagon a little ways off the trail.")
         print(f"You could either search the wagon or leave and save time.")
-        time.sleep(3,)
+        time.sleep(2,)
         print(f"1, search it.")
         print(f"2, leave it.")
         Choice = input(f": ")
@@ -1955,11 +1955,11 @@ class Player:
                 else:
                     print("The snake bites you, then retreats.")
                     self.poisoned = 1
-                time.sleep(3,)
+                time.sleep(2,)
             print("Inside the wagon you find many useful items.")
             rare = random.choice(["colt pistol", "bowie knife", "bread", "rope"])
             self.loot_drop(rare)
-            time.sleep(3,)
+            time.sleep(2,)
         else:
             print(f"You leave the wagon alone and proceed down the trail.")
 
@@ -2376,7 +2376,7 @@ class Player:
         time.sleep(1)
         # Reward phase
         print("\nThe hermit nods approvingly. 'You have proven yourself.'")
-        time.sleep(3,)
+        time.sleep(2,)
         gold_reward = 25
         self.gold += gold_reward
         self.Speed += 1
@@ -2384,7 +2384,7 @@ class Player:
         self.loot_drop(loot_item)
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
         print("You have learned from this adventure, you become more agile. +1 speed.")
-        time.sleep(3,)
+        time.sleep(2,)
 
     def encounter_haunted_house(self):
         print("\nYou approach a dilapidated house on the hill as dusk settles.")
@@ -3182,6 +3182,7 @@ class Player:
             self.Tquest = "None"
 
     def encounter_iron_stage3(self):
+        bonus_used = False
         print("Word spreads: the first train is rolling in with gold and passengers.")
         print("Bandits plan a heist! The foreman begs for your help.")
         print("Options:")
@@ -3192,6 +3193,21 @@ class Player:
         if choice == "1":
             print("You climb aboard as the train whistles into the valley...")
             print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
+            time.sleep(2,)
+            print("As the train chugs along, 7 mounted bandits ride up, firing their pistols at the train!")
+            if self.iron_bonus >= 2:
+                print("You may spend two bonus points you have gained to gain a temporary boost!")
+                print("Will you spend them now?")
+                choice = input(": ").strip()
+                if choice.lower() == "yes":
+                    self.iron_bonus -= 2
+                    self.MaxHealth += 20
+                    self.Health += 20
+                    bonus_used = True
+                    
+                    print("You feel invigorated!")
+                else:
+                    print("You choose to save your bonus points.")
             mounted_bandits = 5   # riders outside
             bandits_in_car = 2    # already onboard
             car_health = 100
@@ -3200,12 +3216,16 @@ class Player:
                 print(f"\nMounted bandits outside: {mounted_bandits}")
                 print(f"Bandits in passenger cars: {bandits_in_car}")
                 print(f"Your Health: {self.Health}")
+                print(f"Train car health: {car_health}")
+                print(f"If the train loses all health, it will be derailed!")
+                print(f"Turns until escape: {8 - turns_elapsed}")
+                input("Press Enter to continue...")
 
                 print("\nChoose your action:")
                 print("1) Climb onto the roof and shoot at mounted bandits.")
-                print("2) Defend inside the passenger cars.")
+                print("2) Defend with your melee in the passenger cars.")
                 print("3) Take cover and heal behind crates.")
-                print("4) Rush forward and fight in melee.")
+                print("4) Rush forward and fight with your fists.")
 
                 choice = input(": ").strip()
 
@@ -3214,34 +3234,58 @@ class Player:
                     if mounted_bandits <= 0:
                         print("No mounted bandits left to shoot at!")
                         continue
-
-                    if any(item in self.weapons["rifle"] for item in self.itemsinventory):
+                    print("Which weapon would you like to use?")
+                    print("1) Rifle")
+                    print("2) Shotgun")
+                    print("3) Revolver")
+                    weapon_choice = input(": ").strip()
+                    if weapon_choice not in ["1", "2", "3"]:
+                        print("Invalid choice. You lose your chance to shoot!")
+                        continue
+                    if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
                         print("You fire your rifle from the rooftop!")
                         if random.randint(1, 10) <= self.trail_skill + 3:
                             print("A rider drops, his horse veering off!")
                             mounted_bandits -= 1
                         else:
+                            if any(item in self.weapons["rifle"] for item in self.itemsinventory) == False:
+                                print("You have no rifle!")
+                                print("A shot grazes you. -8hp")
+                                self.Health -= 8
+                                continue
                             print("You miss! A shot grazes you. -8hp")
                             self.Health -= 8
-                    elif any(item in self.weapons["shotgun"] for item in self.itemsinventory):
+                    elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
                         print("You blast your shotgun downward at the riders!")
                         if random.randint(1, 10) <= self.trail_skill + 2:
                             print("A rider is blown clean off his saddle!")
                             mounted_bandits -= 1
                         else:
+                            if any(item in self.weapons["shotgun"] for item in self.itemsinventory) == False:
+                                print("You have no shotgun!")
+                                print("A shot grazes your arm. -6hp")
+                                self.Health -= 6
+                                continue
                             print("Pellets scatter wide. A return shot hits your arm! -6hp")
                             self.Health -= 6
-                    elif any(item in self.weapons["revolver"] for item in self.itemsinventory):
+                    elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
                         print("You fire your revolver rapidly!")
                         if random.randint(1, 10) <= self.trail_skill + 1:
                             print("One rider tumbles off his horse!")
                             mounted_bandits -= 1
                         else:
-                            print("You miss under pressure. A rider's bullet clips you! -5hp")
-                            self.Health -= 5
+                            if any(item in self.weapons["revolver"] for item in self.itemsinventory) == False:
+                                print("You have no revolver!")
+                                print("A rider's bullet clips you. -5hp")
+                                self.Health -= 5
+                                continue
+                            else:
+                                print("You miss under pressure. A rider's bullet clips you! -5hp")
+                                self.Health -= 5
                     else:
                         print("You have no gun! The riders fire at you mercilessly. -10 hp")
                         self.Health -= 10
+                    time.sleep(2)
 
                 # --- Option 2: Defend inside cars ---
                 elif choice == "2":
@@ -3251,14 +3295,14 @@ class Player:
 
                     print("You rush into the passenger car where bandits terrorize civilians!")
                     if any(item in self.weapons["melee"] for item in self.itemsinventory):
-                        if random.randint(1, 10) <= self.speed + 2:
+                        if random.randint(1, 10) <= self.Speed + 3:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
                         else:
                             print("The bandit shoots first, grazing your shoulder! -8hp")
                             self.Health -= 8
                     else:
-                        if random.randint(1, 10) <= self.strength + 1:
+                        if random.randint(1, 10) <= self.strength_skill:
                             print("You wrestle a bandit to the ground and knock him cold!")
                             bandits_in_car -= 1
                         else:
@@ -3268,7 +3312,7 @@ class Player:
                 # --- Option 3: Take cover ---
                 elif choice == "3":
                     print("You duck behind heavy crates in the cargo car.")
-                    print("You tend to your wounds.")
+                    print("You tend to your wounds. +15hp")
                     self.Health += 15
                     if random.randint(1, 10) <= self.shadow_skill + 2:
                         print("Bullets ping off the steel — you stay safe for now.")
@@ -3280,7 +3324,7 @@ class Player:
                 elif choice == "4":
                     print("You charge forward, fists swinging!")
                     if bandits_in_car > 0:
-                        if random.randint(1, 10) <= self.strength + 2:
+                        if random.randint(1, 10) <= self.strength_skill + 1:
                             print("You knock a bandit out cold in brutal close combat!")
                             bandits_in_car -= 1
                         else:
@@ -3301,12 +3345,16 @@ class Player:
                 Random = random.randint(1, 4)
                 if mounted_bandits > 0 and Random <= 2:
                     print("A rider leaps onto the train roof and drops into a car!")
-                    mounted_bandits -= 1
-                    bandits_in_car += 1
+                    if mounted_bandits < 2:
+                        mounted_bandits -= 1
+                        bandits_in_car += 1
                 elif mounted_bandits > 0 and Random == 3:
                     print("The bandits attempt to shoot you while riding.")
-                    self.Health -= 10
-                    print("You lost 10 health.")
+                    if random.randint(1, 10) <= self.shadow_skill:
+                        print("You dodge the bullets!")
+                    else:
+                        self.Health -= 15
+                        print("You lost 15 health.")
                 else:
                     print("You gain a moment of respite.")
 
@@ -3325,6 +3373,8 @@ class Player:
                         self.iron_bonus -= 1
                         print("The car burns around you.")
                         print("The bandits have already taken everything of value.")
+                    if bonus_used == True:
+                        self.MaxHealth -= 20
                     return
 
                 # --- Check for victory ---
@@ -3338,7 +3388,10 @@ class Player:
                 self.gold += 35
                 self.loot_drop(random.choice(self.rare_loot))
                 self.iron_stage = 4
-                
+            if bonus_used == True:
+                print("You feel a surge of power from your iron reserves!")
+                self.MaxHealth -= 20
+
         else:
             print("You stay behind. The train arrives looted, passengers shaken.")
             self.Hostility += 2
