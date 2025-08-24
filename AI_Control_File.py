@@ -1,12 +1,13 @@
 from httpx import stream
 import ollama, json
+from textwrap import dedent
 
 class AI_Control:
     def __init__(self):
         self.action = None
 
     def parse_action(self, player_text: str, available_actions: list):
-        prompt = f"""
+        prompt = dedent(f"""
     You are the action parser for a text RPG.
     The player may only perform these actions now: {available_actions}.
     Convert the player's input into JSON with one of these actions.
@@ -15,7 +16,7 @@ class AI_Control:
     Arguments are optional.
     Example output: {{"action": "move", "args": {{"direction": "north"}}}}
     Second example: {{"action": "attack_guard", "args": {{"combatant": "guard"}}}}
-    """
+    """)
         response = ollama.chat(
             model="phi3",
             format="json",
@@ -25,7 +26,10 @@ class AI_Control:
             ]
         )
         try:
-            self.action = json.loads(response['message']['content'])
+            response_text = response['message']['content']  # this is still a string
+            response_text = response_text.strip()            # remove leading/trailing whitespace
+            self.action = json.loads(response_text)         # convert to dict
+
             return self.action
         except json.JSONDecodeError:
             # fallback to a safe default
@@ -38,32 +42,22 @@ class AI_Control:
         parsed = self.parse_action(player_input, actions_in_city)
         print(parsed)
 
-    def narrate_action(self) -> str:
-        """
-        Generate narration for a parsed action and update game state if needed.
-        
-        Args:
-            action (dict): { "tool": str, "args": dict }
-            game_state (dict): dictionary storing the current game state
-        
-        Returns:
-            narration (str): What the narrator says
-        """
+    def narrate_action(self):
         game_state = "Player is in a town with guards at the walls and townsfolk milling about."
         tool = self.action.get("action")
         args = self.action.get("args", {})
 
         # Create a dynamic prompt
-        prompt = f"""
+        prompt = dedent(f"""
     You are the narrator for a text RPG.
     The world state is: {game_state}.
     The player has chosen the action: {tool} with arguments {args}.
     Write a short narration (2-3 sentences max) describing what happens next.
     Keep it immersive and consistent with the world state.
     Suggest a few possible actions, and include them in the narration subtly.
-    """
+    """)
         
-        stream = ollama.chat(
+        response_stream = ollama.chat(
             model="llama3:8b",
             messages=[
                 {"role": "system", "content": prompt}
@@ -72,7 +66,7 @@ class AI_Control:
         )
         
         narration = ""
-        for chunk in stream:
+        for chunk in response_stream:
             # Ollama yields dicts with incremental content
             token = chunk["message"]["content"]
             print(token, end="", flush=True)   # print as it arrives
