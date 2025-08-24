@@ -1,6 +1,7 @@
 from httpx import stream
 import ollama, json
 from textwrap import dedent
+import Western Sim working with AI
 
 class AI_Control:
     def __init__(self):
@@ -75,6 +76,6 @@ class AI_Control:
         return narration
 
 
-AI = AI_Control()
-AI.parse_example()
-AI.narrate_action()
+#AI = AI_Control()
+#I.parse_example()
+#AI.narrate_action()
