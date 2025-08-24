@@ -6,6 +6,9 @@ import pygame
 import yaml
 
 pygame.mixer.init()
+# with open('loot.yaml', 'r') as file:
+#     loot_data = yaml.safe_load(file)
+# print(loot_data['common'][1])
 
 class Player:
     def __init__(self):
