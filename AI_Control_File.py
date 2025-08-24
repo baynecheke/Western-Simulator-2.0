@@ -1,7 +1,7 @@
 from httpx import stream
 import ollama, json
 from textwrap import dedent
-import Western Sim working with AI
+from Western_Sim_adding_AI import __init
 
 class AI_Control:
     def __init__(self):
