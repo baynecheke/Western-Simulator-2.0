@@ -1,8 +1,4 @@
-AI_info:
-{
-  last_3_actions = [],
-  current_task = "survive"
-
-
-
+AI_info: {
+  last_3_actions: [],
+  current_task: "survive",
 }

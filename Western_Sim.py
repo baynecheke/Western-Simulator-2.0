@@ -417,8 +417,8 @@ class Player:
             parsed = AI_File.parse_action(choice, self.possibleactions)
             AI_File.narrate_action()
             print(parsed)
-            if choice in self.possibleactions:
-                return choice
+            if parsed in self.possibleactions:
+                return parsed
             else:
                 print("Invalid or unavailable choice. Try again.")
 

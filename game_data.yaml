@@ -1,2 +1,3 @@
-solid = 0
-...
+AI_info:
+  last_3_actions: []
+  current_task: survive
