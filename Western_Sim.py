@@ -146,19 +146,19 @@ class Player:
         self.diary_entries = []
 
         self.BasePossibleActions = [
-            "Enter the TownJail", 
-            "Enter the Doctor's office", 
-            "Enter the General Store", 
-            "Enter the Gunsmith's Shop", 
-            "Enter the Bank", 
-            "Enter the Saloon", 
-            "Talk with the Townspeople",
-            "Enter the Trading Post",
-            "Enter the Blacksmith Shop",
-            "Leave the town",
-            "Use an item",
-            "Take an inventory check",
-            "Continue down the road"
+            "town jail", 
+            "doctor's office", 
+            "general store", 
+            "gunsmith's shop", 
+            "bank", 
+            "saloon", 
+            "talk townspeople",
+            "trading post",
+            "blacksmith shop",
+            "leave town",
+            "use item",
+            "inventory",
+            "travel road"
         ]
         self.possibleactions = self.BasePossibleActions[:-1]  # Exclude "(J) Continue..."
 
@@ -408,48 +408,47 @@ class Player:
 
     def TakeActionsChose(self):
         print("You may choose an action to take:")
-        for action in self.possibleactions:
-            print(action)
-
+        for action1 in self.possibleactions:
+            print(action1)
 
         while True:
-            choice = input("Choice: ").strip().upper()
-            parsed = AI_File.parse_action(choice, self.possibleactions)
-            AI_File.narrate_action()
-            print(parsed)
-            if parsed in self.possibleactions:
-                return parsed
+            choice = input("Choice: ").strip()
+            choice_type = "MG"
+            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type)
+            print(parsed['action'])
+            if parsed['action'] in self.possibleactions:
+                return parsed['action']
             else:
                 print("Invalid or unavailable choice. Try again.")
 
     def ActionFunction(self, choice):
         match choice:
-            case "Enter the TownJail": 
-                self.TownJail
-            case "Enter the Doctor's office": 
-                self.DoctorOffice
-            case "Enter the General Store": 
-                self.GeneralStore
-            case "Enter the Gunsmith's Shop": 
-                self.Gunsmiths
-            case "Enter the Bank": 
-                self.Bank
-            case "Enter the Saloon": 
-                self.Saloon
-            case "Talk with the Townspeople":
-                self.Townspeople
-            case "Enter the Trading Post":
-                self.TradingPost
-            case "Enter the Blacksmith Shop":
-                self.Blacksmith
-            case "Leave the town":
-                self.LeaveTown
-            case "Use an item":
-                self.use_item1
-            case "Take an inventory check":
-                self.Statcheck
-            case "Continue down the road":
-                self.Explore
+            case "town jail": 
+                self.TownJail()
+            case "doctor's office": 
+                self.DoctorOffice()
+            case "general store": 
+                self.GeneralStore()
+            case "gunsmith's shop": 
+                self.Gunsmiths()
+            case "bank": 
+                self.Bank()
+            case "saloon": 
+                self.Saloon()
+            case "talk townspeople":
+                self.Townspeople()
+            case "trading post":
+                self.TradingPost()
+            case "blacksmith shop":
+                self.Blacksmith()
+            case "leave town":
+                self.LeaveTown()
+            case "use item":
+                self.use_item1()
+            case "inventory":
+                self.Statcheck()
+            case "travel road":
+                self.Explore()
             case _:
                 print("That action is not currently available.")
 

@@ -8,16 +8,32 @@ class AI_Control:
     def __init__(self):
         self.action = None
 
-    def parse_action(self, player_text: str, available_actions: list):
-        prompt = dedent(f"""
+    def parse_action(self, player_text: str, available_actions: list, choice_type: str):
+        if choice_type == "MG":
+            prompt = dedent(f"""
     You are the action parser for a text RPG.
     The player may only perform these actions now: {available_actions}.
     Convert the player's input into JSON with one of these actions.
     Return ONLY JSON. Do not invent other actions.
+    Return ONLY JSON in the form:
+    {{"action": "one of the actions", "args": {"an argument"}}}
     You may include arguments in the "args" field if needed.
     Arguments are optional.
-    Example output: {{"action": "move", "args": {{"direction": "north"}}}}
-    Second example: {{"action": "attack_guard", "args": {{"combatant": "guard"}}}}
+    Example output: {{"action": "gunsmith's shop", "args": {{"purchase": "gun"}}}}
+    Second example: {{"action": "town jail", "args": {{"target": "sheriff"}}}}
+    """)
+        elif choice_type == "YN":
+            prompt = dedent(f"""
+    You are the action parser for a text RPG.
+    The player may only yes or no to this choice {choice}.
+    Convert the player's input into JSON with yes or no.
+    Return ONLY JSON. Do not invent other actions.
+    Return ONLY JSON in the form:
+    {{"choice": "yes or no", "args": {"an argument"}}}
+    You may include arguments in the "args" field if needed.
+    Arguments are optional.
+    Example output: {{"choice": "yes", "args": {{"target": "bison"}}}}
+    Second example: {{"choice": "no", "args": {{"leave location": "cave"}}}}
     """)
         response = ollama.chat(
             model="phi3",
@@ -28,9 +44,8 @@ class AI_Control:
             ]
         )
         try:
-            response_text = response['message']['content']  # this is still a string
-            response_text = response_text.strip()            # remove leading/trailing whitespace
-            self.action = json.loads(response_text)         # convert to dict
+            
+            self.action = json.loads(response['message']['content'])         # convert to dict
 
             return self.action
         except json.JSONDecodeError:
