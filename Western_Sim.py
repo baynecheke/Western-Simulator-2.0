@@ -144,6 +144,7 @@ class Player:
         self.town_defense_bonus = 0
         self.diary_bonuses = []
         self.diary_entries = []
+        
 
         self.BasePossibleActions = [
             "town jail", 
@@ -414,13 +415,31 @@ class Player:
         while True:
             choice = input("Choice: ").strip()
             choice_type = "MG"
-            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type, None)
+            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type, None, None)
             print(parsed['action'])
             if parsed['action'] in self.possibleactions:
+                game_state = self.generate_game_state()
+                AI_File.narrate_action(game_state, self.possibleactions, None)
                 return parsed['action']
             else:
                 print("Invalid or unavailable choice. Try again.")
 
+    def generate_game_state(self):
+        if self.invillage == True:
+            village_part = "Player is in a western village"
+        else:
+            village_part = "Player is in the western prairy."
+        if self.Health <= 80:
+            health_status = f"Player has {self.Health}/{self.MaxHealth} health remaining."
+        else:
+            health_status = f"Player is in good health."
+        if self.Hostility >= 1:
+            hostility = f"The Townspeople have a hostility of {self.Hostility}."
+        else: 
+            hostility = ""
+        game_state = village_part + health_status + hostility
+        return game_state
+    
     def ActionFunction(self, choice):
         match choice:
             case "town jail": 
@@ -3797,7 +3816,7 @@ class GenericStore:
             choice_type = "MCP"
             actions = ['leave', 'inventory']
             complete_list = item_list + actions
-            parsed = AI_File.parse_action(choice1, None, choice_type, complete_list)
+            parsed = AI_File.parse_action(choice1, None, choice_type, complete_list, None)
             print(parsed['choice'])
             choice = parsed.get('choice')
             choice = parsed.get('choice')

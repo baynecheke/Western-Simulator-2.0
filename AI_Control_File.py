@@ -8,7 +8,7 @@ class AI_Control:
     def __init__(self):
         self.action = None
 
-    def parse_action(self, player_text: str, available_actions: list, choice_type: str, items: list):
+    def parse_action(self, player_text: str, available_actions: list, choice_type: str, items: list, choice: str):
         if choice_type == "MG":
             prompt = dedent(f"""
     You are the action parser for a text RPG.
@@ -74,19 +74,50 @@ Example outputs:
         parsed = self.parse_action(player_input, actions_in_city)
         print(parsed)
 
-    def narrate_action(self):
-        game_state = "Player is in a town with guards at the walls and townsfolk milling about."
-        tool = self.action.get("action")
+    def narrate_action(self, game_state, possible_actions, past_actions):
+        action = self.action.get("action")
         args = self.action.get("args", {})
 
         # Create a dynamic prompt
         prompt = dedent(f"""
-    You are the narrator for a text RPG.
+    You are the narrator for a western text RPG.
     The world state is: {game_state}.
-    The player has chosen the action: {tool} with arguments {args}.
-    Write a short narration (2-3 sentences max) describing what happens next.
+    Past actions: {past_actions}.
+    The player has chosen the action: {action} with arguments {args}.
+    Write a short narration (1-2 sentences max) describing what happens next.
     Keep it immersive and consistent with the world state.
-    Suggest a few possible actions, and include them in the narration subtly.
+    Suggest a few possible actions, consistent with {possible_actions} and include them in the narration subtly.
+    """)
+        
+        response_stream = ollama.chat(
+            model="llama3:8b",
+            messages=[
+                {"role": "system", "content": prompt}
+            ],
+            stream=True
+        )
+        
+        narration = ""
+        for chunk in response_stream:
+            # Ollama yields dicts with incremental content
+            token = chunk["message"]["content"]
+            print(token, end="", flush=True)   # print as it arrives
+            narration += token
+        print()
+        return narration
+    
+    def narrate_event(self, game_state, event):
+        action = self.action.get("action")
+        args = self.action.get("args", {})
+
+        # Create a dynamic prompt
+        prompt = dedent(f"""
+    You are the narrator for a western text RPG.
+    The world state is: {game_state}.
+    Event: {event}.
+    Write a short narration (2-3 sentences max) describing what the event is.
+    Keep it immersive and consistent with the world state.
+    Do not explicitly state anything about what to do next.
     """)
         
         response_stream = ollama.chat(
