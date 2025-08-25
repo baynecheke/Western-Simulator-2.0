@@ -37,17 +37,18 @@ class AI_Control:
     """)
         elif choice_type == "MCP":
             prompt = dedent(f"""
-    You are the action parser for a text RPG.
-    The player is currently trying to purchase with these options: {items}.
-    Convert the player's input into JSON with one of these items.
-    Return ONLY JSON. Do not invent other items.
-    Return ONLY JSON in the form:
-    {{"choice": "one of the items", "args": {"quantity the player wants"}}}
-    You may include arguments in the "args" field.
-    If player does not specify how many, set quantity to 1.
-    Example output: {{"choice": "rifle", "args": {{"quantity": "1"}}}}
-    Second example: {{"choice": "rilfe ammo", "args": {{"quantity": "2"}}}}
-    """)
+You are the action parser for a text RPG.
+The player is trying to purchase an item. The available items are: {items}.
+Convert the player's input into JSON **with exactly two keys**:
+1. "choice" → must be exactly one of the items (case-insensitive).
+2. "quantity" → must always be present as a string representing an integer. 
+   If the player does not specify a number, use "1" as the default.
+Return ONLY JSON. No explanations or extra text.
+
+Example outputs:
+{{"choice": "rifle", "quantity": "1"}}
+{{"choice": "pistol_ammo", "quantity": "3"}}
+""")
 
         response = ollama.chat(
             model="phi3",
