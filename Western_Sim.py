@@ -4,11 +4,20 @@ import json
 import os
 import pygame
 import yaml
+from AI_Control_File import AI_Control
+AI_File = AI_Control()
 
 pygame.mixer.init()
-# with open('loot.yaml', 'r') as file:
-#     loot_data = yaml.safe_load(file)
-# print(loot_data['common'][1])
+with open('loot.yaml', 'r') as file:
+    loot_data = yaml.safe_load(file)
+
+
+with open('Game_Info.yaml', 'r') as file:
+   data = yaml.safe_load(file)
+
+with open("game_data.yaml", "w") as f:
+    yaml.safe_dump(data, f, sort_keys=False)
+
 
 class Player:
     def __init__(self):
@@ -35,7 +44,12 @@ class Player:
         self.rumors_heard = []
         self.rebirth = False
 
+        #AI
+        last_3_actions = []
+        current_task = "survive"
+        current_actions = []
 
+        #stuff
         self.score = 0
         self.poisoned = 0
         self.difficulty = 'frontier'  # Default
@@ -88,59 +102,14 @@ class Player:
 
 
     #loots
-        self.common_loot = [
-            "bread",
-            "rope",
-            "lantern",
-            "knife",
-            "pistol_ammo",
-            "rifle_ammo",
-            "shotgun_ammo",
-            "small hide",
-            "fire cracker"
-        ]
-        self.uncommon_loot = [
-            "lasso",
-            "antivenom",
-            "revolver",
-            "colt pistol",
-            "rifle",
-            "ammo cartridge",
-            "derringer pistol",
-            "colt navy revolver",
-            "sawed-off shotgun",
-            "tomahawk",
-            "tobacco pouch",
-            "gun oil",
-            "coffee tin",
-        ]
-        self.rare_loot = [
-            "winchester barrel",
-            "winchester stock",
-            "henry rifle",
-            "carbine rifle",
-            "surveyor's kit",
-            "remington pistol",
-            "sharps rifle",
-            "boots",
-            "cavalry saber",
-            "ammo cartridge",
-            "leather armor",
-            "flashbang",
-            "bandage"
-        ]
-        self.ultra_rare_loot = [
-            "winchester rifle",
-            "double barrel shotgun",
-            "gold nugget",
-
-            "carved horn",
-            "chain mail",
-            "sharps rifle",
-            "silver bar",
-            "gold bar",
-            "ammo belt"
-        ]
+        self.common_loot = loot_data['common']
+        
+        self.uncommon_loot = loot_data['uncommon']
+        
+        self.rare_loot = loot_data['rare']
+        
+        self.ultra_rare_loot = loot_data['ultra_rare']
+        
         self.medical_loot = [
                             "bandage", 
                             "bandage"]
@@ -177,19 +146,19 @@ class Player:
         self.diary_entries = []
 
         self.BasePossibleActions = [
-            "(A) Enter the TownJail", 
-            "(B) Enter the Doctor's office", 
-            "(C) Enter the General Store", 
-            "(D) Enter the Gunsmith's Shop", 
-            "(E) Enter the Bank", 
-            "(F) Enter the Saloon", 
-            "(G) Talk with the Townspeople",
-            "(H) Enter the Trading Post",
-            "(I) Enter the Blacksmith Shop",
-            "(J) Leave the town",
-            "(K) Use an item",
-            "(L) Take an inventory check",
-            "(M) Continue down the road"
+            "Enter the TownJail", 
+            "Enter the Doctor's office", 
+            "Enter the General Store", 
+            "Enter the Gunsmith's Shop", 
+            "Enter the Bank", 
+            "Enter the Saloon", 
+            "Talk with the Townspeople",
+            "Enter the Trading Post",
+            "Enter the Blacksmith Shop",
+            "Leave the town",
+            "Use an item",
+            "Take an inventory check",
+            "Continue down the road"
         ]
         self.possibleactions = self.BasePossibleActions[:-1]  # Exclude "(J) Continue..."
 
@@ -436,59 +405,53 @@ class Player:
                 self.add_item(loot)
         self.day_memory["loot"] = item
 
-    def Number(self, Choice):
-        mapping = {
-            "A": 0, "B": 1, "C": 2, "D": 3, "E": 4,
-            "F": 5, "G": 6, "H": 7, "I": 8, "J": 9, 
-            "K": 10, "L": 11, "M": 12, "N": 13
-        }
-        return mapping.get(Choice.upper(), -1)
 
     def TakeActionsChose(self):
         print("You may choose an action to take:")
         for action in self.possibleactions:
             print(action)
 
-        # Extract the valid letter keys from each action, e.g., "(A) Enter the TownJail" -> "A"
-        valid_choices = [action.strip()[1].upper() for action in self.possibleactions]
 
         while True:
             choice = input("Choice: ").strip().upper()
-            if choice == "777777":
-                self.gold = 200
-                self.wandering_trader()
-                self.Day = 1
-                self.loot_drop("ammo cartridge")
-                self.loot_drop("winchester barrel")
-                self.loot_drop("winchester stock")
-                self.loot_drop("sharps rifle")
-                self.loot_drop("ammo belt")
-                self.loot_drop("bandage")
-            if choice == "80":
-                self.Health = 1
-                self.Hunger = 10
-            if choice == "100":
-                combat = Combat(self)
-                combat.FindAttacker("phantom gunslinger")
-                combat.Attack()
-            if choice == "120":
-                self.encounter_iron_stage3()
-
-            if choice in valid_choices:
-                return self.Number(choice)
+            parsed = AI_File.parse_action(choice, self.possibleactions)
+            AI_File.narrate_action()
+            print(parsed)
+            if choice in self.possibleactions:
+                return choice
             else:
                 print("Invalid or unavailable choice. Try again.")
 
-    def ActionFunction(self, index):
-        actions = [
-            self.TownJail, self.DoctorOffice, self.GeneralStore, self.Gunsmiths,
-            self.Bank, self.Saloon, self.Townspeople, self.TradingPost, self.Blacksmith, self.LeaveTown, self.use_item1, self.Statcheck,
-            self.Explore
-        ]
-        if 0 <= index < len(actions):
-            actions[index]()
-        else:
-            print("That action is not currently available.")
+    def ActionFunction(self, choice):
+        match choice:
+            case "Enter the TownJail": 
+                self.TownJail
+            case "Enter the Doctor's office": 
+                self.DoctorOffice
+            case "Enter the General Store": 
+                self.GeneralStore
+            case "Enter the Gunsmith's Shop": 
+                self.Gunsmiths
+            case "Enter the Bank": 
+                self.Bank
+            case "Enter the Saloon": 
+                self.Saloon
+            case "Talk with the Townspeople":
+                self.Townspeople
+            case "Enter the Trading Post":
+                self.TradingPost
+            case "Enter the Blacksmith Shop":
+                self.Blacksmith
+            case "Leave the town":
+                self.LeaveTown
+            case "Use an item":
+                self.use_item1
+            case "Take an inventory check":
+                self.Statcheck
+            case "Continue down the road":
+                self.Explore
+            case _:
+                print("That action is not currently available.")
 
     def DoAction(self):
         index = self.TakeActionsChose()

@@ -1,7 +1,8 @@
 from httpx import stream
 import ollama, json
 from textwrap import dedent
-from Western_Sim import Player
+
+
 
 class AI_Control:
     def __init__(self):
@@ -44,6 +45,8 @@ class AI_Control:
         print(parsed)
 
     def narrate_action(self):
+        from Western_Sim import Player
+        player = Player()
         game_state = "Player is in a town with guards at the walls and townsfolk milling about."
         tool = self.action.get("action")
         args = self.action.get("args", {})
@@ -77,5 +80,5 @@ class AI_Control:
 
 
 #AI = AI_Control()
-#I.parse_example()
+#AI.parse_example()
 #AI.narrate_action()
