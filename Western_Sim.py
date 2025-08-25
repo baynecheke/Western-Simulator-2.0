@@ -414,7 +414,7 @@ class Player:
         while True:
             choice = input("Choice: ").strip()
             choice_type = "MG"
-            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type)
+            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type, None)
             print(parsed['action'])
             if parsed['action'] in self.possibleactions:
                 return parsed['action']
@@ -942,9 +942,9 @@ class Player:
         print("The smith gives you a nod.")
         time.sleep(2,)
         inventory = {
-            1: {'name': 'leather armor', 'price': 35, 'quantity': 3},
-            2: {'name': 'chain mail', 'price': 75, 'quantity': 2},
-            3: {'name': 'boots', 'price': 15, 'quantity': 5}
+            'leather armor': {'name': 'leather armor', 'price': 35, 'quantity': 3},
+            'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2},
+            'boots': {'name': 'boots', 'price': 15, 'quantity': 5}
         }
         BlacksmithShop = GenericStore(self, "Blacksmith Shop", inventory)
         BlacksmithShop.run_shop()
@@ -985,9 +985,9 @@ class Player:
             else:
                 print("You do not have enough gold.")
         doctor_inventory = {
-            1: {'name': 'bandage', 'price': 10, 'quantity': 5},
-            2: {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
-            3: {'name': 'antivenom', 'price': 10, 'quantity': 5},
+            'bandage': {'name': 'bandage', 'price': 10, 'quantity': 5},
+            'field dressing kit': {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
+            'antivenom': {'name': 'antivenom', 'price': 10, 'quantity': 5},
         }
         doc_shop = GenericStore(self, "Doctor's Supply Cabinet", doctor_inventory)
         doc_shop.run_shop()
@@ -999,13 +999,13 @@ class Player:
         print("The gunsmith greets you with a nod. Guns line the walls.")
         time.sleep(2,)
         inventory = {
-        1: {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
-        2: {'name': 'rifle', 'price': 40, 'damage': (20, 25), 'quantity': 3},
-        3: {'name': 'shotgun', 'price': 50, 'damage': (20, 35), 'quantity': 3},
-        4: {'name': 'knife', 'price': 10, 'damage': (5, 10), 'quantity': 10},
-        5: {'name': 'pistol_ammo', 'price': 2, 'quantity': 50},
-        6: {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
-        7: {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
+        'revolver': {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
+        'rifle': {'name': 'rifle', 'price': 40, 'damage': (20, 25), 'quantity': 3},
+        'shotgun': {'name': 'shotgun', 'price': 50, 'damage': (20, 35), 'quantity': 3},
+        'knife': {'name': 'knife', 'price': 10, 'damage': (5, 10), 'quantity': 10},
+        'pistol ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 50},
+        'rifle ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
+        'shotgun ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
         }
         GunsmithStore = GenericStore(self, "Gunsmith", inventory)
         GunsmithStore.run_shop()
@@ -1031,9 +1031,9 @@ class Player:
                 print(f"You are fully healed. Health is now {self.Health}.")
             elif choice == "2":
                 ammo_inventory = {
-                    1: {'name': 'pistol_ammo', 'price': 2, 'quantity': 10},
-                    2: {'name': 'rifle_ammo', 'price': 3, 'quantity': 10},
-                    3: {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
+                    'pistol ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 10},
+                    'rifle ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 10},
+                    'shotgun ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
                 ammo_shop = GenericStore(self, "Armory Ammo Shop", ammo_inventory)
@@ -1478,16 +1478,16 @@ class Player:
         print("You walk into the general store. A friendly shopkeeper greets you.")
         time.sleep(2,)
         general_inventory = {            
-            1: {'name': 'lantern', 'price': 3, 'quantity': 10},
-            2: {'name': 'bread', 'price': 5, 'quantity': 30},
-            3: {'name': 'rope', 'price': 3, 'quantity': 20},
-            4: {'name': 'lasso', 'price': 7, 'quantity': 10},
-            5: {'name': 'fire cracker', 'price': 5, 'quantity': 10},
-            6: {'name': 'antivenom', 'price': 5, 'quantity': 10},
-            7: {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
-            8: {'name': 'gun oil', 'price': 7, 'quantity': 3},
-            9: {'name': 'coffee tin', 'price': 5, 'quantity': 5},
-            10: {'name': 'diary', 'price': 5, 'quantity': 5},}
+            'lantern': {'name': 'lantern', 'price': 3, 'quantity': 10},
+            'bread': {'name': 'bread', 'price': 5, 'quantity': 30},
+            'rope': {'name': 'rope', 'price': 3, 'quantity': 20},
+            'lasso': {'name': 'lasso', 'price': 7, 'quantity': 10},
+            'fire cracker': {'name': 'fire cracker', 'price': 5, 'quantity': 10},
+            'antivenom': {'name': 'antivenom', 'price': 5, 'quantity': 10},
+            'tobacco pouch': {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
+            'gun oil': {'name': 'gun oil', 'price': 7, 'quantity': 3},
+            'coffee tin': {'name': 'coffee tin', 'price': 5, 'quantity': 5},
+            'diary': {'name': 'diary', 'price': 5, 'quantity': 5},}
         gen_shop = GenericStore(self, "General Store", general_inventory)
         gen_shop.run_shop()
 
@@ -3776,17 +3776,39 @@ class GenericStore:
         
     def show_inventory(self):
         print(f"\n--- {self.store_name} Inventory ---")
-        for item_id, item in self.inventory.items():
-            print(f"{item_id}. {item['name'].capitalize()} - ${self.get_price_with_difficulty(item['price'])} | Stock: {item['quantity']}")
+        item_list = []
+        count = 0
+        for value in self.inventory.items():
+            count += 1
+        for count, item in self.inventory.items():
+            print(f"{item['name'].capitalize()} - ${self.get_price_with_difficulty(item['price'])} | Stock: {item['quantity']}")
+            item_list.append(item['name'].capitalize)
         print(f"\nYour Gold: ${self.player.gold:.2f}")
+            
+        return item_list
 
     def run_shop(self):
         print(f"Welcome to the {self.store_name}!")
         while True:
-            self.show_inventory()
-            print("\nEnter the item number to buy (or 'q' to quit): ")
-            print("Show player inventory: p")
-            choice = input(": ").strip().lower()
+            item_list = self.show_inventory()
+            print("\nWhat would you like to buy?")
+            print("You can leave or look at your inventory at any time.")
+            choice1 = input(": ").strip().lower()
+            choice_type = "MCP"
+            actions = ['leave', 'inventory']
+            complete_list = item_list + actions
+            parsed = AI_File.parse_action(choice1, None, choice_type, complete_list)
+            print(parsed['choice'])
+            choice = parsed['choice']
+            if choice in item_list:
+                print("Choice in list.")
+                amount = parsed['quantity']
+            for item in item_list:
+                print(item)
+
+
+
+
 
             if choice == 'q':
                 print(f"Thanks for visiting the {self.store_name}.")
@@ -3796,18 +3818,14 @@ class GenericStore:
                 self.show_player_inventory()
                 continue
 
-            if not choice.isdigit():
-                print("Please enter a valid number.")
-                continue
 
-            item_id = int(choice)
-            if item_id not in self.inventory:
+            if choice not in item_list:
                 print("That item doesn't exist.")
                 continue
-            item = self.inventory[item_id]
+            item = choice
             adjusted_price = self.get_price_with_difficulty(item['price'])
             
-            if item['quantity'] < 1:
+            if item['quantity'] < amount:
                 print(f"{item['name'].capitalize()} is out of stock.")
                 continue
             if self.player.gold < adjusted_price:
@@ -3815,7 +3833,7 @@ class GenericStore:
                 continue
 
             # Transaction
-            item['quantity'] -= 1
+            item['quantity'] -= amount
             self.player.gold -= adjusted_price
             self.player.itemsinventory[item['name']] = self.player.itemsinventory.get(item['name'], 0) + 1
             print(f"You bought 1 {item['name']} for ${adjusted_price}. Remaining gold: ${self.player.gold:.2f}")

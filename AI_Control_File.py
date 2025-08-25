@@ -8,7 +8,7 @@ class AI_Control:
     def __init__(self):
         self.action = None
 
-    def parse_action(self, player_text: str, available_actions: list, choice_type: str):
+    def parse_action(self, player_text: str, available_actions: list, choice_type: str, items: list):
         if choice_type == "MG":
             prompt = dedent(f"""
     You are the action parser for a text RPG.
@@ -35,6 +35,20 @@ class AI_Control:
     Example output: {{"choice": "yes", "args": {{"target": "bison"}}}}
     Second example: {{"choice": "no", "args": {{"leave location": "cave"}}}}
     """)
+        elif choice_type == "MCP":
+            prompt = dedent(f"""
+    You are the action parser for a text RPG.
+    The player is currently trying to purchase with these options: {items}.
+    Convert the player's input into JSON with one of these items.
+    Return ONLY JSON. Do not invent other items.
+    Return ONLY JSON in the form:
+    {{"choice": "one of the items", "args": {"quantity the player wants"}}}
+    You may include arguments in the "args" field.
+    If player does not specify how many, set quantity to 1.
+    Example output: {{"choice": "rifle", "args": {{"quantity": "1"}}}}
+    Second example: {{"choice": "rilfe ammo", "args": {{"quantity": "2"}}}}
+    """)
+
         response = ollama.chat(
             model="phi3",
             format="json",
