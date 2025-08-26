@@ -5,25 +5,11 @@ from textwrap import dedent
 
 
 class AI_Control:
-    def __init__(self):
+    def __init__(self,):
         self.action = None
 
-    def parse_action(self, player_text: str, available_actions: list, choice_type: str, items: list, choice: str):
-        if choice_type == "MG":
-            prompt = dedent(f"""
-    You are the action parser for a text RPG.
-    The player may only perform these actions now: {available_actions}.
-    Convert the player's input into JSON with one of these actions.
-    Return ONLY JSON. Do not invent other actions.
-    Return ONLY JSON in the form:
-    {{"action": "one of the actions", "args": {"an argument"}}}
-    You may include arguments in the "args" field if needed.
-    Arguments are optional.
-    Example output: {{"action": "gunsmith's shop", "args": {{"purchase": "gun"}}}}
-    Second example: {{"action": "town jail", "args": {{"target": "sheriff"}}}}
-    """)
-        elif choice_type == "YN":
-            prompt = dedent(f"""
+    def parse_YN(self, choice: str, player_text):
+        prompt = dedent(f"""
     You are the action parser for a text RPG.
     The player may only yes or no to this choice {choice}.
     Convert the player's input into JSON with yes or no.
@@ -35,10 +21,28 @@ class AI_Control:
     Example output: {{"choice": "yes", "args": {{"target": "bison"}}}}
     Second example: {{"choice": "no", "args": {{"leave location": "cave"}}}}
     """)
-        elif choice_type == "MCP":
-            prompt = dedent(f"""
+        response = ollama.chat(
+            model="phi3",
+            format="json",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": player_text}
+            ]
+        )
+        try:
+            
+            self.action = json.loads(response['message']['content'])         # convert to dict
+
+            return self.action
+        except json.JSONDecodeError:
+            # fallback to a safe default
+            self.action = {"action": "help", "args": {}}
+            return {"action": "help", "args": {}}
+
+    def parse_purchase(self, items: list, player_text):
+        prompt = dedent(f"""
 You are the action parser for a text RPG.
-The player is trying to purchase an item. The available items are: {items}.
+The player is trying to purchase an item. The available items are: {", ".join(items)}.
 Convert the player's input into JSON **with exactly two keys**:
 1. "choice" → must be exactly one of the items (case-insensitive).
 2. "quantity" → must always be present as a string representing an integer. 
@@ -49,7 +53,38 @@ Example outputs:
 {{"choice": "rifle", "quantity": "1"}}
 {{"choice": "pistol_ammo", "quantity": "3"}}
 """)
+        response = ollama.chat(
+            model="phi3",
+            format="json",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": player_text}
+            ]
+        )
+        try:
+            
+            self.action = json.loads(response['message']['content'])         # convert to dict
 
+            return self.action
+        except json.JSONDecodeError:
+            # fallback to a safe default
+            self.action = {"action": "help", "args": {}}
+            return {"action": "help", "args": {}}
+
+    def parse_action(self, player_text: str, available_actions: list):
+        prompt = dedent(f"""
+    You are the action parser for a text RPG.
+    The player may only perform these actions now: {available_actions}.
+    Convert the player's input into JSON with one of these actions.
+    Return ONLY JSON. Do not invent other actions.
+    Return ONLY JSON in the form:
+    {{"action": "one of the actions", "args": {"an argument"}}}
+    You may include arguments in the "args" field if needed.
+    Arguments are optional.
+    Example output: {{"action": "gunsmith's shop", "args": {{"purchase": "gun"}}}}
+    Second example: {{"action": "town jail", "args": {{"target": "sheriff"}}}}
+    """)    
+        
         response = ollama.chat(
             model="phi3",
             format="json",

@@ -411,15 +411,11 @@ class Player:
         print("You may choose an action to take:")
         for action1 in self.possibleactions:
             print(action1)
-
         while True:
             choice = input("Choice: ").strip()
-            choice_type = "MG"
-            parsed = AI_File.parse_action(choice, self.possibleactions, choice_type, None, None)
+            parsed = AI_File.parse_action(choice, self.possibleactions)
             print(parsed['action'])
             if parsed['action'] in self.possibleactions:
-                game_state = self.generate_game_state()
-                AI_File.narrate_action(game_state, self.possibleactions, None)
                 return parsed['action']
             else:
                 print("Invalid or unavailable choice. Try again.")
@@ -3813,10 +3809,10 @@ class GenericStore:
             print("\nWhat would you like to buy?")
             print("You can leave or look at your inventory at any time.")
             choice1 = input(": ").strip()
-            choice_type = "MCP"
+
             actions = ['leave', 'inventory']
             complete_list = item_list + actions
-            parsed = AI_File.parse_action(choice1, None, choice_type, complete_list, None)
+            parsed = AI_File.parse_purchase(complete_list, choice1)
             print(parsed['choice'])
             choice = parsed.get('choice')
             choice = parsed.get('choice')
@@ -3838,6 +3834,13 @@ class GenericStore:
                 self.show_player_inventory()
                 continue
 
+            print(f"The AI understood you want to buy {amount} x {item_name.capitalize()} for ${amount_price}.")
+            confirm = input("Confirm purchase? (y/n): ").lower()
+
+            if confirm != "n":
+                print("Purchase cancelled.")
+                continue
+
 
             if choice not in item_list:
                 print("That item doesn't exist.")
@@ -3849,13 +3852,14 @@ class GenericStore:
             if item['quantity'] < amount:
                 print(f"{item['name'].capitalize()} is out of stock.")
                 continue
-            if self.player.gold < adjusted_price:
+            amount_price = adjusted_price*amount
+            
+            if self.player.gold < amount_price:
                 print("You don't have enough gold.")
                 continue
 
             # Transaction
             item['quantity'] -= amount
-            amount_price = adjusted_price*amount
             self.player.gold -= amount_price
             
             self.player.itemsinventory[item['name']] = self.player.itemsinventory.get(item['name'], 0) + amount
