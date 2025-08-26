@@ -147,6 +147,7 @@ Example outputs:
         base_prompt = [{"role": "system", "content": dedent(f"""
         You are an NPC for a western text RPG.
         The world state is: {game_state}.
+        Your tone should
         Event: {event}.
         You are {NPC}.
         Stay in character, answer briefly in dialogue style.

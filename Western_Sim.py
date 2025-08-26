@@ -413,6 +413,10 @@ class Player:
             print(action1)
         while True:
             choice = input("Choice: ").strip()
+            if choice == "3":
+                self.Hostility += 1
+                print("H")
+                continue
             parsed = AI_File.parse_action(choice, self.possibleactions)
             print(parsed['action'])
             if parsed['action'] in self.possibleactions:
@@ -429,10 +433,14 @@ class Player:
             health_status = f"Player has {self.Health}/{self.MaxHealth} health remaining."
         else:
             health_status = f"Player is in good health."
-        if self.Hostility >= 1:
-            hostility = f"The Townspeople have a hostility of {self.Hostility}."
-        else: 
-            hostility = ""
+        if self.Hostility == 1:
+            hostility = f"You are somewhat hostile to the player."
+        elif self.Hostility == 2:
+            hostility = f"You are very hostile to the player for what they have done in town."
+        elif self.Hostility >= 3: 
+            hostility = f"You are extremely hostile to the player for what they have done in town."
+        else:
+            hostility = "You are not hostile to the player."
         game_state = village_part + health_status + hostility
         return game_state
     
@@ -956,6 +964,12 @@ class Player:
         print("You walk into the blacksmith.")
         print("The smith gives you a nod.")
         time.sleep(2,)
+        if random.randint(1,3) == 3:
+            print(f"The owner walks over and greets you.")
+            game_state = player.generate_game_state()
+            event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
+            NpC = "blacksmith"
+            AI_File.narrate_dialogue(game_state, event, NpC)
         inventory = {
             'leather armor': {'name': 'leather armor', 'price': 35, 'quantity': 3},
             'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2},
@@ -1004,7 +1018,7 @@ class Player:
             'field dressing kit': {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
             'antivenom': {'name': 'antivenom', 'price': 10, 'quantity': 5},
         }
-        if random.randint(3,3) == 3:
+        if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
             game_state = player.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
@@ -1018,6 +1032,12 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You enter the gunsmith.")
         print("The gunsmith greets you with a nod. Guns line the walls.")
+        if random.randint(1,3) == 3:
+            print(f"The owner walks over and greets you.")
+            game_state = player.generate_game_state()
+            event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
+            NpC = "gunsmith"
+            AI_File.narrate_dialogue(game_state, event, NpC)
         time.sleep(2,)
         inventory = {
         'revolver': {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
@@ -3824,7 +3844,7 @@ class GenericStore:
             actions = ['leave', 'inventory']
             complete_list = item_list + actions
             parsed = AI_File.parse_purchase(complete_list, choice1)
-            print(parsed['choice'])
+            print(parsed.get('choice', "invalid input"))
             choice = parsed.get('choice')
             if not choice:
                 print("Invalid input, defaulting to 'help'.")
