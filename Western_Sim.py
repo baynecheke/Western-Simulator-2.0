@@ -3765,7 +3765,6 @@ class Combat:
 
 class GenericStore:
     def __init__(self, player, store_name, inventory):
-
         self.player = player
         self.store_name = store_name
         self.inventory = inventory
@@ -3804,6 +3803,12 @@ class GenericStore:
 
     def run_shop(self):
         print(f"Welcome to the {self.store_name}!")
+        if random.randint(3,3) == 3:
+            print(f"The owner walks over and greets you.")
+            game_state = player.generate_game_state()
+            event = f"The player walks into the {self.store_name}, and is greeted by the owner."
+            NpC = "store owner"
+            AI_File.narrate_dialogue(game_state, event, NpC)
         while True:
             item_list = self.show_inventory()
             print("\nWhat would you like to buy?")
@@ -3814,7 +3819,6 @@ class GenericStore:
             complete_list = item_list + actions
             parsed = AI_File.parse_purchase(complete_list, choice1)
             print(parsed['choice'])
-            choice = parsed.get('choice')
             choice = parsed.get('choice')
             if not choice:
                 print("Invalid input, defaulting to 'help'.")
@@ -3834,12 +3838,7 @@ class GenericStore:
                 self.show_player_inventory()
                 continue
 
-            print(f"The AI understood you want to buy {amount} x {item_name.capitalize()} for ${amount_price}.")
-            confirm = input("Confirm purchase? (y/n): ").lower()
-
-            if confirm != "n":
-                print("Purchase cancelled.")
-                continue
+            
 
 
             if choice not in item_list:
@@ -3854,9 +3853,19 @@ class GenericStore:
                 continue
             amount_price = adjusted_price*amount
             
+
+            print(f"The AI understood you want to buy {amount} x {choice.capitalize()} for ${amount_price}.")
+            confirm = input("Confirm purchase? (y/n): ").lower()
+
+            if confirm != "n":
+                print("Purchase cancelled.")
+                continue
+
             if self.player.gold < amount_price:
                 print("You don't have enough gold.")
                 continue
+
+
 
             # Transaction
             item['quantity'] -= amount

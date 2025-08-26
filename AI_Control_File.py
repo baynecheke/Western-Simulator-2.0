@@ -141,36 +141,50 @@ Example outputs:
         print()
         return narration
     
-    def narrate_event(self, game_state, event):
-        action = self.action.get("action")
-        args = self.action.get("args", {})
-
+    def narrate_dialogue(self, game_state, event, NPC):
         # Create a dynamic prompt
-        prompt = dedent(f"""
-    You are the narrator for a western text RPG.
-    The world state is: {game_state}.
-    Event: {event}.
-    Write a short narration (2-3 sentences max) describing what the event is.
-    Keep it immersive and consistent with the world state.
-    Do not explicitly state anything about what to do next.
-    """)
-        
-        response_stream = ollama.chat(
-            model="llama3:8b",
-            messages=[
-                {"role": "system", "content": prompt}
-            ],
-            stream=True
-        )
-        
-        narration = ""
-        for chunk in response_stream:
-            # Ollama yields dicts with incremental content
-            token = chunk["message"]["content"]
-            print(token, end="", flush=True)   # print as it arrives
-            narration += token
-        print()
-        return narration
+
+        base_prompt = [{"role": "system", "content": dedent(f"""
+        You are an NPC for a western text RPG.
+        The world state is: {game_state}.
+        Event: {event}.
+        You are {NPC}.
+        Stay in character, answer briefly in dialogue style.
+    """)}
+]
+        dialogue_history = []
+        leave = False
+        while leave == False:
+            leave = False
+            prompt = [base_prompt[0]]
+            prompt.extend(dialogue_history[-3:])
+            response_stream = ollama.chat(
+                model="llama3:8b",
+                messages=prompt,
+                stream=True)
+            
+            
+            narration = ""
+
+            for chunk in response_stream:
+                # Ollama yields dicts with incremental content
+                token = chunk["message"]["content"]
+                print(token, end="", flush=True)   # print as it arrives
+                narration += token
+            
+
+            dialogue_history.append({"role": "assistant", "content": narration})
+
+                
+            player_input = input("You: ").strip()
+            if player_input.lower() in ["bye", "leave", "exit", "quit"]:
+                print(f"{NPC}: Safe travels, stranger.")
+                break
+            dialogue_history.append({"role": "user", "content": player_input})
+            
+            
+            
+
 
 
 #AI = AI_Control()
