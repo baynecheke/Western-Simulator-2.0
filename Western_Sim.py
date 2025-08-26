@@ -1004,7 +1004,13 @@ class Player:
             'field dressing kit': {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
             'antivenom': {'name': 'antivenom', 'price': 10, 'quantity': 5},
         }
-        doc_shop = GenericStore(self, "Doctor's Supply Cabinet", doctor_inventory)
+        if random.randint(3,3) == 3:
+            print(f"The owner walks over and greets you.")
+            game_state = player.generate_game_state()
+            event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
+            NpC = "doctor"
+            AI_File.narrate_dialogue(game_state, event, NpC)
+        doc_shop = GenericStore(self, "Doctor's Supply Store", doctor_inventory)
         doc_shop.run_shop()
         print("You leave the Doctor's Office.")
 
@@ -3803,7 +3809,7 @@ class GenericStore:
 
     def run_shop(self):
         print(f"Welcome to the {self.store_name}!")
-        if random.randint(3,3) == 3:
+        if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
             game_state = player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
