@@ -8,17 +8,17 @@ class AI_Control:
     def __init__(self,):
         self.action = None
 
-    def parse_YN(self, choice: str, player_text):
+    def parse_YN(self, choice: str, player_text: str) -> str:
         prompt = dedent(f"""
-    You are the action parser for a text RPG.
-    The player may only yes or no to this choice {choice}.
-    Convert the player's input into JSON with yes or no.
-    Return ONLY JSON. Do not invent other actions.
-    Return ONLY JSON in the form:
-    Example: {{"choice": "yes"}},
-    Example2: {{"choice": "no"}}
+        You are the action parser for a text RPG.
+        The player may only answer yes or no to this choice: {choice}.
+        Convert the player's input into JSON with yes or no.
 
-    """)
+        Return ONLY JSON in the form:
+        Example: {{"choice": "yes"}}
+        Example2: {{"choice": "no"}}
+        """)
+
         response = ollama.chat(
             model="phi3",
             format="json",
@@ -27,17 +27,18 @@ class AI_Control:
                 {"role": "user", "content": player_text}
             ]
         )
+
         try:
-            
             parsed = json.loads(response['message']['content'])
+            print(parsed.get("choice", "no").lower())
             answer = parsed.get("choice", "no").lower()
-
+            if answer not in ("yes", "no"):
+                answer = "no"  # enforce valid fallback
             return answer
-        except json.JSONDecodeError:
-            # fallback to a safe default
-            self.action = {"choice": "no"}
-            return self.action
 
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return "no"  # always return string, never dict
+    
     def parse_purchase(self, items: list, player_text):
         prompt = dedent(f"""
 You are the action parser for a text RPG.
@@ -172,7 +173,7 @@ Example outputs:
             self.action = {"action": "talk"}
             return {"action": "talk", }
 
-    def narrate_dialogue(self, game_state, event, NPC):
+    def narrate_shop(self, game_state, event, NPC):
         # Create a dynamic prompt
 
         base_prompt = [{"role": "system", "content": dedent(f"""
@@ -222,6 +223,7 @@ Example outputs:
             if choice.get("action", 'talk') == "buy":
                 leave = True
                 print("Here is what I've got:")
+                return 'buy'
             
     def narrate_dialogue_once(self, game_state, event, NPC):
         # Create a dynamic prompt

@@ -3821,7 +3821,11 @@ class GenericStore:
 
     def get_price_with_difficulty(self, base_price):
         if self.player.Hostility == 1:
-            print()
+            base_price += 1
+        elif self.player.Hostility == 2:
+            base_price += 2
+        elif self.player.Hostility >= 3:
+            base_price += 3
 
         if self.player.difficulty == 'adventure':
             return int(base_price * 0.9)  # 10% cheaper
@@ -3832,9 +3836,6 @@ class GenericStore:
     def show_inventory(self):
         print(f"\n--- {self.store_name} Inventory ---")
         item_list = []
-        count = 0
-        for value in self.inventory.items():
-            count += 1
         for count, item in self.inventory.items():
             print(f"{item['name'].capitalize()} - ${self.get_price_with_difficulty(item['price'])} | Stock: {item['quantity']}")
             item_list.append(item['name'])
@@ -3844,12 +3845,12 @@ class GenericStore:
 
     def run_shop(self):
         print(f"Welcome to the {self.store_name}!")
-        if random.randint(3,3) == 3:
+        if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
             game_state = player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
             NpC = "store owner"
-            leave = AI_File.narrate_dialogue(game_state, event, NpC)
+            leave = AI_File.narrate_shop(game_state, event, NpC)
             if leave == 'leave':
                 return
         while True:
@@ -3897,10 +3898,10 @@ class GenericStore:
             amount_price = adjusted_price*amount
             
 
-            print(f"The AI understood you want to buy {amount} x {choice.capitalize()} for ${amount_price}.")
-            confirm = input("Confirm purchase? (y/n): ").lower()
-
-            if confirm != "y":
+            print(f"I understood you want to buy {amount} x {choice.capitalize()} for ${amount_price}.")
+            confirm = input("Confirm purchase? (yes/no): ").lower()
+            choice = AI_File.parse_YN(f"Confirming if the player want to buy a {choice.capitalize()}", confirm)
+            if choice != "yes":
                 print("Purchase cancelled.")
                 continue
 
