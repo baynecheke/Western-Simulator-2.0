@@ -52,6 +52,7 @@ Return ONLY JSON. No explanations or extra text.
 Example outputs:
 {{"choice": "rifle", "quantity": "1"}}
 {{"choice": "pistol_ammo", "quantity": "3"}}
+{{"choice": "leave", "quantity": ""}}
 """)
         response = ollama.chat(
             model="phi3",
@@ -68,8 +69,8 @@ Example outputs:
             return self.action
         except json.JSONDecodeError:
             # fallback to a safe default
-            self.action = {"action": "help", "args": {}}
-            return {"action": "help", "args": {}}
+            self.action = {"choice": "leave", "args": {}}
+            return self.action
 
     def parse_action(self, player_text: str, available_actions: list):
         prompt = dedent(f"""
@@ -141,22 +142,59 @@ Example outputs:
         print()
         return narration
     
+    def parse_dialogue_player(self, player_dialogue, choices: list):
+        prompt = dedent(f"""
+    You are a dialogue parser for a game.  
+The player is speaking to an NPC.  
+You must decide if the player wants to {", ".join(choices)}.  
+
+Return ONLY valid JSON in this format:
+{{"action": "talk"}}
+or  
+{{"action": "buy"}} 
+or
+{{"action": "leave"}}
+or any other choice in the previous list.
+
+Do not add extra text. Do not invent other actions.
+If player not clear, select {{"action": "talk"}}.
+
+    """)    
+        
+        response = ollama.chat(
+            model="phi3",
+            format="json",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": player_dialogue}
+            ]
+        )
+        try:
+            
+            self.action = json.loads(response['message']['content'])         # convert to dict
+
+            return self.action
+        except json.JSONDecodeError:
+            # fallback to a safe default
+            self.action = {"action": "talk"}
+            return {"action": "talk", }
+
     def narrate_dialogue(self, game_state, event, NPC):
         # Create a dynamic prompt
 
         base_prompt = [{"role": "system", "content": dedent(f"""
         You are an NPC for a western text RPG.
         The world state is: {game_state}.
-        Your tone should
         Event: {event}.
         You are {NPC}.
-        Stay in character, answer briefly in dialogue style.
+        Stay in character, answer very briefly in dialogue style.
+        1-2 sentences max.
+        Make sure you respond with the correct hostility.
     """)}
 ]
         dialogue_history = []
         leave = False
         while leave == False:
-            leave = False
             prompt = [base_prompt[0]]
             prompt.extend(dialogue_history[-3:])
             response_stream = ollama.chat(
@@ -178,10 +216,19 @@ Example outputs:
 
                 
             player_input = input("You: ").strip()
-            if player_input.lower() in ["bye", "leave", "exit", "quit"]:
+            if player_input.lower() in ["bye"]:
                 print(f"{NPC}: Safe travels, stranger.")
                 break
             dialogue_history.append({"role": "user", "content": player_input})
+            list_options = ["buy", "talk", "leave"]
+            choice = self.parse_dialogue_player(player_input, list_options)
+            if choice.get("action", 'talk') == "leave":
+                print(f"{NPC}: Safe travels, stranger.")
+                leave = True
+                return 'leave'
+            if choice.get("action", 'talk') == "buy":
+                leave = True
+                print("Here is what I've got:")
             
             
             

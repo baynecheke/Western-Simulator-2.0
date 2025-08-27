@@ -418,9 +418,9 @@ class Player:
                 print("H")
                 continue
             parsed = AI_File.parse_action(choice, self.possibleactions)
-            print(parsed['action'])
-            if parsed['action'] in self.possibleactions:
-                return parsed['action']
+            print(parsed.get('action', 'none'))
+            if parsed.get('action', 'none') in self.possibleactions:
+                return parsed.get('action', 'none')
             else:
                 print("Invalid or unavailable choice. Try again.")
 
@@ -429,10 +429,6 @@ class Player:
             village_part = "Player is in a western village"
         else:
             village_part = "Player is in the western prairy."
-        if self.Health <= 80:
-            health_status = f"Player has {self.Health}/{self.MaxHealth} health remaining."
-        else:
-            health_status = f"Player is in good health."
         if self.Hostility == 1:
             hostility = f"You are somewhat hostile to the player."
         elif self.Hostility == 2:
@@ -441,7 +437,7 @@ class Player:
             hostility = f"You are extremely hostile to the player for what they have done in town."
         else:
             hostility = "You are not hostile to the player."
-        game_state = village_part + health_status + hostility
+        game_state = village_part + hostility
         return game_state
     
     def ActionFunction(self, choice):
@@ -3829,12 +3825,14 @@ class GenericStore:
 
     def run_shop(self):
         print(f"Welcome to the {self.store_name}!")
-        if random.randint(1,3) == 3:
+        if random.randint(3,3) == 3:
             print(f"The owner walks over and greets you.")
             game_state = player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
             NpC = "store owner"
-            AI_File.narrate_dialogue(game_state, event, NpC)
+            leave = AI_File.narrate_dialogue(game_state, event, NpC)
+            if leave == 'leave':
+                return
         while True:
             item_list = self.show_inventory()
             print("\nWhat would you like to buy?")
@@ -3883,7 +3881,7 @@ class GenericStore:
             print(f"The AI understood you want to buy {amount} x {choice.capitalize()} for ${amount_price}.")
             confirm = input("Confirm purchase? (y/n): ").lower()
 
-            if confirm != "n":
+            if confirm != "y":
                 print("Purchase cancelled.")
                 continue
 
