@@ -1303,6 +1303,8 @@ class Player:
         time.sleep(2)
 
     def Townspeople(self):
+        if self.Hostility >= 3:
+            print("The townspeople are hostile and refuse to talk to you.")
         print(f"You chat with a few townsfolk.")
         time.sleep(1)
         self.counter += 1
@@ -1310,47 +1312,64 @@ class Player:
             print("You've chatted for a while; there are no new conversations right now.")
             return
 
-        roll = random.randint(1, 100)
+        roll = random.randint(31, 45)
 
         if roll <= 15:
             # Basic job
-            print("A man asks if you'll help load wagons at the stable.")
-            print("Work for 2 hours for gold? (yes/no)")
-            if input(": ").strip().lower() == "yes":
-                earned = random.randint(6, 14)
+            print("A merchant walks up to you.")
+            NpC = "merchant"
+            event = "A merchant asks if the player will help load wagons at the stable."
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
+            if choice.strip().lower() == "yes":
+                earned = random.randint(31, 45)
                 self.gold += earned
                 self.Time += 2
                 print(f"You work and earn {earned} gold.")
             else:
                 print("You politely decline.")
+            time.sleep(2,)
 
         elif roll <= 30:
-            # Farmer & the plow
-            print("A farmer waves you over. 'My plow's busted—can you help fix it?'")
-            if "rope" in self.itemsinventory:
-                print("You tie it back together with your rope.")
-                self.itemsinventory["rope"] -= 1
-                if self.itemsinventory["rope"] <= 0:
-                    del self.itemsinventory["rope"]
-                self.gold += 10
-                print("You fix the plow. +10 gold.")
-            elif self.strength_skill >= 4:
-                print("You heave the plow upright and wedge it in tight.")
-                self.gold += 8
-                print("The farmer gives you 8 gold for your help.")
+            NpC = "farmer"
+            print("A farmer waves you over.")
+            event = "A farmer waves the player over. 'My plow's busted—can you help fix it?'"
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
+
+            if choice == "yes":
+                if "rope" in self.itemsinventory:
+                    print("You tie it back together with your rope.")
+                    self.itemsinventory["rope"] -= 1
+                    if self.itemsinventory["rope"] <= 0:
+                        del self.itemsinventory["rope"]
+                    self.gold += 10
+                    print("You fix the plow. +10 gold.")
+                elif self.strength_skill >= 4:
+                    print("You heave the plow upright and wedge it in tight.")
+                    self.gold += 8
+                    print("The farmer gives you 8 gold for your help.")
+                else:
+                    print("You try to help, but it's beyond your skill. The farmer thanks you anyway.")
             else:
-                print("You try to help, but it's beyond your skill. The farmer thanks you anyway.")
+                print("You decline to help the farmer.")
+            
+            time.sleep(2)
+
 
         elif roll <= 45:
-            # Teaching children
-            print("A schoolteacher asks if you'll speak to the children about survival.")
-            if input("Do you agree? (yes/no): ").strip().lower() == "yes":
+            print("A schoolteacher walks over.")
+            NpC = "schoolteacher"
+            event = "A schoolteacher asks if the player will speak to the children about survival."
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
+
+            if choice == "yes":
+                self.Time += 2
                 self.shadow_skill += 1
                 print("You tell them stories and teach a few tricks. +1 Shadow Skill.")
                 self.Time += 1
             else:
                 print("You shake your head and move on.")
-
+            
+            time.sleep(2)
         elif roll <= 60:
             # Help the blacksmith
             print("The blacksmith grunts, 'Hand me that hammer, would ya?'")

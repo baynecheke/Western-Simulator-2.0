@@ -15,11 +15,9 @@ class AI_Control:
     Convert the player's input into JSON with yes or no.
     Return ONLY JSON. Do not invent other actions.
     Return ONLY JSON in the form:
-    {{"choice": "yes or no", "args": {"an argument"}}}
-    You may include arguments in the "args" field if needed.
-    Arguments are optional.
-    Example output: {{"choice": "yes", "args": {{"target": "bison"}}}}
-    Second example: {{"choice": "no", "args": {{"leave location": "cave"}}}}
+    Example: {{"choice": "yes"}},
+    Example2: {{"choice": "no"}}
+
     """)
         response = ollama.chat(
             model="phi3",
@@ -31,13 +29,14 @@ class AI_Control:
         )
         try:
             
-            self.action = json.loads(response['message']['content'])         # convert to dict
+            parsed = json.loads(response['message']['content'])
+            answer = parsed.get("choice", "no").lower()
 
-            return self.action
+            return answer
         except json.JSONDecodeError:
             # fallback to a safe default
-            self.action = {"action": "help", "args": {}}
-            return {"action": "help", "args": {}}
+            self.action = {"choice": "no"}
+            return self.action
 
     def parse_purchase(self, items: list, player_text):
         prompt = dedent(f"""
@@ -145,21 +144,15 @@ Example outputs:
     def parse_dialogue_player(self, player_dialogue, choices: list):
         prompt = dedent(f"""
     You are a dialogue parser for a game.  
-The player is speaking to an NPC.  
-You must decide if the player wants to {", ".join(choices)}.  
+    The player is speaking to an NPC.  
+    You must choose one of the following actions: {", ".join(choices)}.  
 
-Return ONLY valid JSON in this format:
-{{"action": "talk"}}
-or  
-{{"action": "buy"}} 
-or
-{{"action": "leave"}}
-or any other choice in the previous list.
+    Return ONLY valid JSON in this format:
+    {{"action": "<one_of_choices>"}}
 
-Do not add extra text. Do not invent other actions.
-If player not clear, select {{"action": "talk"}}.
-
-    """)    
+    If the player is not clear, default to:
+    {{"action": "talk"}}
+    """)
         
         response = ollama.chat(
             model="phi3",
@@ -230,6 +223,41 @@ If player not clear, select {{"action": "talk"}}.
                 leave = True
                 print("Here is what I've got:")
             
+    def narrate_dialogue_once(self, game_state, event, NPC):
+        # Create a dynamic prompt
+
+        prompt = [{"role": "system", "content": dedent(f"""
+        You are an NPC for a western text RPG.
+        The world state is: {game_state}.
+        Event: {event}.
+        You are {NPC}.
+        Stay in character, answer very briefly in dialogue style.
+        1-2 sentences max.
+        Make sure you respond with the correct hostility.
+    """)}
+]
+
+
+        response_stream = ollama.chat(
+            model="llama3:8b",
+            messages=prompt,
+            stream=True)
+            
+            
+        narration = ""
+
+        for chunk in response_stream:
+            # Ollama yields dicts with incremental content
+            token = chunk["message"]["content"]
+            print(token, end="", flush=True)   # print as it arrives
+            narration += token
+        player_input = input("You: ").strip()
+        choice = self.parse_YN(event, player_input)
+        if choice == 'yes':
+            return 'yes'
+        else:
+            return 'no'
+
             
             
 
