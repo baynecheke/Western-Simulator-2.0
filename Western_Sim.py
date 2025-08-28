@@ -776,9 +776,10 @@ class Player:
 
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
-        print(f"Shadow skill:")
-        print(f"Strength skill:")
-        print(f"Trail skill:")
+        print(f"Shadow skill: {self.shadow_skill}.")
+        print(f"Strength skill: {self.strength_skill}.")
+        print(f"Trail skill: {self.trail_skill}.")
+        print(f"Max health: {self.MaxHealth}")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
         if self.watch:
@@ -859,12 +860,14 @@ class Player:
         elif choice == "4":
             print("The sheriff can teach you some skills.")
             print("Choose a skill to learn:")
-            print("(1) Shadow Skill - Improves stealth and tracking.")
-            print("(2) Trail Skill - Improves navigation and survival.")
-            print("(3) Strength Skill - Improves combat effectiveness.")
-            print("(4) Durability Skill - Improves max Health.")
-            skill_choice = input("Enter your choice (1-3): ").strip()
-            if skill_choice == "1":
+            print(f"Shadow Skill - Improves stealth and tracking. Current: {self.shadow_skill}")
+            print(f"Strength Skill - Improves combat effectiveness. Current: {self.strength_skill}")
+            print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
+            print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
+            skill_choice = input("Enter your choice: ").strip()
+            available_choices = ['Durability', 'Trail', 'Strength', 'Shadow']
+            skill_choice = AI_File.parse_choice(available_choices, skill_choice)
+            if skill_choice == "Shadow":
                 gold = self.shadow_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -874,7 +877,7 @@ class Player:
                     print("Your shadow skill has improved! +1 shadow skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "2":
+            elif skill_choice == "Trail":
                 gold = self.trail_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -884,17 +887,17 @@ class Player:
                     print("Your trail skill has improved! +1 trail skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "3":
+            elif skill_choice == "Strength":
                 gold = self.strength_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
                 choice = input(": ").strip().lower()
                 if choice == "yes":
                     self.strength_skill += 1
-                    print("Your strength skill has improved!")
+                    print("Your strength skill has improved! +1 strength skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "4":
+            elif skill_choice == "Durability":
                 gold = (self.MaxHealth-95)/5 * 10
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")

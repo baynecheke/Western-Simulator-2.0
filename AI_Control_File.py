@@ -104,12 +104,6 @@ Example outputs:
             self.action = {"action": "help", "args": {}}
             return {"action": "help", "args": {}}
 
-    def parse_example(self):
-        actions_in_city = ["move", "look", "talk", "inventory"]
-        player_input = str(input("What do you want to do:"))
-        parsed = self.parse_action(player_input, actions_in_city)
-        print(parsed)
-
     def narrate_action(self, game_state, possible_actions, past_actions):
         action = self.action.get("action")
         args = self.action.get("args", {})
@@ -260,7 +254,36 @@ Example outputs:
         else:
             return 'no'
 
+    def parse_choice(self, available_choices, player_text):
+        prompt = dedent(f"""
+    You are the choice parser for a text RPG.
+    The player may only choose from these choices now: {", ".join(available_choices)}.
+    Convert the player's input into JSON with one of these actions.
+    Return ONLY JSON. Do not invent other actions.
+    Return ONLY JSON in the form:
+    {{"choice": "<one of the choices>"}}
+    """)    
+        
+        response = ollama.chat(
+            model="phi3",
+            format="json",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": player_text}
+            ]
+        )
+        try:
             
+            parsed = json.loads(response['message']['content'])
+            print(parsed.get("choice", "no").lower())
+            answer = parsed.get("choice", "none").lower()
+            if answer not in (available_choices):
+                answer = "none"  # enforce valid fallback
+            return answer
+        except json.JSONDecodeError:
+            # fallback to a safe default
+            self.action = {"choice": "None", }
+            return self.action
             
 
 
