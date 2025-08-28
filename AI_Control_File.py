@@ -10,13 +10,10 @@ class AI_Control:
 
     def parse_YN(self, choice: str, player_text: str) -> str:
         prompt = dedent(f"""
-        You are the action parser for a text RPG.
-        The player may only answer yes or no to this choice: {choice}.
-        Convert the player's input into JSON with yes or no.
-
-        Return ONLY JSON in the form:
-        Example: {{"choice": "yes"}}
-        Example2: {{"choice": "no"}}
+You are an action parser for a text RPG.
+The player may only respond "yes" or "no" to: {choice}.
+Output JSON only, in this format:
+{{"choice": "yes"}} or {{"choice": "no"}}
         """)
 
         response = ollama.chat(
