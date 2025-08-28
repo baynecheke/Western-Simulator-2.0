@@ -865,9 +865,9 @@ class Player:
             print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
             skill_choice = input("Enter your choice: ").strip()
-            available_choices = ['Durability', 'Trail', 'Strength', 'Shadow']
-            skill_choice = AI_File.parse_choice(available_choices, skill_choice)
-            if skill_choice == "Shadow":
+            available_choices = ['durability', 'trail', 'strength', 'shadow']
+            skill_choice = AI_File.parse_choice(available_choices, skill_choice).lower()
+            if skill_choice == "shadow":
                 gold = self.shadow_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -877,7 +877,7 @@ class Player:
                     print("Your shadow skill has improved! +1 shadow skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "Trail":
+            elif skill_choice == "trail":
                 gold = self.trail_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -887,7 +887,7 @@ class Player:
                     print("Your trail skill has improved! +1 trail skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "Strength":
+            elif skill_choice == "strength":
                 gold = self.strength_skill * 5
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -897,7 +897,7 @@ class Player:
                     print("Your strength skill has improved! +1 strength skill.")
                 else:
                     print("You decided not to pay for the lesson.")
-            elif skill_choice == "Durability":
+            elif skill_choice == "durability":
                 gold = (self.MaxHealth-95)/5 * 10
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
@@ -1114,7 +1114,7 @@ class Player:
             price = self.TownUpgrades["general store"]["level"]
             print(f"Price to upgrade: {price}")
             self.TownUpgrades["general store"]["level"] += 1
-            print(f"General store level:{self.TownUpgrades["general store"]["level"]}")
+            print(f"General store level:{self.TownUpgrades['general store']['level']}")
 
 
     def Armory(self):
