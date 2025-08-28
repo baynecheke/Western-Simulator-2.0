@@ -4,8 +4,51 @@ import json
 import os
 import pygame
 import yaml
+import builtins
+import sys
 from AI_Control_File import AI_Control
 AI_File = AI_Control()
+
+USE_SPEECH_INPUT = True
+
+# Save original input
+original_input = builtins.input
+
+try:
+    import speech_recognition as sr
+    recognizer = sr.Recognizer()
+    mic = sr.Microphone()
+
+    def speech_input(prompt=""):
+        if not USE_SPEECH_INPUT:
+            return original_input(prompt)
+
+        print(prompt + " (Press Enter to type)", end="", flush=True)
+        try:
+            with mic as source:
+                recognizer.adjust_for_ambient_noise(source)
+                print("\nListening...", flush=True)
+                audio = recognizer.listen(source, timeout=5)
+            text = recognizer.recognize_google(audio)
+            print(f"You said: {text}")
+            return text
+        except (sr.WaitTimeoutError, sr.UnknownValueError, sr.RequestError):
+            # fallback to keyboard input
+            return original_input("\nType your response: ")
+
+except ImportError:
+    print("SpeechRecognition not installed. Using normal input.")
+    USE_SPEECH_INPUT = False
+    def speech_input(prompt=""):
+        return original_input(prompt)
+
+# Override input globally
+builtins.input = speech_input
+
+# Ask user if they want speech input
+choice = original_input("Would you like to use speech to text? (yes/no) ").strip().lower()
+USE_SPEECH_INPUT = choice == "yes"
+
 
 pygame.mixer.init()
 with open('loot.yaml', 'r') as file:
@@ -67,7 +110,14 @@ class Player:
         self.Temporarytravelboost = 0
         self.enemy_effects = []
         self.player_effects = []
-        self.TownUpgrades = []
+        self.TownUpgrades = {
+            "general store": {'level':0},
+            "gunsmith's shop": {'level':0},
+            "town jail":{'level':0},
+            "doctor's office":{'level':0},
+            "trading post":{'level':0},
+            "blacksmith shop":{'level':0},
+        }
         #classifications
         self.weapons = {
             "melee": [
@@ -726,6 +776,9 @@ class Player:
 
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
+        print(f"Shadow skill:")
+        print(f"Strength skill:")
+        print(f"Trail skill:")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
         if self.watch:
@@ -1049,6 +1102,17 @@ class Player:
 
     def Bank(self):
         print("You walk into the Bank. The air smells of leather and dust.")
+        print("What town building would you like to invest in?")
+        print("general store")
+        print("blacksmith")
+        print("gunsmith's shop")
+        choice = input(": ")
+        if choice == "general store":
+            price = self.TownUpgrades["general store"]["level"]
+            print(f"Price to upgrade: {price}")
+            self.TownUpgrades["general store"]["level"] += 1
+            print(f"General store level:{self.TownUpgrades["general store"]["level"]}")
+
 
     def Armory(self):
         print("You enter the Armory, a shattered house on the edge of town.")
@@ -3935,8 +3999,9 @@ else:
     pygame.mixer.music.set_volume(0.5)
 
     print("Would you like music to play during the game? (yes/no)")
-    choice = input(": ").strip().upper()
-    if choice == "YES":
+    choice = input(": ").strip().lower()
+    choice = AI_File.parse_YN(f"Confirming if the player wants music to play.", choice)
+    if choice == "yes":
         pygame.mixer.music.play(-1)
     else:
         player.music = False
