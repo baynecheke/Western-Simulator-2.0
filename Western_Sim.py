@@ -10,44 +10,70 @@ from AI_Control_File import AI_Control
 AI_File = AI_Control()
 
 USE_SPEECH_INPUT = True
+import builtins
+import speech_recognition as sr
 
-# Save original input
+USE_SPEECH_INPUT = True
 original_input = builtins.input
 
-try:
-    import speech_recognition as sr
-    recognizer = sr.Recognizer()
-    mic = sr.Microphone()
+recognizer = sr.Recognizer()
 
-    def speech_input(prompt=""):
-        if not USE_SPEECH_INPUT:
-            return original_input(prompt)
+speech_buffer = []
+stop_listening = None
 
-        print(prompt + " (Press Enter to type)", end="", flush=True)
-        try:
-            with mic as source:
-                recognizer.adjust_for_ambient_noise(source)
-                print("\nListening...", flush=True)
-                audio = recognizer.listen(source, timeout=5)
-            text = recognizer.recognize_google(audio)
-            print(f"You said: {text}")
-            return text
-        except (sr.WaitTimeoutError, sr.UnknownValueError, sr.RequestError):
-            # fallback to keyboard input
-            return original_input("\nType your response: ")
 
-except ImportError:
-    print("SpeechRecognition not installed. Using normal input.")
-    USE_SPEECH_INPUT = False
-    def speech_input(prompt=""):
+def background_callback(recognizer, audio):
+    global speech_buffer
+    try:
+        text = recognizer.recognize_google(audio)
+        speech_buffer.append(text)
+        combined = " ".join(speech_buffer)
+        print(f"\r> {combined}", end="", flush=True)
+    except sr.UnknownValueError:
+        pass
+    except sr.RequestError:
+        print("\n[Speech API unavailable, switching to typing]")
+        global USE_SPEECH_INPUT
+        USE_SPEECH_INPUT = False
+
+
+def start_listening():
+    global stop_listening
+    mic = sr.Microphone()  # create mic here, not globally
+    stop_listening = recognizer.listen_in_background(mic, background_callback)
+    print("[Listening... speak now, press Enter when ready]")
+
+
+def stop_and_clear():
+    global stop_listening, speech_buffer
+    if stop_listening:
+        stop_listening(wait_for_stop=False)
+        stop_listening = None
+    text = " ".join(speech_buffer).strip()
+    speech_buffer = []
+    return text
+
+
+def speech_input(prompt=""):
+    if not USE_SPEECH_INPUT:
         return original_input(prompt)
 
-# Override input globally
+    print(prompt)
+    start_listening()
+    original_input("")  # press Enter when ready
+    text = stop_and_clear()
+    if not text:
+        return original_input("Type your response: ")
+    print(f"\nFinal: {text}")
+    return text
+
+
 builtins.input = speech_input
 
-# Ask user if they want speech input
 choice = original_input("Would you like to use speech to text? (yes/no) ").strip().lower()
 USE_SPEECH_INPUT = choice == "yes"
+
+
 
 
 pygame.mixer.init()
