@@ -71,35 +71,34 @@ Example outputs:
 
     def parse_action(self, player_text: str, available_actions: list):
         prompt = dedent(f"""
-    You are the action parser for a text RPG.
-    The player may only perform these actions now: {available_actions}.
-    Convert the player's input into JSON with one of these actions.
-    Return ONLY JSON. Do not invent other actions.
-    Return ONLY JSON in the form:
-    {{"action": "one of the actions", "args": {"an argument"}}}
-    You may include arguments in the "args" field if needed.
-    Arguments are optional.
-    Example output: {{"action": "gunsmith's shop", "args": {{"purchase": "gun"}}}}
-    Second example: {{"action": "town jail", "args": {{"target": "sheriff"}}}}
-    """)    
-        
+        You are an action parser for a text RPG.
+        The player may only perform one of these actions: {available_actions}
+
+        Return ONLY JSON in this format:
+        {{"action": "one of the available actions"}}
+        """)
+
         response = ollama.chat(
             model="phi3",
             format="json",
+            options={"temperature": 0},   # deterministic & faster
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": player_text}
             ]
         )
-        try:
-            
-            self.action = json.loads(response['message']['content'])         # convert to dict
 
-            return self.action
-        except json.JSONDecodeError:
-            # fallback to a safe default
-            self.action = {"action": "help", "args": {}}
-            return {"action": "help", "args": {}}
+        try:
+            parsed = json.loads(response['message']['content'])
+            action = parsed.get("action", "").lower()
+            if action not in available_actions:
+                action = "help"  # fallback
+            self.action = {"action": action}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            self.action = {"action": "help"}
+
+        return self.action
+
 
     def narrate_action(self, game_state, possible_actions, past_actions):
         action = self.action.get("action")

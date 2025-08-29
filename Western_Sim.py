@@ -802,12 +802,14 @@ class Player:
         print("You walk into the town jail.")
         print("The sheriff greets you.")
         print("Would you like to: ")
-        print("(1) Pay a fine to reduce hostility.")
-        print("(2) Return a criminal or loot to the sheriff.")
-        print("(3) Ask the sheriff about rumors.")
-        print("(4) Ask the sheriff to teach you some skills.")
-        print("(5) Leave the jail.")
-        choice = input("Enter your choice (1-5): ").strip()
+        print("Pay a fine to reduce hostility.")
+        print("Return a criminal or loot to the sheriff.")
+        print("Ask the sheriff about rumors.")
+        print("Ask the sheriff to teach you some skills.")
+        print("Leave the jail.")
+        choice = input("Enter your choice: ").strip()
+        available_choices = ["pay fine", "return criminal", "ask rumors", "teach skills", "leave"]
+        AI_File.parse_choice(available_choices)
         if choice == "1":
             if self.Hostility > 0:
                 fine = self.Hostility * 5
@@ -869,9 +871,12 @@ class Player:
             skill_choice = AI_File.parse_choice(available_choices, skill_choice).lower()
             if skill_choice == "shadow":
                 gold = self.shadow_skill * 5
+                if gold > self.gold:
+                    print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
                 choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN("The player is deciding if they would like to pay for a lesson.", choice)
                 if choice == "yes":
                     self.shadow_skill += 1
                     print("Your shadow skill has improved! +1 shadow skill.")
@@ -879,9 +884,12 @@ class Player:
                     print("You decided not to pay for the lesson.")
             elif skill_choice == "trail":
                 gold = self.trail_skill * 5
+                if gold > self.gold:
+                    print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
                 choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN("The player is deciding if they would like to pay for a lesson.", choice)
                 if choice == "yes":
                     self.trail_skill += 1
                     print("Your trail skill has improved! +1 trail skill.")
@@ -889,9 +897,12 @@ class Player:
                     print("You decided not to pay for the lesson.")
             elif skill_choice == "strength":
                 gold = self.strength_skill * 5
+                if gold > self.gold:
+                    print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
                 choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN("The player is deciding if they would like to pay for a lesson.", choice)
                 if choice == "yes":
                     self.strength_skill += 1
                     print("Your strength skill has improved! +1 strength skill.")
@@ -899,9 +910,12 @@ class Player:
                     print("You decided not to pay for the lesson.")
             elif skill_choice == "durability":
                 gold = (self.MaxHealth-95)/5 * 10
+                if gold > self.gold:
+                    print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
                 choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN("The player is deciding if they would like to pay for a lesson.", choice)
                 if choice == "yes":
                     self.MaxHealth += 5
                     print("Your durability skill has improved! +5 max Health.")
@@ -1021,7 +1035,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
-            AI_File.narrate_dialogue(game_state, event, NpC)
+            AI_File.narrate_shop(game_state, event, NpC)
         inventory = {
             'leather armor': {'name': 'leather armor', 'price': 35, 'quantity': 3},
             'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2},
@@ -1075,7 +1089,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
-            AI_File.narrate_dialogue(game_state, event, NpC)
+            AI_File.narrate_shop(game_state, event, NpC)
         doc_shop = GenericStore(self, "Doctor's Supply Store", doctor_inventory)
         doc_shop.run_shop()
         print("You leave the Doctor's Office.")
@@ -1089,7 +1103,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
             NpC = "gunsmith"
-            AI_File.narrate_dialogue(game_state, event, NpC)
+            AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
         inventory = {
         'revolver': {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
