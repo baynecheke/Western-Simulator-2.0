@@ -3692,6 +3692,9 @@ class Combat:
             elif self.player.difficulty == 'savage':
                 enemy_health = int(self.EnemyCombatant["health"] * 1.25)
                 enemy_damage = int(self.EnemyCombatant["damage"] * 1.1)
+        if self.player.Day >= 4:
+                enemy_health = int(self.EnemyCombatant["health"] + (5*self.player.Day))
+                enemy_damage = int(self.EnemyCombatant["damage"] + (5*self.player.Day))
 
         print(f"\nYou face off against a {self.Enemy.capitalize()}!")
         print(f"Enemy stats — Health: {enemy_health}, Damage: {enemy_damage}, Speed: {enemy_speed}")
