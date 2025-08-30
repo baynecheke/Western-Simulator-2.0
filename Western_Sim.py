@@ -3713,9 +3713,9 @@ class Combat:
             else:
                 print(f"You boldly approach the {self.Enemy}.")
         
-        Choice = input("Would you like to use an item before the combat? Yes/No:")
+        Choice = input("Would you like to use an item before the combat? Yes/No:").strip().lower()
         Choice = AI_File.parse_YN(Choice)
-        if Choice == "Yes":
+        if Choice == "yes":
             self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
         if self.player.Speed > self.EnemyCombatant["speed"]:
             TurnOrder = ["player", "enemy"]
