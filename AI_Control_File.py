@@ -274,7 +274,7 @@ Example outputs:
             print(token, end="", flush=True)   # print as it arrives
             narration += token
         player_input = input("You: ").strip()
-        choice = self.parse_YN(event, player_input)
+        choice = self.parse_YN(player_input)
         if choice == 'yes':
             return 'yes'
         else:
