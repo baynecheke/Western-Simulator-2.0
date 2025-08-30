@@ -2687,7 +2687,7 @@ class Player:
             print("A bear emerges from the shadows!")
             combat = Combat(self)
             combat.FindAttacker("bear")
-            combat.Attack()
+            escape = combat.Attack()
             if self.Health <= 0:
                 self.Death("The bear has defeated you in the cave.")
         else:
@@ -2695,11 +2695,14 @@ class Player:
             print("A pack of wolves lurks here!")
             combat = Combat(self)
             combat.FindAttacker("pack of wolves")
-            combat.Attack()
+            escape = combat.Attack()
             if self.Health <= 0:
                 self.Death("The wolves have defeated you in the cave.")
 
         time.sleep(1)
+        if escape == True:
+            print("You leave the cave battered, without any treasure...")
+            return
         print("\nAt last, you find a hidden chamber filled with glinting treasures!")
         gold_found = random.randint(40, 70)
         self.gold += gold_found
