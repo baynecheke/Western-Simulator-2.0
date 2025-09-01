@@ -142,22 +142,7 @@ class Player:
             "trading post":{'level':0},
             "blacksmith":{'level':0},
         }
-        self.ShopUpgrades = {
-    "gunsmith": {
-        1: {'colt navy revolver': {'name': 'colt navy revolver', 'price': 35, 'damage': (12, 18), 'quantity': 2}},
-        2: {'winchester rifle': {'name': 'winchester rifle', 'price': 100, 'damage': (25, 30), 'quantity': 2}},
-        3: {'gatling gun': {'name': 'gatling gun', 'price': 150, 'damage': (40, 60), 'quantity': 1}}
-    },
-    "general store": {
-        1: {'coffee tin': {'name': 'coffee tin', 'price': 5, 'quantity': 5}},
-        2: {'surveyor\'s kit': {'name': 'surveyor\'s kit', 'price': 20, 'quantity': 1}},
-        3: {'gold bar': {'name': 'gold bar', 'price': 75, 'quantity': 1}}
-    },
-    "blacksmith": {
-        1: {'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2}},
-        2: {'steel armor': {'name': 'steel armor', 'price': 120, 'quantity': 1}}
-    }
-}
+
         #classifications
         self.weapons = {
             "melee": [
@@ -1160,15 +1145,29 @@ class Player:
             NpC = "gunsmith"
             AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
+        available_weapons = ["revolver", "rifle", "shotgun", "knife"]
+        if self.TownUpgrades >= 1:
+            available_weapons.append("sawed-off shotgun")
+            available_weapons.append("lever-action rifle")
+        if self.TownUpgrades >= 2:
+            available_weapons.append("henry rifle")
+            available_weapons.append("remington pistol")
+        if self.TownUpgrades >= 3:
+            available_weapons.append("winchester rifle")
+            available_weapons.append("double barrel shotgun")
         inventory = {
-        'revolver': {'name': 'revolver', 'price': 20, 'damage': (10, 15), 'quantity': 5},
-        'rifle': {'name': 'rifle', 'price': 40, 'damage': (20, 25), 'quantity': 3},
-        'shotgun': {'name': 'shotgun', 'price': 50, 'damage': (20, 35), 'quantity': 3},
-        'knife': {'name': 'knife', 'price': 10, 'damage': (5, 10), 'quantity': 10},
-        'pistol_ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 50},
-        'rifle_ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
-        'shotgun_ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
+        name: {**info, 'quantity': 3}  # default quantity
+        for name, info in weapons_data.items()
+            if name in available_weapons  # starting gunsmith stock
         }
+        # Add ammo separately:
+        inventory.update({
+            'pistol_ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 50},
+            'rifle_ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
+            'shotgun_ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10},
+        })
+        
+        
         
         GunsmithStore = GenericStore(self, "Gunsmith", inventory)
         GunsmithStore.run_shop()
@@ -3925,44 +3924,6 @@ class Combat:
 
                     if choice == "1":
                         # Get list of owned weapons (weapons with known names)
-                        weapon_choices = {
-                            'revolver': (10, 15),
-                            'rifle': (20, 25),
-                            'shotgun': (20,40),
-                            'colt pistol': (15,20),
-                            'knife': (5, 10),
-                            'bowie knife': (10, 15),
-                            'winchester rifle': (50, 55),
-                            'henry rifle': (30, 35),
-                            'remington pistol': (15, 25),
-                            'derringer pistol':      (5,  15),
-                            'carbine rifle':         (25, 35),
-                            'double barrel shotgun': (30, 50),
-                            'tomahawk':              (15, 25),
-                            'sharps rifle':     (35, 50),
-                            'lever-action rifle':    (30, 35),
-                            'sawed-off shotgun':     (15, 30),
-                            'colt navy revolver':    (20, 25),
-                            'cavalry saber':         (15, 25),
-                        }
-                        ammo_needed = {
-                            'revolver': 'pistol_ammo',
-                            'colt pistol': 'pistol_ammo',
-                            'rifle': 'rifle_ammo',
-                            'shotgun': 'shotgun_ammo',
-                            'winchester rifle': 'rifle_ammo',
-                            'henry rifle': 'rifle_ammo',
-                            'remington pistol': 'pistol_ammo',
-                            'derringer pistol': 'pistol_ammo',
-                            'carbine rifle':      'rifle_ammo',
-                            'double barrel shotgun': 'shotgun_ammo',
-                            'sharps rifle':  'rifle_ammo',
-                            'lever-action rifle': 'rifle_ammo',
-                            'sawed-off shotgun':  'shotgun_ammo',
-                            'colt navy revolver': 'pistol_ammo',
-                        }
-
-
                         owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
                         if not owned_weapons:
                             print("You don't have any weapons, so you fight with your fists!")

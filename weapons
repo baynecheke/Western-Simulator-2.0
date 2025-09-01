@@ -49,7 +49,7 @@ lever-action rifle:
 
 henry rifle:
   name: "henry rifle"
-  price: 45
+  price: 55
   damage: [30, 35]
   ammo: rifle_ammo
   ability: none
@@ -71,21 +71,21 @@ winchester rifle:
 shotgun:
   name: "shotgun"
   price: 50
-  damage: [20, 35]
+  damage: [15, 30]
   ammo: shotgun_ammo
   ability: none
 
 sawed-off shotgun:
   name: "sawed-off shotgun"
-  price: 55
-  damage: [10, 30]
+  price: 30
+  damage: [5, 35]
   ammo: shotgun_ammo
   ability: none
 
 double barrel shotgun:
   name: "double barrel shotgun"
-  price: 80
-  damage: [25, 50]
+  price: 120
+  damage: [20, 50]
   ammo: shotgun_ammo
   ability: none
 
@@ -99,7 +99,7 @@ knife:
 tomahawk:
   name: "tomahawk"
   price: 25
-  damage: [15, 25]
+  damage: [10, 15]
   ammo: none
   ability: none
 
