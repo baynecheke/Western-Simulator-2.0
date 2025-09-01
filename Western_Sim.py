@@ -9,7 +9,7 @@ import sys
 from AI_Control_File import AI_Control
 AI_File = AI_Control()
 
-with open('weapons.yaml', 'r') as file:
+with open('weapons', 'r') as file:
     weapons_data = yaml.safe_load(file)
 
 USE_SPEECH_INPUT = True
@@ -507,6 +507,14 @@ class Player:
             if choice == "3":
                 self.Hostility += 1
                 print("H")
+                continue
+            if choice == "777":
+                self.loot_drop("revolver")
+                self.loot_drop("pistol_ammo")
+                combat = Combat(self)
+                combat.FindAttacker("brawler")
+                combat.Attack()
+
                 continue
             parsed = AI_File.parse_action(choice, self.possibleactions)
             print(parsed.get('action', 'none'))
@@ -4183,8 +4191,11 @@ class GenericStore:
             if not choice:
                 print("Invalid input, defaulting to 'help'.")
                 choice = 'help'
-            raw_quantity = parsed.get('quantity', '1')   # get as string
-            if not raw_quantity.isdigit() or raw_quantity == "":
+
+
+
+            raw_quantity = parsed.get('quantity', '1')   # get as stringv
+            if raw_quantity is None or raw_quantity.strip() == "" or not raw_quantity.isdigit():
                 amount = 1
             else:
                 amount = int(raw_quantity)
