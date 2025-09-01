@@ -9,6 +9,9 @@ import sys
 from AI_Control_File import AI_Control
 AI_File = AI_Control()
 
+with open('weapons.yaml', 'r') as file:
+    weapons_data = yaml.safe_load(file)
+
 USE_SPEECH_INPUT = True
 import builtins
 import speech_recognition as sr
@@ -139,6 +142,22 @@ class Player:
             "trading post":{'level':0},
             "blacksmith":{'level':0},
         }
+        self.ShopUpgrades = {
+    "gunsmith": {
+        1: {'colt navy revolver': {'name': 'colt navy revolver', 'price': 35, 'damage': (12, 18), 'quantity': 2}},
+        2: {'winchester rifle': {'name': 'winchester rifle', 'price': 100, 'damage': (25, 30), 'quantity': 2}},
+        3: {'gatling gun': {'name': 'gatling gun', 'price': 150, 'damage': (40, 60), 'quantity': 1}}
+    },
+    "general store": {
+        1: {'coffee tin': {'name': 'coffee tin', 'price': 5, 'quantity': 5}},
+        2: {'surveyor\'s kit': {'name': 'surveyor\'s kit', 'price': 20, 'quantity': 1}},
+        3: {'gold bar': {'name': 'gold bar', 'price': 75, 'quantity': 1}}
+    },
+    "blacksmith": {
+        1: {'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2}},
+        2: {'steel armor': {'name': 'steel armor', 'price': 120, 'quantity': 1}}
+    }
+}
         #classifications
         self.weapons = {
             "melee": [
@@ -868,7 +887,7 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
-                "buried_gold_east": "Legend has it that there is gold east of here.",
+                "earp_vendetta_quest": "It turns out that Wyatt Earp has",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"A patron murmurs: \"{rumor}\"")
@@ -1142,6 +1161,7 @@ class Player:
         'rifle_ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
         'shotgun_ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
         }
+        
         GunsmithStore = GenericStore(self, "Gunsmith", inventory)
         GunsmithStore.run_shop()
 
@@ -1278,7 +1298,7 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
                 "old_mine_lights": "Strange lights seen in the old mine.",
-                "buried_gold_east": "A lost prospector buried gold east of here.",
+                "earp_vendetta_quest": "A lost prospector buried gold east of here.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"He leans in: \"{rumor}.\"")
@@ -1383,7 +1403,7 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
-                "buried_gold_east": "Legend has it that there is gold east of here.",
+                "earp_vendetta_quest": "Legend has it that there is gold east of here.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"A patron murmurs: \"{rumor}\"")
@@ -1434,7 +1454,7 @@ class Player:
             print("You've chatted for a while; there are no new conversations right now.")
             return
 
-        roll = random.randint(31, 45)
+        roll = random.randint(1, 45)
 
         if roll <= 15:
             # Basic job
@@ -1442,6 +1462,7 @@ class Player:
             NpC = "merchant"
             event = "A merchant asks if the player will help load wagons at the stable."
             choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
+            choice = AI_File.parse_YN(choice)
             if choice.strip().lower() == "yes":
                 earned = random.randint(31, 45)
                 self.gold += earned
@@ -1809,17 +1830,10 @@ class Player:
             print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
             # Trigger a special event based on the quest topic
             if quest_topic == "bandits_coyote_camp":
-                print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
-                combat = Combat(self)
-                combat.FindAttacker("bandit")
-                combat.Attack()
-                if self.Health > 0:
-                    print("You defeat the bandits and find some loot.")
-                    self.loot_drop("gold nugget")
-                    self.loot_drop("pistol_ammo")
+                self.cayote_camp_quest()
             elif quest_topic == "old_mine_lights":
                 self.encounter_haunted_mine()
-            elif quest_topic == "buried_gold_east":
+            elif quest_topic == "earp_vendetta_quest":
                 print("You search east of town and, after some digging, uncover a buried chest!")
                 self.loot_drop("gold bar")
                 self.gold += 25
@@ -2886,6 +2900,165 @@ class Player:
         print("You leave the haunted mine, feeling both richer and a little uneasy about what you found.")
         time.sleep(2)
 
+    def encounter_earp_intro(self):
+        print("At the Oriental Saloon, a hush falls. Morgan Earp has been murdered in cold blood.")
+        print("Wyatt Earp leans on the bar, eyes cold. 'The law won't act. I'm forming a posse.'")
+        choice = input("Do you ride with Wyatt Earp for vengeance? (yes/no): ").strip().lower()
+        if choice == "yes":
+            print("You swear loyalty to the Vendetta Ride.")
+            self.Tquest = "earp_vendetta"
+            self.earp_stage = 1
+            print("Wyatt gives you a box of shells and a share of collected funds. +15 gold.")
+            self.gold += 15
+            self.loot_drop("ammo cartridge")
+            self.earp_bonus += 1
+        else:
+            print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
+            self.Tquest = "None"
+
+    def encounter_earp_stage1(self):
+        print("The Vendetta Posse rides to Pete Spence’s wood camp.")
+        print("A known outlaw is holed up there, armed and waiting.")
+        print("Options:")
+        print("1) Ride in with the posse guns blazing.")
+        print("2) Flank around through the brush.")
+        print("3) Refuse to fight.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("outlaw gunman")
+            combat.Attack()
+            if self.Health > 0:
+                print("You help cut down the outlaw. The posse pushes forward.")
+                self.gold += 10
+                self.earp_bonus += 1
+            else:
+                print("You fall in the shootout. The posse drags you away as they move on.")
+                self.Tquest = "None"
+        elif choice == "2":
+            if random.randint(1,10) <= self.shadow_skill + 2:
+                print("You flank the outlaw’s position, forcing him into Wyatt’s fire. Success!")
+                self.gold += 15
+                self.loot_drop("revolver")
+                self.earp_bonus += 2
+            else:
+                print("You trip in the brush — shots ring out! You’re hit. -12hp")
+                self.Health -= 12
+        else:
+            print("You hang back. The posse fights without you.")
+            self.earp_bonus -= 1
+
+        self.earp_stage = 2
+
+    def encounter_earp_stage2(self):
+        print("At dawn, word comes: Florentino Cruz, a Cowboy, is spotted near the San Pedro River.")
+        print("Wyatt growls, 'He helped ambush Morgan.'")
+        print("Options:")
+        print("1) Ride hard to catch him.")
+        print("2) Stay behind in camp.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("cowboy scout")
+            combat.Attack()
+            if self.Health > 0:
+                print("You gun down Florentino Cruz. Wyatt is grim but satisfied.")
+                self.earp_bonus += 1
+                self.gold += 20
+            else:
+                print("You’re shot from ambush and collapse.")
+                self.Tquest = "None"
+        else:
+            print("You refuse. Wyatt mutters about weak resolve.")
+            self.earp_bonus -= 1
+
+        self.earp_stage = 3
+
+    def encounter_earp_stage3(self):
+        print("The posse learns the Clanton brothers are nearby.")
+        print("Wyatt declares: 'They won’t escape justice.'")
+        print("Options:")
+        print("1) Confront the Clantons openly.")
+        print("2) Set an ambush at the river crossing.")
+        print("3) Abandon the vendetta.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("clanton gunfighter")
+            combat.Attack()
+            if self.Health > 0:
+                print("In a fierce shootout, one Clanton falls dead in the dust.")
+                self.earp_bonus += 2
+            else:
+                print("A Clanton bullet strikes you down. The Vendetta falters.")
+                self.Tquest = "None"
+        elif choice == "2":
+            if random.randint(1,10) <= self.trail_skill + 3:
+                print("Your ambush works! You take the Clantons by surprise, killing one instantly.")
+                self.gold += 25
+                self.loot_drop("cowboy rifle")
+                self.earp_bonus += 2
+            else:
+                print("The Clantons sense danger. They escape into the hills.")
+                self.earp_bonus -= 1
+        else:
+            print("You abandon the vendetta. The posse brands you a coward.")
+            self.Hostility += 1
+            self.Tquest = "None"
+
+        self.earp_stage = 4
+
+    def encounter_earp_stage4(self):
+        print("The Vendetta Posse closes in on Curly Bill Brocius at Iron Springs.")
+        print("This is the showdown that will decide everything.")
+        print("Options:")
+        print("1) Charge in alongside Wyatt.")
+        print("2) Find a vantage point and snipe.")
+        print("3) Hesitate.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("curly bill")
+            combat.Attack()
+            if self.Health > 0:
+                print("Curly Bill is gunned down in a storm of lead. The Vendetta is triumphant!")
+                self.gold += 75
+                self.loot_drop("sawed-off shotgun")
+                self.earp_bonus += 3
+            else:
+                print("Curly Bill’s scattergun blast drops you. The Vendetta staggers on without you.")
+                self.Tquest = "None"
+        elif choice == "2":
+            if random.randint(1,10) <= self.trail_skill + 2:
+                print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
+                self.gold += 50
+                self.earp_bonus += 2
+            else:
+                print("Your shot misses! Curly Bill fires back, grazing you. -10hp")
+                self.Health -= 10
+        else:
+            print("You freeze. The others charge ahead without you.")
+            self.earp_bonus -= 2
+
+        # Quest complete
+        print("The Vendetta Ride is over. The Cowboys are broken, scattered to the winds.")
+        self.Tquest = "None"
+        self.earp_stage = None
+
+    def cayote_camp_quest(self):
+        print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
+        combat = Combat(self)
+        combat.FindAttacker("bandit")
+        combat.Attack()
+        if self.Health > 0:
+            print("You defeat the bandits and find some loot.")
+            self.loot_drop("gold nugget")
+            self.loot_drop("pistol_ammo")
+
     def change_music(self, filename, loop):
         music_path = os.path.join(os.path.dirname(__file__), filename)
         if self.music == False:
@@ -3640,12 +3813,12 @@ class Combat:
             "wolf": {"health": 50, "damage": 15, "speed": 4, "loot": "medium", "type": "animal",},  
             "bison": {"health": 100, "damage": 15, "speed": 2, "loot": "large", "passive": True,  "type": "animal"},
             "pack of wolves": {"health": 70, "damage": 20, "speed": 4, "loot": "medium", "type": "pack"},
-            "bear": {"health": 125, "damage": 30, "speed": 3, "loot": "medium",  "type": "animal"},
+            "bear": {"health": 125, "damage": 20, "speed": 3, "loot": "medium",  "type": "animal"},
             "bandit": {"health": 80, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human"},
             "mounted bandit": {"health": 120, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human"},
             "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human", },
             "sheriff": {"health": 65, "damage": 20, "speed": 2, "loot": "townsperson",  "type": "human"},
-            "looter": {"health": 90, "damage": 10, "speed": 5, "loot": "rare",  "type": "human"},
+            "looter": {"health": 65, "damage": 10, "speed": 5, "loot": "rare",  "type": "human"},
             "bandit leader": {"health": 100, "damage": 35, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True},
             "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True},
             "phantom gunslinger": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form"},
@@ -3695,9 +3868,9 @@ class Combat:
             elif self.player.difficulty == 'savage':
                 enemy_health = int(self.EnemyCombatant["health"] * 1.25)
                 enemy_damage = int(self.EnemyCombatant["damage"] * 1.1)
-        if self.player.Day >= 4:
-                enemy_health = int(self.EnemyCombatant["health"] + (5*self.player.Day))
-                enemy_damage = int(self.EnemyCombatant["damage"] + (5*self.player.Day))
+        if self.player.Day >= 5:
+                enemy_health = int(self.EnemyCombatant["health"] + (2*self.player.Day))
+                enemy_damage = int(self.EnemyCombatant["damage"] + (2*self.player.Day))
 
         print(f"\nYou face off against a {self.Enemy.capitalize()}!")
         print(f"Enemy stats — Health: {enemy_health}, Damage: {enemy_damage}, Speed: {enemy_speed}")
@@ -3782,7 +3955,7 @@ class Combat:
                         }
 
 
-                        owned_weapons = [w for w in weapon_choices if w in self.player.itemsinventory]
+                        owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
                         if not owned_weapons:
                             print("You don't have any weapons, so you fight with your fists!")
                             player_attack = random.randint(2, 5)
@@ -3791,11 +3964,12 @@ class Combat:
                             while True:
                                 print("Choose a weapon:")
                                 for i, weapon in enumerate(owned_weapons, start=1):
-                                    dmg = weapon_choices[weapon]
+                                    info = weapons_data[weapon]
+                                    dmg = info['damage']
+                                    ammo_type = info['ammo']
                                     ammo_info = ""
-                                    if weapon in ammo_needed:
-                                        ammo_type = ammo_needed[weapon]
-                                        if ability_auto_ammo_belt == True:
+                                    if ammo_type != 'none':
+                                        if ability_auto_ammo_belt:
                                             self.player.itemsinventory[ammo_type] = self.player.itemsinventory.get(ammo_type, 0) + 1
                                             print("Your ammo belt provides +1 ammo for your gun.")
                                             ability_auto_ammo_belt = False
@@ -3813,12 +3987,14 @@ class Combat:
                                         break
                                     elif 1 <= weapon_choice <= len(owned_weapons):
                                         weapon = owned_weapons[weapon_choice - 1]
-                                        if weapon in ammo_needed:
-                                            ammo_type = ammo_needed[weapon]
+                                        info = weapons_data[weapon]
+                                        ammo_type = info['ammo']
+                                        # check ammo
+                                        if ammo_type != 'none':
                                             if self.player.itemsinventory.get(ammo_type, 0) < 1:
                                                 print(f"You're out of {ammo_type}! Choose another weapon.")
                                                 player.play_sound("blank_click.mp3")
-                                                time.sleep(1,)
+                                                time.sleep(1)
                                                 continue
                                             else:
                                                 self.player.itemsinventory[ammo_type] -= 1
@@ -3831,9 +4007,11 @@ class Combat:
                                         else:
                                             player.play_sound("knife.mp3")
                                             player.weapon_ability(weapon)
-                                        dmg_range = weapon_choices[weapon]
+
+                                        # roll damage
+                                        dmg_range = info['damage']
                                         player_attack = random.randint(*dmg_range)
-                                        player_attack = player_attack*player.dmg_modifier_multiply
+                                        player_attack = player_attack * player.dmg_modifier_multiply
                                         break
                                     else:
                                         print("Invalid selection.")

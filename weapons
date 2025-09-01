@@ -1,0 +1,19 @@
+weapons:
+{
+  'derringer pistol': {'name': 'derringer pistol', 'price': 5, 'damage': !!python/tuple [5, 15], 'ammo': 'pistol_ammo', 'ability': 'none'},
+  'revolver': {'name': 'revolver', 'price': 20, 'damage': !!python/tuple [10, 15], 'ammo': 'pistol_ammo', 'ability': 'none'},
+  'colt pistol': {'name': 'colt pistol', 'price': 20, 'damage': !!python/tuple [10, 15], 'ammo': 'pistol_ammo', 'ability': 'none'},
+  'remington pistol': {'name': 'remington pistol', 'price': 25, 'damage': !!python/tuple [15, 25], 'ammo': 'pistol_ammo', 'ability': 'none'},
+  'colt navy revolver': {'name': 'colt navy revolver', 'price': 30, 'damage': !!python/tuple [15, 20], 'ammo': 'pistol_ammo', 'ability': 'none'},
+  'rifle': {'name': 'rifle', 'price': 40, 'damage': !!python/tuple [20, 25], 'ammo': 'rifle_ammo', 'ability': 'none'},
+  'lever-action rifle': {'name': 'lever-action rifle', 'price': 60, 'damage': !!python/tuple [25, 35], 'ammo': 'rifle_ammo', 'ability': 'none'},
+  'henry rifle': {'name': 'henry rifle', 'price': 45, 'damage': !!python/tuple [30, 35], 'ammo': 'rifle_ammo', 'ability': 'none'},
+  'sharps rifle': {'name': 'sharps rifle', 'price': 100, 'damage': !!python/tuple [40, 45], 'ammo': 'rifle_ammo', 'ability': 'none'},
+  'winchester rifle': {'name': 'winchester rifle', 'price': 130, 'damage': !!python/tuple [50, 55], 'ammo': 'rifle_ammo', 'ability': 'none'},
+  'shotgun': {'name': 'shotgun', 'price': 50, 'damage': !!python/tuple [20, 35], 'ammo': 'shotgun_ammo', 'ability': 'none'},
+  'sawed-off shotgun': {'name': 'sawed-off shotgun', 'price': 55, 'damage': !!python/tuple [10, 30], 'ammo': 'shotgun_ammo', 'ability': 'none'},
+  'double barrel shotgun' : {'name': 'double barrel shotgun', 'price': 80, 'damage': !!python/tuple [25, 50], 'ammo': 'shotgun_ammo', 'ability': 'none'},
+  'knife': {'name': 'knife', 'price': 10, 'damage': !!python/tuple [5, 10], 'ammo': 'none', 'ability': 'none'},
+  'tomahawk': {'name': 'tomahawk', 'price': 25, 'damage': !!python/tuple [15, 25], 'ammo': 'none', 'ability': 'none'},
+  'cavalry saber': {'name': 'cavalry saber', 'price': 35, 'damage': !!python/tuple [15, 25], 'ammo': 'none', 'ability': 'none'},
+}
