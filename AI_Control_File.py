@@ -33,7 +33,7 @@ class AI_Control:
             answer = parsed.get("choice", "none").lower()
             if answer not in (available_choices):
                 answer = "none"  # enforce valid fallback
-            return answer
+            return answer.strip().lower()
         except json.JSONDecodeError:
             # fallback to a safe default
             self.action = {"choice": "None", }

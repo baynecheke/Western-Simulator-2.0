@@ -115,6 +115,7 @@ class Player:
         self.rumors_collected = 0
         self.rumors_heard = []
         self.rebirth = False
+        self.rumor = False
 
         #stuff
         self.score = 0
@@ -135,12 +136,12 @@ class Player:
         self.enemy_effects = []
         self.player_effects = []
         self.TownUpgrades = {
-            "general store": {'level':0},
-            "gunsmith": {'level':0},
-            "town jail":{'level':0},
-            "doctor":{'level':0},
-            "trading post":{'level':0},
-            "blacksmith":{'level':0},
+            "general store": {'level':1},
+            "gunsmith": {'level':1},
+            "town jail":{'level':1},
+            "doctor":{'level':1},
+            "trading post":{'level':1},
+            "blacksmith":{'level':1},
         }
 
         #classifications
@@ -1146,13 +1147,13 @@ class Player:
             AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
-        if self.TownUpgrades >= 1:
+        if self.TownUpgrades["gunsmith"]["level"] >= 2:
             available_weapons.append("sawed-off shotgun")
             available_weapons.append("lever-action rifle")
-        if self.TownUpgrades >= 2:
+        if self.TownUpgrades["gunsmith"]["level"] >= 3:
             available_weapons.append("henry rifle")
             available_weapons.append("remington pistol")
-        if self.TownUpgrades >= 3:
+        if self.TownUpgrades["gunsmith"]["level"] >= 4:
             available_weapons.append("winchester rifle")
             available_weapons.append("double barrel shotgun")
         inventory = {
@@ -1175,24 +1176,37 @@ class Player:
     def Bank(self):
         print("You walk into the Bank. The air smells of leather and dust.")
         print("What town building would you like to invest in?")
-        print("general store")
-        print("blacksmith")
-        print("gunsmith")
+        price1 = self.TownUpgrades["general store"]["level"]*20
+        price2 = self.TownUpgrades["blacksmith"]["level"]*20
+        price3 = self.TownUpgrades["gunsmith"]["level"]*20
+        print(f"General store, price to upgrade: {price1}.")
+        print(f"Blacksmith, price to upgrade: {price2}.")
+        print(f"Gunsmith, price to upgrade: {price3}.")
         choice = input(": ")
         available_choices = ["general store", "blacksmith", "gunsmith"]
         choice = AI_File.parse_choice(available_choices, choice)
         if choice == "general store":
-            price = self.TownUpgrades["general store"]["level"]
-            print(f"Price to upgrade: {price}")
+            if self.gold >= price1:
+                print("You cannot afford to do that.")
+                return
+            self.gold -= price1
             self.TownUpgrades["general store"]["level"] += 1
             print(f"General Store level:{self.TownUpgrades['general store']['level']}")
         if choice == "blacksmith":
-            price = self.TownUpgrades["blacksmith"]["level"]
+            if self.gold >= price2:
+                print("You cannot afford to do that.")
+                return
+            self.gold -= price2
+            price = self.TownUpgrades["blacksmith"]["level"]*20
             print(f"Price to upgrade: {price}")
             self.TownUpgrades["blacksmith"]["level"] += 1
             print(f"blacksmith level:{self.TownUpgrades['blacksmith']['level']}")
         if choice == "gunsmith":
-            price = self.TownUpgrades["gunsmith"]["level"]
+            if self.gold >= price3:
+                print("You cannot afford to do that.")
+                return
+            self.gold -= price3
+            price = self.TownUpgrades["gunsmith"]["level"]*20
             print(f"Price to upgrade: {price}")
             self.TownUpgrades['gunsmith']['level'] += 1
             print(f"gunsmith level:{self.TownUpgrades['gunsmith']['level']}")
@@ -1280,6 +1294,7 @@ class Player:
         elif roll == 4:
             print("A drunk cowboy staggers over and offers you a swig of whiskey. (yes/no)")
             ans = input(": ").strip().lower()
+            ans = AI_File.parse_YN(ans)
             if ans == "yes":
                 if random.randint(1,10) >= 9:
                     print("The whiskey was spoiled! You feel ill.")
@@ -1300,21 +1315,9 @@ class Player:
         print("2) Buy a drink (5 gold)")
         choice = input("Choice: ").strip()
         if choice == "1":
-            if "barkeeper_rumor" not in self.rumors_heard:
-                self.rumors_heard.append("barkeeper_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "Bandits spotted near Coyote Camp.",
-                "old_mine_lights": "Strange lights seen in the old mine.",
-                "earp_vendetta_quest": "A lost prospector buried gold east of here.",
-                }
-                topic, rumor = random.choice(list(rumor_topics.items()))
-                print(f"He leans in: \"{rumor}.\"")
-                self.rumors[topic] = self.rumors.get(topic, 0) + 1
-                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-            # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 5:
-                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    self.quest.append(topic)
+            if self.rumor == False:
+                self.quest.append("old mine")
+                self.rumor == True
             else:
                 print("He shrugs: \"Nothing new to tell ya.\"")
         elif choice == "2":
