@@ -886,7 +886,7 @@ class Player:
                 self.rumors[topic] = self.rumors.get(topic, 0) + 1
                 print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
                 # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 5:
+                if self.rumors[topic] == 1:
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
                     self.quest.append(topic)
             else:
@@ -1312,11 +1312,24 @@ class Player:
         print("2) Buy a drink (5 gold)")
         choice = input("Choice: ").strip()
         if choice == "1":
-            if self.rumor == False:
-                self.quest.append("old mine")
-                self.rumor == True
+            if "barkeeper_rumor" not in self.rumors_heard:
+                self.rumors_heard.append("barkeeper_rumor")
+                rumor_topics = {
+                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                "old_mine_lights": "Nobody goes near the old mine anymore.",
+                "earp_vendetta_quest": "Legend has it that there is gold east of here.",
+                }
+                topic, rumor = random.choice(list(rumor_topics.items()))
+                print(f"A patron murmurs: \"{rumor}\"")
+                self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                # Example: trigger a quest after hearing a rumor 2 times
+                if self.rumors[topic] == 1:
+                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                    self.quest.append(topic)
             else:
-                print("He shrugs: \"Nothing new to tell ya.\"")
+                print("They shrug: \"We'll let you know if something happens.\"")
+            time.sleep(2)
         elif choice == "2":
             if self.gold >= 5:
                 self.gold -= 5
@@ -1417,7 +1430,7 @@ class Player:
                 self.rumors[topic] = self.rumors.get(topic, 0) + 1
                 print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
                 # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 5:
+                if self.rumors[topic] == 1:
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
                     self.quest.append(topic)
             else:
@@ -2251,7 +2264,7 @@ class Player:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
         time.sleep(2)
-        self.Tquest == "defend_town"
+        self.Tquest = "defend_town"
 
     def encounter_town_part2(self):
         if self.town_defense_outcome is None:
