@@ -3,13 +3,15 @@ import time
 import json
 import os
 import pygame
+pygame.init()
+pygame.mixer.init()
 import yaml
 import builtins
 import sys
 from AI_Control_File import AI_Control
 AI_File = AI_Control()
 
-with open('weapons', 'r') as file:
+with open('c:/Users/djche/OneDrive/WesternSim2.0/Western-Simulator-2.0/weapons', 'r') as file:
     weapons_data = yaml.safe_load(file)
 
 USE_SPEECH_INPUT = True
@@ -75,22 +77,17 @@ builtins.input = speech_input
 
 choice = original_input("Would you like to use speech to text? (yes/no) ").strip().lower()
 USE_SPEECH_INPUT = choice == "yes"
+base_dir = os.path.dirname(os.path.abspath(__file__))
 
-
-
-
-pygame.mixer.init()
-with open('loot.yaml', 'r') as file:
+with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
     loot_data = yaml.safe_load(file)
+# Read Game_Info.yaml
+with open(os.path.join(base_dir, "Game_Info.yaml"), "r") as file:
+    data = yaml.safe_load(file)
 
-
-with open('Game_Info.yaml', 'r') as file:
-   data = yaml.safe_load(file)
-
-with open("game_data.yaml", "w") as f:
+# Write game_data.yaml
+with open(os.path.join(base_dir, "game_data.yaml"), "w") as f:
     yaml.safe_dump(data, f, sort_keys=False)
-
-
 class Player:
     def __init__(self):
         #Basic player stuff
@@ -577,7 +574,7 @@ class Player:
                 "boots": "Increases travel speed by 1. Only usable outside of combat.",
                 "leather armor": "Reduces combat damage taken (90%). Only usable in combat.",
                 "chain mail": "Greatly reduces combat damage taken (70%). Only usable in combat.",
-                "lasso": "Halves the health of animal-type enemies. Only usable in combat.",
+                "rope": "Halves the health of animal-type enemies. Only usable in combat.",
                 "fire cracker": "Halves health of pack-type enemies and stuns them. Only usable in combat.",
                 "rope": "Could be used during events. Only usable outside of combat.",
                 "ammo cartridge": "Gives 5 of a given ammo. Only usable outside of combat.",
@@ -724,15 +721,16 @@ class Player:
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
 
-                elif selected_item == "lasso":
-                    if combat and enemy_combatant and enemy_combatant.get("type") == "animal":
-                        self.enemy_effects.append("hphalf")
-                        print(f"You used the lasso! The {enemy_name}'s health is halved!")
+                elif selected_item == "rope":
+                    if combat and enemy_combatant:
+                        old_hp = enemy_combatant["health"]
+                        enemy_combatant["health"] = max(1, enemy_combatant["health"] // 2)
+                        print(f"You used the rope! The {enemy_name}'s health is halved from {old_hp} to {enemy_combatant['health']}!")
                         self.itemsinventory[selected_item] -= 1
                         if self.itemsinventory[selected_item] <= 0:
                             del self.itemsinventory[selected_item]
                     else:
-                        print("The lasso has no effect on this enemy.")
+                        print("You can only use the rope during combat.")
 
                 elif selected_item == "fire cracker":
                     if combat and enemy_combatant and enemy_combatant.get("type") == "pack":
@@ -901,9 +899,9 @@ class Player:
             print(f"Strength Skill - Improves combat effectiveness. Current: {self.strength_skill}")
             print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
-            skill_choice = input("Enter your choice: ").strip()
+            skill_choice = input("Enter your choice: ").strip().lower()
             available_choices = ['durability', 'trail', 'strength', 'shadow']
-            skill_choice = AI_File.parse_choice(available_choices, skill_choice).lower()
+            skill_choice = AI_File.parse_choice(available_choices, skill_choice)
             if skill_choice == "shadow":
                 gold = self.shadow_skill * 5
                 if gold > self.gold:
@@ -978,7 +976,7 @@ class Player:
             "revolver": 20, "colt pistol": 20, "sharps rifle": 40,
             "rifle": 15, "shotgun": 25,
             "pistol_ammo": 1, "rifle_ammo": 2, "shotgun_ammo": 3,
-            "lasso": 5, "winchester rifle": 50, "carved horn": 40,
+            "winchester rifle": 50, "carved horn": 40,
             "gold nugget": random.randint(10, 40),
             "silver watch": random.randint(5, 15),
             "silver bar": random.randint(30, 40),
@@ -989,7 +987,6 @@ class Player:
         trade_offers = [
             {"give": "winchester barrel", "get": "winchester stock"},
             {"give": "winchester stock", "get": "winchester barrel"},
-            {"give": "lasso", "get": "rope"},
             {"give": "gold nugget", "get": "field dressing kit"},
             {"give": "medium hide", "get": "bandage"},
             {"give": "shotgun_ammo", "get": "rifle_ammo"},
@@ -1689,8 +1686,7 @@ class Player:
         general_inventory = {            
             'lantern': {'name': 'lantern', 'price': 3, 'quantity': 10},
             'bread': {'name': 'bread', 'price': 5, 'quantity': 30},
-            'rope': {'name': 'rope', 'price': 3, 'quantity': 20},
-            'lasso': {'name': 'lasso', 'price': 7, 'quantity': 10},
+            'rope': {'name': 'rope', 'price': 5, 'quantity': 20},
             'fire cracker': {'name': 'fire cracker', 'price': 5, 'quantity': 10},
             'antivenom': {'name': 'antivenom', 'price': 5, 'quantity': 10},
             'tobacco pouch': {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
@@ -1835,7 +1831,8 @@ class Player:
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
             # --- Rumor quest handler ---
-        if self.quest:
+        if self.quest and random.randint(1,3) == 2:
+            print("You remember a rumor you heard in town.")
             quest_topic = self.quest.pop(0)  # Remove and get the oldest quest
             print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
             # Trigger a special event based on the quest topic
@@ -2193,12 +2190,12 @@ class Player:
 
     def encounter_wild_stallion(self):
         print("\nA wild stallion rears up in a clearing—untamed and swift.")
-        print("1) Try to catch it with your lasso")
+        print("1) Try to catch it with your rope")
         print("2) Leave it be")
         Choice = input(": ").strip()
         if Choice == "1":
-            if "lasso" in self.itemsinventory:
-                print("You manage to lasso the stallion! Your travels feel faster now. +1 travel speed.")
+            if "rope" in self.itemsinventory:
+                print("You manage to rope the stallion! Your travels feel faster now. +1 travel speed.")
                 self.travelspeed += 1
             else:
                 print("It throws you off with a vicious kick!")
@@ -2803,7 +2800,7 @@ class Player:
                     self.Health -= dmg
                     print(f"-{dmg} health.")
             elif action == "3":
-                print("You expertly lasso the minecart, slowing it enough to avoid harm.")
+                print("You expertly rope the minecart, slowing it enough to avoid harm.")
                 self.itemsinventory["rope"] -= 1
                 if self.itemsinventory["rope"] <= 0:
                     del self.itemsinventory["rope"]
@@ -2850,7 +2847,7 @@ class Player:
                     self.Health -= dmg
                     print(f"-{dmg} health.")
             elif action == "3":
-                print("You expertly lasso the minecart, slowing it enough to avoid harm.")
+                print("You expertly rope the minecart, slowing it enough to avoid harm.")
                 self.itemsinventory["rope"] -= 1
                 if self.itemsinventory["rope"] <= 0:
                     del self.itemsinventory["rope"]
@@ -4179,7 +4176,7 @@ class GenericStore:
             if choice not in item_list:
                 print("That item doesn't exist.")
                 continue
-            item_name = choice.lower()  # string like "lasso"
+            item_name = choice.lower()  # string like "rope"
             item = self.inventory[item_name]
             adjusted_price = self.get_price_with_difficulty(item['price'])
             
