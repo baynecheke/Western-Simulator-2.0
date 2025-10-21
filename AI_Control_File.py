@@ -158,15 +158,27 @@ class AI_Control:
                 # Return a consistent, safe default that matches the expected format
                 self.action = {"choice": "leave", "quantity": "0"} 
                 return self.action
-            
+
+
+# In AI_Control_File.py
     def parse_action(self, player_text: str, available_actions: list):
+        
+        # --- START FIX ---
+        # Give the AI a "help" option and better instructions
+        ai_choices = available_actions + ["help"]
+        
         prompt = dedent(f"""
         You are an action parser for a text RPG.
-        The player may only perform one of these actions: {available_actions}
+        The player's input is: "{player_text}"
+        
+        You must choose the **closest match** from this list of actions: {ai_choices}
+        - If the player's input is "travel", the closest match is "travel road".
+        - If the player's input is unclear, or you cannot find a good match, default to "help".
 
         Return ONLY JSON in this format:
-        {{"action": "one of the available actions"}}
+        {{"action": "<one_of_the_choices_from_the_list>"}}
         """)
+        # --- END FIX ---
 
         response = ollama.chat(
             model="phi3",
@@ -174,21 +186,27 @@ class AI_Control:
             options={"temperature": 0},   # deterministic & faster
             messages=[
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": player_text}
+                {"role": "user", "content": player_text} # The AI will now see the input twice, reinforcing it
             ]
         )
 
         try:
             parsed = json.loads(response['message']['content'])
             action = parsed.get("action", "").lower()
-            if action not in available_actions:
+            
+            # --- START FIX ---
+            # Check against the list the AI was given
+            if action not in ai_choices:
                 action = "help"  # fallback
+            # --- END FIX ---
+
             self.action = {"action": action}
         except (json.JSONDecodeError, KeyError, TypeError):
             self.action = {"action": "help"}
 
         return self.action
    
+
     def parse_dialogue_player(self, player_dialogue, choices: list):
         prompt = dedent(f"""
     You are a dialogue parser for a game.  

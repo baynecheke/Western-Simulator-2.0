@@ -490,10 +490,23 @@ class Player:
             print(action1)
         while True:
             choice = input("Choice: ").strip()
+            # Add a manual, non-AI "help" command
+            if choice.lower() == "help":
+                print("\n--- Available Actions ---")
+                for action1 in self.possibleactions:
+                    print(action1)
+                print("-------------------------")
+                continue # Ask for input again
             parsed = AI_File.parse_action(choice, self.possibleactions)
             print(parsed.get('action', 'none'))
             if parsed.get('action', 'none') in self.possibleactions:
                 return parsed.get('action', 'none')
+            elif action == "help":
+                print("\n--- Available Actions ---")
+                for action1 in self.possibleactions:
+                    print(action1)
+                print("-------------------------")
+                continue # Ask for input again
             else:
                 print("Invalid or unavailable choice. Try again.")
 
