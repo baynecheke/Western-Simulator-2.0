@@ -8,6 +8,8 @@ class AI_Control:
     def __init__(self,):
         self.action = None
 
+# In AI_Control_File.py
+
     def parse_choice(self, available_choices, player_text):
         prompt = dedent(f"""
     You are the choice parser for a text RPG.
@@ -18,27 +20,39 @@ class AI_Control:
     {{"choice": "<one of the choices>"}}
     """)    
         
-        response = ollama.chat(
-            model="phi3",
-            format="json",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": player_text}
-            ]
-        )
+        # --- START FIX ---
+        # Define a smart, safe fallback action.
+        # If "leave" is a valid choice, use it. Otherwise, use "none".
+        safe_fallback = "none"
+        if "leave" in available_choices:
+            safe_fallback = "leave"
+        # --- END FIX ---
+
         try:
+            response = ollama.chat(
+                model="phi3",
+                format="json",
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": player_text}
+                ]
+            )
             
-            parsed = json.loads(response['message']['content'])
-            print(parsed.get("choice", "no").lower())
-            answer = parsed.get("choice", "none").lower()
-            if answer not in (available_choices):
-                answer = "none"  # enforce valid fallback
-            return answer.strip().lower()
-        except json.JSONDecodeError:
-            # fallback to a safe default
-            self.action = {"choice": "None", }
-            return self.action
- 
+            # This is your original try/except, now nested
+            try:
+                parsed = json.loads(response['message']['content'])
+                answer = parsed.get("choice", safe_fallback).lower() # Use safe_fallback
+                if answer not in (available_choices):
+                    answer = safe_fallback  # Enforce valid fallback
+                return answer.strip().lower()
+            except json.JSONDecodeError:
+                return safe_fallback # Return the safe string
+                
+        except Exception as e: # This catches network errors
+            print(f"[AI_Control Error in parse_choice]: {e}")
+            print(f"[AI_Control]: Falling back to default '{safe_fallback}' action.")
+            return safe_fallback # Return the safe string
+
     def parse_YN(self, player_text: str) -> str:
         """
         Parse yes/no answers robustly without using LLMs.
@@ -47,59 +61,104 @@ class AI_Control:
         yes_words = {"yes", "y", "yeah", "yep", "sure", "ok", "okay", "affirmative", "of course", "certainly"}
         no_words  = {"no", "n", "nope", "nah", "negative", "never"}
 
-        text = player_text.strip().lower()
+        text_lower = player_text.strip().lower()
 
-        # Direct checks
-        if text in yes_words:
+        # Direct check first (most common)
+        if text_lower in yes_words:
             return "yes"
-        if text in no_words:
+        if text_lower in no_words:
             return "no"
 
-        # Partial matching (covers phrases like "yes please", "sure thing")
-        for word in yes_words:
-            if word in text:
-                return "yes"
-        for word in no_words:
-            if word in text:
-                return "no"
+        # Split input into words and check
+        words_in_text = set(text_lower.split())
+
+        # Check if any word from the input is in our 'yes' set
+        if not words_in_text.isdisjoint(yes_words):
+            return "yes"
+
+        # Check if any word from the input is in our 'no' set
+        if not words_in_text.isdisjoint(no_words):
+            return "no"
 
         # Fallback default
         return "no"
 
-    
     def parse_purchase(self, items: list, player_text):
-        prompt = dedent(f"""
-You are the action parser for a text RPG.
-The player is trying to purchase an item. The available items are: {", ".join(items)}.
-Convert the player's input into JSON **with exactly two keys**:
-1. "choice" → must be exactly one of the items (case-insensitive).
-2. "quantity" → must always be present as a string representing an integer. 
-   If the player does not specify a number, use "1" as the default.
-Return ONLY JSON. No explanations or extra text.
-
-Example outputs:
-{{"choice": "rifle", "quantity": "1"}}
-{{"choice": "pistol_ammo", "quantity": "3"}}
-{{"choice": "leave", "quantity": ""}}
-""")
-        response = ollama.chat(
-            model="phi3",
-            format="json",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": player_text}
-            ]
-        )
-        try:
+            # Add "leave" as a valid item for the prompt
+            shop_items = items + ["leave"]
             
-            self.action = json.loads(response['message']['content'])         # convert to dict
+            prompt = dedent(f"""
+        You are the action parser for a text RPG.
+        The player is trying to purchase an item. The available items are: {", ".join(shop_items)}.
+        Convert the player's input into JSON **with exactly two keys**:
+        1. "choice" -> must be exactly one of the items (case-insensitive).
+        2. "quantity" -> must always be present as a string representing an integer.
+        - If the player does not specify a number, use "1" as the default.
+        - If the player's choice is "leave", use "0" as the quantity.
+        Return ONLY JSON. No explanations or extra text.
 
-            return self.action
-        except json.JSONDecodeError:
-            # fallback to a safe default
-            self.action = {"choice": "leave", "args": {}}
-            return self.action
+        Example outputs:
+        {{"choice": "rifle", "quantity": "1"}}
+        {{"choice": "pistol_ammo", "quantity": "3"}}
+        {{"choice": "leave", "quantity": "0"}}
+        """) # NOTE: Changed the "leave" example from "" to "0" for consistency
 
+            response = ollama.chat(
+                model="phi3",
+                format="json",
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": player_text}
+                ]
+            )
+            
+            try:
+                # 1. Try to parse the LLM's response
+                parsed_data = json.loads(response['message']['content'])
+
+                # 2. Basic structure check
+                if not isinstance(parsed_data, dict):
+                    raise ValueError("LLM did not return a dictionary.")
+
+                # 3. Get 'choice', with a fallback
+                choice = parsed_data.get("choice", "leave").lower()
+
+                # 4. Get 'quantity' raw value, with a "1" default if key is missing
+                quantity_raw = parsed_data.get("quantity", "1")
+
+                # 5. Validate 'choice'
+                valid_choices = [item.lower() for item in shop_items]
+                if choice not in valid_choices:
+                    choice = "leave" # Fallback to "leave" if choice is invalid
+
+                # 6. Handle the "leave" case explicitly
+                if choice == "leave":
+                    quantity_final = "0"
+                else:
+                    # 7. VALIDATION PATCH: Validate 'quantity' for non-leave choices
+                    
+                    # Convert if it's an int (e.g., 1 -> "1")
+                    if isinstance(quantity_raw, int):
+                        quantity_raw = str(quantity_raw)
+                        
+                    # Check if it's a string AND is a positive digit
+                    if isinstance(quantity_raw, str) and quantity_raw.isdigit() and int(quantity_raw) > 0:
+                        quantity_final = quantity_raw
+                    else:
+                        # This is a "weird" value (e.g., "two", "0", "", "-5", "a bunch")
+                        # Default to "1" as requested
+                        quantity_final = "1" 
+
+                # 8. Success: create and return the clean action
+                self.action = {"choice": choice, "quantity": quantity_final}
+                return self.action
+
+            except (json.JSONDecodeError, ValueError, TypeError, KeyError):
+                # 9. Catch-all fallback for bad JSON or validation errors
+                # Return a consistent, safe default that matches the expected format
+                self.action = {"choice": "leave", "quantity": "0"} 
+                return self.action
+            
     def parse_action(self, player_text: str, available_actions: list):
         prompt = dedent(f"""
         You are an action parser for a text RPG.
@@ -161,37 +220,38 @@ Example outputs:
             self.action = {"action": "talk"}
             return {"action": "talk", }
 
-    def narrate_action(self, game_state, possible_actions, past_actions):
-        action = self.action.get("action")
-        args = self.action.get("args", {})
+    # def narrate_action(self, game_state, possible_actions, past_actions):
+    #     action = self.action.get("action")
+    #     args = self.action.get("args", {})
 
-        # Create a dynamic prompt
-        prompt = dedent(f"""
-    You are the narrator for a western text RPG.
-    The world state is: {game_state}.
-    Past actions: {past_actions}.
-    The player has chosen the action: {action} with arguments {args}.
-    Write a short narration (1-2 sentences max) describing what happens next.
-    Keep it immersive and consistent with the world state.
-    Suggest a few possible actions, consistent with {possible_actions} and include them in the narration subtly.
-    """)
+    #     # Create a dynamic prompt
+    #     prompt = dedent(f"""
+    # You are the narrator for a western text RPG.
+    # The world state is: {game_state}.
+    # Past actions: {past_actions}.
+    # The player has chosen the action: {action} with arguments {args}.
+    # Write a short narration (1-2 sentences max) describing what happens next.
+    # Keep it immersive and consistent with the world state.
+    # Suggest a few possible actions, consistent with {possible_actions} and include them in the narration subtly.
+    # """)
         
-        response_stream = ollama.chat(
-            model="llama3:8b",
-            messages=[
-                {"role": "system", "content": prompt}
-            ],
-            stream=True
-        )
+    #     response_stream = ollama.chat(
+    #         model="llama3:8b",
+    #         messages=[
+    #             {"role": "system", "content": prompt}
+    #         ],
+    #         stream=True
+    #     )
         
-        narration = ""
-        for chunk in response_stream:
-            # Ollama yields dicts with incremental content
-            token = chunk["message"]["content"]
-            print(token, end="", flush=True)   # print as it arrives
-            narration += token
-        print()
-        return narration
+    #     narration = ""
+    #     for chunk in response_stream:
+    #         # Ollama yields dicts with incremental content
+    #         token = chunk["message"]["content"]
+    #         print(token, end="", flush=True)   # print as it arrives
+    #         narration += token
+    #     print()
+    #     return narration
+
 
     def narrate_shop(self, game_state, event, NPC):
         # Create a dynamic prompt

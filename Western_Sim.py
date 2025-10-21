@@ -3,6 +3,7 @@ import time
 import json
 import os
 import pygame
+from store import ShopItem, ShopSession
 pygame.init()
 pygame.mixer.init()
 import yaml
@@ -93,6 +94,7 @@ class Player:
         #Basic player stuff
         self.rumors = {}
         self.Day = 1
+        self.AI_File = AI_File
         self.Time = 9
         self.Speed = 3
         self.watch = False
@@ -207,6 +209,7 @@ class Player:
 
         self.cheat_code = False
         self.Tquest = "None"  
+        self.quest_today = False
         self.quest = []
         self.iron_stage = 0
         self.iron_bonus = 0
@@ -487,18 +490,6 @@ class Player:
             print(action1)
         while True:
             choice = input("Choice: ").strip()
-            if choice == "3":
-                self.Hostility += 1
-                print("H")
-                continue
-            if choice == "777":
-                self.loot_drop("revolver")
-                self.loot_drop("pistol_ammo")
-                combat = Combat(self)
-                combat.FindAttacker("brawler")
-                combat.Attack()
-
-                continue
             parsed = AI_File.parse_action(choice, self.possibleactions)
             print(parsed.get('action', 'none'))
             if parsed.get('action', 'none') in self.possibleactions:
@@ -969,7 +960,8 @@ class Player:
             print("You don't have any items to trade or sell.")
             return
 
-        prices = {
+        # Define the data here, but pass the logic to the session
+        sell_prices = {
             "small hide": 5, "medium hide": 10, "large hide": 25,
             "small meat": 5, "medium meat": 10, "large meat": 20,
             "horn": 35, "bread": 2, "knife": 5,
@@ -983,7 +975,6 @@ class Player:
             "gold bar": random.randint(45, 75)
         }
 
-        # --- NEW predetermined trades ---
         trade_offers = [
             {"give": "winchester barrel", "get": "winchester stock"},
             {"give": "winchester stock", "get": "winchester barrel"},
@@ -992,74 +983,11 @@ class Player:
             {"give": "shotgun_ammo", "get": "rifle_ammo"},
         ]
 
-        self.play_sound("store_bell.mp3")
-        print("You walk into the trading post.")
-        print("The trader greets you.")
-        time.sleep(2)
+        # We don't need a buy inventory, so we pass an empty dict {}
+        trader_session = ShopSession(self, self.AI_File, "Trading Post", {})
 
-        while True:
-            print("\n--- Trading Post ---")
-            print("1) Sell items")
-            print("2) Swap items (predetermined trades)")
-            print("3) Leave")
-
-            choice = input("What would you like to do? ").strip()
-
-            if choice == "1":
-                # --- Sell logic ---
-                print("Your Inventory:")
-                for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
-                    price = prices.get(item, 1)
-                    print(f"{idx}. {item} (x{qty}) - Sell Price: ${price}")
-
-                sell_choice = input("Enter the number of the item you want to sell or 'q' to cancel: ").strip()
-                if sell_choice.lower() == "q":
-                    continue
-                if sell_choice.isdigit():
-                    idx = int(sell_choice)
-                    if 1 <= idx <= len(self.itemsinventory):
-                        item_to_sell = list(self.itemsinventory.keys())[idx - 1]
-                        price = prices.get(item_to_sell, 1) + self.trade_bonus
-                        self.gold += price
-                        self.itemsinventory[item_to_sell] -= 1
-                        print(f"You sold 1 {item_to_sell} for ${price}. Current gold: ${self.gold}")
-                        if self.itemsinventory[item_to_sell] <= 0:
-                            del self.itemsinventory[item_to_sell]
-
-            elif choice == "2":
-                # --- Swap logic (predetermined) ---
-                print("\nAvailable trades:")
-                for idx, trade in enumerate(trade_offers, 1):
-                    print(f"{idx}. Give {trade['give']}, Receive {trade['get']}")
-
-                trade_choice = input("Pick a trade (or 'q' to cancel): ").strip()
-                if trade_choice.lower() == "q":
-                    continue
-                if not trade_choice.isdigit():
-                    continue
-
-                trade_choice = int(trade_choice)
-                if 1 <= trade_choice <= len(trade_offers):
-                    offer = trade_offers[trade_choice - 1]
-                    if offer["give"] in self.itemsinventory:
-                        print(f"The trader will give you {offer['get']} in exchange for your {offer['give']}. Accept? (yes/no)")
-                        if input(": ").strip().lower() == "yes":
-                            # remove the offered item
-                            self.itemsinventory[offer["give"]] -= 1
-                            if self.itemsinventory[offer["give"]] <= 0:
-                                del self.itemsinventory[offer["give"]]
-                            # give the new item
-                            self.add_item(offer["get"])
-                            print(f"You traded {offer['give']} for {offer['get']}.")
-                        else:
-                            print("Trade declined.")
-                    else:
-                        print(f"You don't have a {offer['give']} to trade.")
-
-            elif choice == "3":
-                return
-            else:
-                print("Invalid choice.")
+        # Call our new, specialized method!
+        trader_session.run_trade_session(sell_prices, trade_offers)
 
     def Blacksmith(self):
         self.play_sound("store_bell.mp3")
@@ -1072,13 +1000,14 @@ class Player:
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
             AI_File.narrate_shop(game_state, event, NpC)
+
         inventory = {
-            'leather armor': {'name': 'leather armor', 'price': 35, 'quantity': 3},
-            'chain mail': {'name': 'chain mail', 'price': 75, 'quantity': 2},
-            'boots': {'name': 'boots', 'price': 15, 'quantity': 5}
+            'leather armor': ShopItem('leather armor', 35, 3),
+            'chain mail': ShopItem('chain mail', 75, 2),
+            'boots': ShopItem('boots', 15, 5)
         }
-        BlacksmithShop = GenericStore(self, "Blacksmith Shop", inventory)
-        BlacksmithShop.run_shop()
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", inventory)
+        BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
         self.play_sound("store_bell.mp3")
@@ -1118,9 +1047,10 @@ class Player:
                 print("You do not have enough gold.")
             time.sleep(2,)
         doctor_inventory = {
-            'bandage': {'name': 'bandage', 'price': 10, 'quantity': 5},
-            'field dressing kit': {'name': 'field dressing kit', 'price': 20, 'quantity': 5},
-            'antivenom': {'name': 'antivenom', 'price': 10, 'quantity': 5},
+            # Use ShopItem('name', base_price, quantity)
+            'bandage': ShopItem('bandage', 10, 5),
+            'field dressing kit': ShopItem('field dressing kit', 20, 5),
+            'antivenom': ShopItem('antivenom', 10, 5),
         }
         if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
@@ -1128,8 +1058,8 @@ class Player:
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
             AI_File.narrate_shop(game_state, event, NpC)
-        doc_shop = GenericStore(self, "Doctor's Supply Store", doctor_inventory)
-        doc_shop.run_shop()
+        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory)
+        doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
 
     def Gunsmiths(self):
@@ -1143,6 +1073,7 @@ class Player:
             NpC = "gunsmith"
             AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
+
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
         if self.TownUpgrades["gunsmith"]["level"] >= 2:
             available_weapons.append("sawed-off shotgun")
@@ -1153,22 +1084,23 @@ class Player:
         if self.TownUpgrades["gunsmith"]["level"] >= 4:
             available_weapons.append("winchester rifle")
             available_weapons.append("double barrel shotgun")
-        inventory = {
-        name: {**info, 'quantity': 3}  # default quantity
-        for name, info in weapons_data.items()
-            if name in available_weapons  # starting gunsmith stock
-        }
+
+        # Create inventory using ShopItem
+        inventory = {}
+        for name in available_weapons:
+            if name in weapons_data:
+                info = weapons_data[name]
+                inventory[name] = ShopItem(name, info['price'], 3) # default quantity 3
+
         # Add ammo separately:
         inventory.update({
-            'pistol_ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 50},
-            'rifle_ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 30},
-            'shotgun_ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10},
+            'pistol_ammo': ShopItem('pistol_ammo', 2, 50),
+            'rifle_ammo': ShopItem('rifle_ammo', 3, 30),
+            'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10),
         })
-        
-        
-        
-        GunsmithStore = GenericStore(self, "Gunsmith", inventory)
-        GunsmithStore.run_shop()
+
+        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory)
+        GunsmithStore.run_buy_session()
 
     def Bank(self):
         print("You walk into the Bank. The air smells of leather and dust.")
@@ -1183,14 +1115,14 @@ class Player:
         available_choices = ["general store", "blacksmith", "gunsmith"]
         choice = AI_File.parse_choice(available_choices, choice)
         if choice == "general store":
-            if self.gold >= price1:
+            if self.gold < price1:
                 print("You cannot afford to do that.")
                 return
             self.gold -= price1
             self.TownUpgrades["general store"]["level"] += 1
             print(f"General Store level:{self.TownUpgrades['general store']['level']}")
         if choice == "blacksmith":
-            if self.gold >= price2:
+            if self.gold < price2:
                 print("You cannot afford to do that.")
                 return
             self.gold -= price2
@@ -1199,7 +1131,7 @@ class Player:
             self.TownUpgrades["blacksmith"]["level"] += 1
             print(f"blacksmith level:{self.TownUpgrades['blacksmith']['level']}")
         if choice == "gunsmith":
-            if self.gold >= price3:
+            if self.gold < price3:
                 print("You cannot afford to do that.")
                 return
             self.gold -= price3
@@ -1227,13 +1159,13 @@ class Player:
                 print(f"You are fully healed. Health is now {self.Health}.")
             elif choice == "2":
                 ammo_inventory = {
-                    'pistol_ammo': {'name': 'pistol_ammo', 'price': 2, 'quantity': 10},
-                    'rifle_ammo': {'name': 'rifle_ammo', 'price': 3, 'quantity': 10},
-                    'shotgun_ammo': {'name': 'shotgun_ammo', 'price': 5, 'quantity': 10}
+                    'pistol_ammo': ShopItem('pistol_ammo', 2, 10),
+                    'rifle_ammo': ShopItem('rifle_ammo', 3, 10),
+                    'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = GenericStore(self, "Armory Ammo Shop", ammo_inventory)
-                ammo_shop.run_shop()
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory)
+                ammo_shop.run_buy_session()
             elif choice == "3":
                 print("The armory clerk hands you a crate of supplies...")
                 loot = random.choice(["colt pistol", "revolver", "bandage", "ammo cartridge", "bread", "rope"])
@@ -1691,23 +1623,24 @@ class Player:
         self.score = self.score + 5
         time.sleep(2)
         self.town_encounter()
-      
+
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
         print("You walk into the general store. A friendly shopkeeper greets you.")
         time.sleep(2,)
         general_inventory = {            
-            'lantern': {'name': 'lantern', 'price': 3, 'quantity': 10},
-            'bread': {'name': 'bread', 'price': 5, 'quantity': 30},
-            'rope': {'name': 'rope', 'price': 5, 'quantity': 20},
-            'fire cracker': {'name': 'fire cracker', 'price': 5, 'quantity': 10},
-            'antivenom': {'name': 'antivenom', 'price': 5, 'quantity': 10},
-            'tobacco pouch': {'name': 'tobacco pouch', 'price': 7, 'quantity': 7},
-            'gun oil': {'name': 'gun oil', 'price': 7, 'quantity': 3},
-            'coffee tin': {'name': 'coffee tin', 'price': 5, 'quantity': 5},
-            'diary': {'name': 'diary', 'price': 5, 'quantity': 5},}
-        gen_shop = GenericStore(self, "General Store", general_inventory)
-        gen_shop.run_shop()
+            'lantern': ShopItem('lantern', 3, 10),
+            'bread': ShopItem('bread', 5, 30),
+            'rope': ShopItem('rope', 5, 20),
+            'fire cracker': ShopItem('fire cracker', 5, 10),
+            'antivenom': ShopItem('antivenom', 5, 10),
+            'tobacco pouch': ShopItem('tobacco pouch', 7, 7),
+            'gun oil': ShopItem('gun oil', 7, 3),
+            'coffee tin': ShopItem('coffee tin', 5, 5),
+            'diary': ShopItem('diary', 5, 5),
+        }
+        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory)
+        gen_shop.run_buy_session()
 
     def HostilityFunc(self):
         if self.Hostility < 1:
@@ -1808,6 +1741,7 @@ class Player:
                 self.Health = self.MaxHealth
             if self.Health <= 0:
                 self.Death("You have succumbed to your injuries during the day.")
+            self.quest_today = False
         time.sleep(1)
         if self.Health <= 0:
             self.Death("You have succumbed to your injuries during the day.")
@@ -1844,23 +1778,25 @@ class Player:
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
             # --- Rumor quest handler ---
-        if self.quest and random.randint(1,3) == 2:
-            print("You remember a rumor you heard in town.")
-            quest_topic = self.quest.pop(0)  # Remove and get the oldest quest
-            print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
-            # Trigger a special event based on the quest topic
-            if quest_topic == "bandits_coyote_camp":
-                self.cayote_camp_quest()
-            elif quest_topic == "old_mine_lights":
-                self.encounter_haunted_mine()
-            elif quest_topic == "earp_vendetta_quest":
-                print("You search east of town and, after some digging, uncover a buried chest!")
-                self.loot_drop("gold bar")
-                self.gold += 25
-                print("You gain 25 gold!")
-            else:
-                print("You follow the rumor, but nothing comes of it this time.")
-            return  # Only do one quest per call
+        if self.quest_today == False:
+            if self.quest and random.randint(1,1) == 1:
+                print("You remember a rumor you heard in town.")
+                quest_topic = self.quest.pop(0)  # Remove and get the oldest quest
+                self.quest_today = True
+                print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
+                # Trigger a special event based on the quest topic
+                if quest_topic == "bandits_coyote_camp":
+                    self.cayote_camp_quest()
+                elif quest_topic == "old_mine_lights":
+                    self.encounter_haunted_mine()
+                elif quest_topic == "earp_vendetta_quest":
+                    print("You search east of town and, after some digging, uncover a buried chest!")
+                    self.loot_drop("gold bar")
+                    self.gold += 25
+                    print("You gain 25 gold!")
+                else:
+                    print("You follow the rumor, but nothing comes of it this time.")
+                return  # Only do one quest per call
         
         if Random <= 5:
             self.encounter_abandoned_wagon()
@@ -4100,125 +4036,6 @@ class Combat:
                     if self.player.Health <= 0:
                         self.player.Death("You have been defeated by the " + self.Enemy + ".")
                     time.sleep(2,)
-
-
-class GenericStore:
-    def __init__(self, player, store_name, inventory):
-        self.player = player
-        self.store_name = store_name
-        self.inventory = inventory
-
-    def show_player_inventory(self):
-        print("\nYour Inventory:")
-        if not self.player.itemsinventory:
-            print(" - (empty)")
-        else:
-            for item, quantity in self.player.itemsinventory.items():
-                print(f" - {item.capitalize()}: {quantity}")
-        input("Press enter to coninue:")
-
-    def get_price_with_difficulty(self, base_price):
-        if self.player.Hostility == 1:
-            base_price += 1
-        elif self.player.Hostility == 2:
-            base_price += 2
-        elif self.player.Hostility >= 3:
-            base_price += 3
-
-        if self.player.difficulty == 'adventure':
-            return int(base_price * 0.9)  # 10% cheaper
-        elif self.player.difficulty == 'savage':
-            return int(base_price * 1.1)  # 10% more expensive
-        return base_price
-        
-    def show_inventory(self):
-        print(f"\n--- {self.store_name} Inventory ---")
-        item_list = []
-        for count, item in self.inventory.items():
-            print(f"{item['name'].capitalize()} - ${self.get_price_with_difficulty(item['price'])} | Stock: {item['quantity']}")
-            item_list.append(item['name'])
-        print(f"\nYour Gold: ${self.player.gold:.2f}")
-            
-        return item_list
-
-    def run_shop(self):
-        print(f"Welcome to the {self.store_name}!")
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the {self.store_name}, and is greeted by the owner."
-            NpC = "store owner"
-            leave = AI_File.narrate_shop(game_state, event, NpC)
-            if leave == 'leave':
-                return
-        while True:
-            item_list = self.show_inventory()
-            print("\nWhat would you like to buy?")
-            print("You can leave or look at your inventory at any time.")
-            choice1 = input(": ").strip()
-
-            actions = ['leave', 'inventory']
-            complete_list = item_list + actions
-            parsed = AI_File.parse_purchase(complete_list, choice1)
-            print(parsed.get('choice', "invalid input"))
-            choice = parsed.get('choice')
-            if not choice:
-                print("Invalid input, defaulting to 'help'.")
-                choice = 'help'
-
-
-
-            raw_quantity = parsed.get('quantity', '1')   # get as stringv
-            if raw_quantity is None or raw_quantity.strip() == "" or not raw_quantity.isdigit():
-                amount = 1
-            else:
-                amount = int(raw_quantity)
-
-
-            if choice == 'leave':
-                print(f"Thanks for visiting the {self.store_name}.")
-                break
-            
-            if choice == 'inventory':
-                self.show_player_inventory()
-                continue
-
-            
-
-
-            if choice not in item_list:
-                print("That item doesn't exist.")
-                continue
-            item_name = choice.lower()  # string like "rope"
-            item = self.inventory[item_name]
-            adjusted_price = self.get_price_with_difficulty(item['price'])
-            
-            if item['quantity'] < amount:
-                print(f"{item['name'].capitalize()} is out of stock.")
-                continue
-            amount_price = adjusted_price*amount
-            
-
-            print(f"I understood you want to buy {amount} x {choice.capitalize()} for ${amount_price}.")
-            confirm = input("Confirm purchase? (yes/no): ").lower()
-            choice = AI_File.parse_YN(confirm)
-            if choice != "yes":
-                print("Purchase cancelled.")
-                continue
-
-            if self.player.gold < amount_price:
-                print("You don't have enough gold.")
-                continue
-
-
-
-            # Transaction
-            item['quantity'] -= amount
-            self.player.gold -= amount_price
-            
-            self.player.itemsinventory[item['name']] = self.player.itemsinventory.get(item['name'], 0) + amount
-            print(f"You bought {amount} {item['name']} for ${amount_price}. Remaining gold: ${self.player.gold:.2f}")
-            time.sleep(1,)
 
 
 player = Player()
