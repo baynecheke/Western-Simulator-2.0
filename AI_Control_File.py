@@ -270,59 +270,79 @@ class AI_Control:
     #     print()
     #     return narration
 
-
     def narrate_shop(self, game_state, event, NPC):
-        # Create a dynamic prompt
+            # Create a dynamic prompt
 
-        base_prompt = [{"role": "system", "content": dedent(f"""
-        You are an NPC for a western text RPG.
-        The world state is: {game_state}.
-        Event: {event}.
-        You are {NPC}.
-        Stay in character, answer very briefly in dialogue style.
-        1-2 sentences max.
-        Make sure you respond with the correct hostility.
-    """)}
-]
-        dialogue_history = []
-        leave = False
-        while leave == False:
-            prompt = [base_prompt[0]]
-            prompt.extend(dialogue_history[-3:])
-            response_stream = ollama.chat(
-                model="llama3:8b",
-                messages=prompt,
-                stream=True)
+            base_prompt = [{"role": "system", "content": dedent(f"""
+            You are an NPC for a western text RPG.
+            The world state is: {game_state}.
+            Event: {event}.
+            You are {NPC}.
+            Stay in character, answer very briefly in dialogue style.
+            1-2 sentences max.
+            Make sure you respond with the correct hostility.
+        """)}
+    ]
+            dialogue_history = []
             
-            
-            narration = ""
+            # --- START FIX ---
+            # Define keywords that trigger actions
+            leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya"}
+            buy_words = {"buy", "shop", "wares", "see wares", "let's trade", "show me", "what do you have", "see what you have"}
+            # --- END FIX ---
 
-            for chunk in response_stream:
-                # Ollama yields dicts with incremental content
-                token = chunk["message"]["content"]
-                print(token, end="", flush=True)   # print as it arrives
-                narration += token
-            
-
-            dialogue_history.append({"role": "assistant", "content": narration})
-
+            leave = False
+            while leave == False:
+                prompt = [base_prompt[0]]
+                prompt.extend(dialogue_history[-3:])
                 
-            player_input = input("You: ").strip()
-            if player_input.lower() in ["bye"]:
-                print(f"{NPC}: Safe travels, stranger.")
-                break
-            dialogue_history.append({"role": "user", "content": player_input})
-            list_options = ["buy", "talk", "leave"]
-            choice = self.parse_dialogue_player(player_input, list_options)
-            if choice.get("action", 'talk') == "leave":
-                print(f"{NPC}: Safe travels, stranger.")
-                leave = True
-                return 'leave'
-            if choice.get("action", 'talk') == "buy":
-                leave = True
-                print("Here is what I've got:")
-                return 'buy'
-            
+                # --- Add outer try/except for network errors ---
+                try:
+                    response_stream = ollama.chat(
+                        model="llama3:8b",
+                        messages=prompt,
+                        stream=True)
+                except Exception as e:
+                    print(f"[AI_Control Error in narrate_shop]: {e}")
+                    print(f"{NPC}: Sorry, lost my train of thought. What was I sayin'?")
+                    # Safely exit the conversation on AI failure
+                    return 'leave' 
+                # --- End outer try/except ---
+                
+                narration = ""
+
+                for chunk in response_stream:
+                    # Ollama yields dicts with incremental content
+                    token = chunk["message"]["content"]
+                    print(token, end="", flush=True)   # print as it arrives
+                    narration += token
+                
+
+                dialogue_history.append({"role": "assistant", "content": narration})
+
+                    
+                player_input = input("You: ").strip()
+                player_lower = player_input.lower() # Get a lowercase version
+
+                # --- START FIX ---
+                # 1. Check for LEAVE intent
+                # We use 'any' to check if any of the player's words are in our leave_words set
+                if any(word in player_lower.split() for word in leave_words) or player_lower in leave_words:
+                    print(f"{NPC}: Safe travels, stranger.")
+                    return 'leave' # Correctly return 'leave'
+
+                # 2. Check for BUY intent
+                # We use 'any' to check if the player's input contains any of our buy_words
+                if any(phrase in player_lower for phrase in buy_words):
+                    print(f"{NPC}: Here is what I've got:")
+                    return 'buy' # Correctly return 'buy'
+                # --- END FIX ---
+
+                # 3. If not leaving or buying, it's just talk.
+                dialogue_history.append({"role": "user", "content": player_input})
+                
+                # The loop will now repeat, and the AI will respond to the player's last statement.       
+
     def narrate_dialogue_once(self, game_state, event, NPC):
         # Create a dynamic prompt
 
