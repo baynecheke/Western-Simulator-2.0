@@ -11,11 +11,12 @@ class ShopItem:
 
 class ShopSession:
     """Handles the entire shopping interaction (UI and logic)."""
-    def __init__(self, player, ai_file, store_name, inventory):
+    def __init__(self, player, ai_file, store_name, inventory, use_ollama=True):
         self.player = player
         self.ai_file = ai_file
         self.store_name = store_name
         self.inventory = inventory # This will be a dict of {'item_name': ShopItem}
+        self.use_ollama = use_ollama
 
     def _show_player_inventory(self):
         """Internal helper to show the player's inventory."""

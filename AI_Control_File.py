@@ -10,48 +10,74 @@ class AI_Control:
 
 # In AI_Control_File.py
 
-    def parse_choice(self, available_choices, player_text):
-        prompt = dedent(f"""
-    You are the choice parser for a text RPG.
-    The player may only choose from these choices now: {", ".join(available_choices)}.
-    Convert the player's input into JSON with one of these actions.
-    Return ONLY JSON. Do not invent other actions.
-    Return ONLY JSON in the form:
-    {{"choice": "<one of the choices>"}}
-    """)    
-        
-        # --- START FIX ---
-        # Define a smart, safe fallback action.
-        # If "leave" is a valid choice, use it. Otherwise, use "none".
+    def parse_choice(self, available_choices, player_text, use_ollama):
         safe_fallback = "none"
         if "leave" in available_choices:
             safe_fallback = "leave"
-        # --- END FIX ---
-
-        try:
-            response = ollama.chat(
-                model="phi3",
-                format="json",
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": player_text}
-                ]
-            )
+        if use_ollama:
+            prompt = dedent(f"""
+        You are the choice parser for a text RPG.
+        The player may only choose from these choices now: {", ".join(available_choices)}.
+        Convert the player's input into JSON with one of these actions.
+        Return ONLY JSON. Do not invent other actions.
+        Return ONLY JSON in the form:
+        {{"choice": "<one of the choices>"}}
+        """)    
             
-            # This is your original try/except, now nested
+            # --- START FIX ---
+            # Define a smart, safe fallback action.
+            # If "leave" is a valid choice, use it. Otherwise, use "none".
+            safe_fallback = "none"
+            if "leave" in available_choices:
+                safe_fallback = "leave"
+            # --- END FIX ---
+
             try:
-                parsed = json.loads(response['message']['content'])
-                answer = parsed.get("choice", safe_fallback).lower() # Use safe_fallback
-                if answer not in (available_choices):
-                    answer = safe_fallback  # Enforce valid fallback
-                return answer.strip().lower()
-            except json.JSONDecodeError:
-                return safe_fallback # Return the safe string
+                response = ollama.chat(
+                    model="phi3",
+                    format="json",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": player_text}
+                    ]
+                )
                 
-        except Exception as e: # This catches network errors
-            print(f"[AI_Control Error in parse_choice]: {e}")
-            print(f"[AI_Control]: Falling back to default '{safe_fallback}' action.")
-            return safe_fallback # Return the safe string
+                # This is your original try/except, now nested
+                try:
+                    parsed = json.loads(response['message']['content'])
+                    answer = parsed.get("choice", safe_fallback).lower() # Use safe_fallback
+                    if answer not in (available_choices):
+                        answer = safe_fallback  # Enforce valid fallback
+                    return answer.strip().lower()
+                except json.JSONDecodeError:
+                    return safe_fallback # Return the safe string
+                    
+            except Exception as e: # This catches network errors
+                print(f"[AI_Control Error in parse_choice]: {e}")
+                print(f"[AI_Control]: Falling back to default '{safe_fallback}' action.")
+                return safe_fallback # Return the safe string
+        else:
+            print("\nChoose an option:")
+            for i, choice_text in enumerate(available_choices, 1):
+                print(f"{i}. {choice_text.capitalize()}")
+
+            # The 'player_text' variable holds the user's raw input (which should be a number here)
+            choice_input = player_text # Use the input directly
+
+            try:
+                choice_num = int(choice_input)
+                if 1 <= choice_num <= len(available_choices):
+                    # Adjust index (user enters 1, list index is 0)
+                    return available_choices[choice_num - 1].lower()
+                else:
+                    print("Invalid number.")
+                    return safe_fallback
+            except ValueError:
+                # Still allow direct name match as a fallback if they typed text
+                if choice_input.lower() in available_choices:
+                    return choice_input.lower()
+                print("Please enter a valid number corresponding to the choice.")
+                return safe_fallback
 
     def parse_YN(self, player_text: str) -> str:
         """
@@ -83,7 +109,8 @@ class AI_Control:
         # Fallback default
         return "no"
 
-    def parse_purchase(self, items: list, player_text):
+    def parse_purchase(self, items: list, player_text, use_ollama):
+        if use_ollama:
             # Add "leave" as a valid item for the prompt
             shop_items = items + ["leave"]
             
@@ -158,85 +185,235 @@ class AI_Control:
                 # Return a consistent, safe default that matches the expected format
                 self.action = {"choice": "leave", "quantity": "0"} 
                 return self.action
+        else:
+            # --- Numerical Fallback Logic ---
+            safe_fallback = {"choice": "leave", "quantity": "0"}
+
+            # Note: The calling function (ShopSession._display_wares) should have printed
+            # the numbered list including 'Leave' as an option.
+
+            # The 'player_text' variable holds the user's raw input (which should be a number here)
+            choice_input = player_text
+
+            try:
+                choice_num = int(choice_input)
+
+                # Check if choice number corresponds to an item in the 'items' list
+                if 1 <= choice_num <= len(items):
+                    selected_item_name = items[choice_num - 1].lower()
+
+                    # Ask for quantity separately
+                    while True:
+                        qty_input = input(f"How many {selected_item_name.capitalize()}? (Enter a number > 0): ").strip()
+                        if qty_input.isdigit() and int(qty_input) > 0:
+                            self.action = {"choice": selected_item_name, "quantity": qty_input}
+                            return self.action
+                        else:
+                            print("Invalid quantity. Please enter a positive number.")
+
+                # Check if choice number corresponds to the "Leave" option
+                # Assumes "Leave" is always listed immediately after the items
+                elif choice_num == len(items) + 1:
+                    return safe_fallback # Return the leave action
+
+                else:
+                    print("Invalid item number.")
+                    return safe_fallback
+
+            except ValueError:
+                # Allow direct name match as fallback if they typed text instead of number
+                # Check against only purchasable items first
+                if choice_input.lower() in items:
+                    selected_item_name = choice_input.lower()
+                    # Ask for quantity
+                    while True:
+                        qty_input = input(f"How many {selected_item_name.capitalize()}? (Enter a number > 0, or press Enter for 1): ").strip()
+                        if not qty_input: # Default to 1 if Enter is pressed
+                            quantity = "1"
+                            break
+                        elif qty_input.isdigit() and int(qty_input) > 0:
+                            quantity = qty_input
+                            break
+                        else:
+                            print("Invalid quantity. Please enter a positive number.")
+                    self.action = {"choice": selected_item_name, "quantity": quantity}
+                    return self.action
+                # Check if they explicitly typed "leave"
+                elif choice_input.lower() == "leave":
+                    return safe_fallback
+                # If input is neither a valid number, item name, nor "leave"
+                print("Please enter the number corresponding to your choice, or 'leave'.")
+                return safe_fallback
+            # --- End Numerical Fallback Logic ---
 
 
 # In AI_Control_File.py
-    def parse_action(self, player_text: str, available_actions: list):
+    def parse_action(self, player_text: str, available_actions: list, use_ollama):
         
-        # --- START FIX ---
-        # Give the AI a "help" option and better instructions
-        ai_choices = available_actions + ["help"]
-        
-        prompt = dedent(f"""
-        You are an action parser for a text RPG.
-        The player's input is: "{player_text}"
-        
-        You must choose the **closest match** from this list of actions: {ai_choices}
-        - If the player's input is "travel", the closest match is "travel road".
-        - If the player's input is unclear, or you cannot find a good match, default to "help".
-
-        Return ONLY JSON in this format:
-        {{"action": "<one_of_the_choices_from_the_list>"}}
-        """)
-        # --- END FIX ---
-
-        response = ollama.chat(
-            model="phi3",
-            format="json",
-            options={"temperature": 0},   # deterministic & faster
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": player_text} # The AI will now see the input twice, reinforcing it
-            ]
-        )
-
-        try:
-            parsed = json.loads(response['message']['content'])
-            action = parsed.get("action", "").lower()
-            
+        if use_ollama:
             # --- START FIX ---
-            # Check against the list the AI was given
-            if action not in ai_choices:
-                action = "help"  # fallback
+            # Give the AI a "help" option and better instructions
+            ai_choices = available_actions + ["help"]
+            
+            prompt = dedent(f"""
+            You are an action parser for a text RPG.
+            The player's input is: "{player_text}"
+            
+            You must choose the **closest match** from this list of actions: {ai_choices}
+            - If the player's input is "travel", the closest match is "travel road".
+            - If the player's input is unclear, or you cannot find a good match, default to "help".
+
+            Return ONLY JSON in this format:
+            {{"action": "<one_of_the_choices_from_the_list>"}}
+            """)
             # --- END FIX ---
 
-            self.action = {"action": action}
-        except (json.JSONDecodeError, KeyError, TypeError):
-            self.action = {"action": "help"}
+            response = ollama.chat(
+                model="phi3",
+                format="json",
+                options={"temperature": 0},   # deterministic & faster
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": player_text} # The AI will now see the input twice, reinforcing it
+                ]
+            )
 
-        return self.action
-   
+            try:
+                parsed = json.loads(response['message']['content'])
+                action = parsed.get("action", "").lower()
+                
+                # --- START FIX ---
+                # Check against the list the AI was given
+                if action not in ai_choices:
+                    action = "help"  # fallback
+                # --- END FIX ---
 
-    def parse_dialogue_player(self, player_dialogue, choices: list):
-        prompt = dedent(f"""
-    You are a dialogue parser for a game.  
-    The player is speaking to an NPC.  
-    You must choose one of the following actions: {", ".join(choices)}.  
-
-    Return ONLY valid JSON in this format:
-    {{"action": "<one_of_choices>"}}
-
-    If the player is not clear, default to:
-    {{"action": "talk"}}
-    """)
-        
-        response = ollama.chat(
-            model="phi3",
-            format="json",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": player_dialogue}
-            ]
-        )
-        try:
-            
-            self.action = json.loads(response['message']['content'])         # convert to dict
+                self.action = {"action": action}
+            except (json.JSONDecodeError, KeyError, TypeError):
+                self.action = {"action": "help"}
 
             return self.action
-        except json.JSONDecodeError:
-            # fallback to a safe default
-            self.action = {"action": "talk"}
-            return {"action": "talk", }
+        else:
+            # --- Numerical Fallback Logic ---
+            safe_fallback = {"action": "help"}
+
+            print("\nAvailable Actions:")
+            for i, action_text in enumerate(available_actions, 1):
+                print(f"{i}. {action_text.capitalize()}")
+            # Explicitly add Help as the last option
+            print(f"{len(available_actions) + 1}. Help")
+
+            # The 'player_text' variable holds the user's raw input (which should be a number here)
+            choice_input = player_text # Use the input directly
+
+            try:
+                choice_num = int(choice_input)
+                # Map numbers to actions (adjust index)
+                if 1 <= choice_num <= len(available_actions):
+                    action = available_actions[choice_num - 1].lower()
+                    self.action = {"action": action}
+                    return self.action
+                elif choice_num == len(available_actions) + 1: # Check for Help number
+                    self.action = {"action": "help"}
+                    return self.action
+                else:
+                    print("Invalid number.")
+                    return safe_fallback
+            except ValueError:
+                # Still allow direct name match as a fallback if they typed text
+                if choice_input.lower() in available_actions:
+                    self.action = {"action": choice_input.lower()}
+                    return self.action
+                elif choice_input.lower() == "help":
+                    self.action = {"action": "help"}
+                    return self.action
+                print("Please enter a valid number or 'help'.")
+                return safe_fallback
+            # --- End Numerical Fallback Logic ---
+
+    def parse_dialogue_player(self, player_dialogue, choices: list, use_ollama):
+        """
+        Parses player dialogue input against a list of specific dialogue actions.
+        Uses Ollama if use_ollama is True, otherwise uses numerical input.
+        Defaults to 'talk' if unclear or on error.
+        Returns a dictionary like {"action": "chosen_action"}.
+        """
+        safe_fallback_action = "talk" # Define the fallback action
+
+        if use_ollama:
+            # --- Ollama Logic ---
+            prompt = dedent(f"""
+            You are a dialogue parser for a game.
+            The player is speaking to an NPC.
+            You must choose one of the following actions based on the player's input: {", ".join(choices)}.
+
+            Return ONLY valid JSON in this format:
+            {{"action": "<one_of_choices>"}}
+
+            If the player is not clear which action they want, default to:
+            {{"action": "{safe_fallback_action}"}}
+            """)
+
+            try:
+                response = ollama.chat(
+                    model="phi3",
+                    format="json",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": player_dialogue}
+                    ]
+                )
+                try:
+                    parsed_action = json.loads(response['message']['content'])
+                    # Validate the action returned by the AI
+                    if parsed_action.get("action") not in choices:
+                        print(f"[AI Warning: AI returned invalid action '{parsed_action.get('action')}'. Falling back.]")
+                        self.action = {"action": safe_fallback_action}
+                    else:
+                        self.action = parsed_action # Use the valid AI response
+
+                    return self.action
+                except json.JSONDecodeError:
+                    print("[AI Error: Could not parse dialogue response. Falling back.]")
+                    self.action = {"action": safe_fallback_action}
+                    return self.action # Use the safe fallback
+
+            except Exception as e:
+                print(f"[AI_Control Error in parse_dialogue_player]: {e}")
+                print(f"[AI_Control]: Ollama call failed. Falling back to '{safe_fallback_action}'.")
+                self.action = {"action": safe_fallback_action}
+                return self.action
+            # --- End Ollama Logic ---
+
+        else:
+            # --- Numerical Fallback Logic ---
+            print("\nChoose a dialogue option:")
+            for i, choice_text in enumerate(choices, 1):
+                print(f"{i}. {choice_text.capitalize()}")
+
+            # The 'player_dialogue' variable holds the user's raw input (number expected)
+            choice_input = player_dialogue
+
+            try:
+                choice_num = int(choice_input)
+                if 1 <= choice_num <= len(choices):
+                    # Adjust index
+                    chosen_action = choices[choice_num - 1].lower()
+                    self.action = {"action": chosen_action}
+                    return self.action
+                else:
+                    print("Invalid number.")
+                    self.action = {"action": safe_fallback_action}
+                    return self.action
+            except ValueError:
+                # Allow direct name match as fallback
+                if choice_input.lower() in choices:
+                    self.action = {"action": choice_input.lower()}
+                    return self.action
+                print("Please enter a valid number corresponding to the dialogue choice.")
+                self.action = {"action": safe_fallback_action}
+                return self.action
+            # --- End Numerical Fallback Logic ---
 
     # def narrate_action(self, game_state, possible_actions, past_actions):
     #     action = self.action.get("action")
@@ -270,7 +447,8 @@ class AI_Control:
     #     print()
     #     return narration
 
-    def narrate_shop(self, game_state, event, NPC):
+    def narrate_shop(self, game_state, event, NPC, use_ollama):
+        if use_ollama:
             # Create a dynamic prompt
 
             base_prompt = [{"role": "system", "content": dedent(f"""
@@ -342,45 +520,62 @@ class AI_Control:
                 dialogue_history.append({"role": "user", "content": player_input})
                 
                 # The loop will now repeat, and the AI will respond to the player's last statement.       
-
-    def narrate_dialogue_once(self, game_state, event, NPC):
-        # Create a dynamic prompt
-
-        prompt = [{"role": "system", "content": dedent(f"""
-        You are an NPC for a western text RPG.
-        The world state is: {game_state}.
-        Event: {event}.
-        You are {NPC}.
-        Stay in character, answer very briefly in dialogue style.
-        1-2 sentences max.
-        Make sure you respond with the correct hostility.
-    """)}
-]
-
-
-        response_stream = ollama.chat(
-            model="llama3:8b",
-            messages=prompt,
-            stream=True)
-            
-            
-        narration = ""
-
-        for chunk in response_stream:
-            # Ollama yields dicts with incremental content
-            token = chunk["message"]["content"]
-            print(token, end="", flush=True)   # print as it arrives
-            narration += token
-        player_input = input("You: ").strip()
-        choice = self.parse_YN(player_input)
-        if choice == 'yes':
-            return 'yes'
         else:
-            return 'no'
-           
+            # --- Numerical Fallback Logic ---
+            # Simple, direct approach for non-AI mode
+            print(f"\n{NPC}: Welcome to the shop. Take a look.")
+            # Automatically proceed to showing wares in numerical mode.
+            # The ShopSession loop will handle buying/leaving from there.
+            return 'buy'
+            # --- End Numerical Fallback Logic ---
+
+    def narrate_dialogue_once(self, game_state, event, NPC, use_ollama):
+        if use_ollama:
+            # Create a dynamic prompt
+
+            prompt = [{"role": "system", "content": dedent(f"""
+            You are an NPC for a western text RPG.
+            The world state is: {game_state}.
+            Event: {event}.
+            You are {NPC}.
+            Stay in character, answer very briefly in dialogue style.
+            1-2 sentences max.
+            Make sure you respond with the correct hostility.
+        """)}
+    ]
+
+
+            response_stream = ollama.chat(
+                model="llama3:8b",
+                messages=prompt,
+                stream=True)
+                
+                
+            narration = ""
+
+            for chunk in response_stream:
+                # Ollama yields dicts with incremental content
+                token = chunk["message"]["content"]
+                print(token, end="", flush=True)   # print as it arrives
+                narration += token
+            player_input = input("You: ").strip()
+            choice = self.parse_YN(player_input)
+            if choice == 'yes':
+                return 'yes'
+            else:
+                return 'no'
+        else:
+            # --- Numerical Fallback Logic ---
+            # Print a direct question based on the event context
+            print(f"\n{NPC}: {event} (yes/no?)")
+            player_input = input("You: ").strip()
+            choice = self.parse_YN(player_input) # Use reliable Y/N parser
+            return choice # Return 'yes' or 'no'
+            # --- End Numerical Fallback Logic ---
+            
 
 
 
-#AI = AI_Control()
-#AI.parse_example()
-#AI.narrate_action()
+    #AI = AI_Control()
+    #AI.parse_example()
+    #AI.narrate_action()

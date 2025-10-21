@@ -1,4 +1,5 @@
 import random
+import ollama
 import time
 import json
 import os
@@ -11,8 +12,50 @@ import builtins
 import sys
 from AI_Control_File import AI_Control
 AI_File = AI_Control()
+from requests.exceptions import ConnectionError
+USE_OLLAMA = False # Default to False
+print("[Checking for Ollama server...]") # Add feedback
+try:
+    # 1. Try creating a client - checks basic connectivity
+    client = ollama.Client() 
+    
+    # 2. Try a simple command like listing models
+    client.list() # Use the client object
+    
+    print("[Ollama server detected and responding. Natural language input enabled.]")
+    USE_OLLAMA = True
+    
+# --- Catch specific connection errors FIRST ---
+except ConnectionError:
+    print("[Ollama Connection Error: Server not found or not running at the expected address (usually http://localhost:11434).]")
+    print("[Falling back to numerical input.]")
+    
+# --- Catch other potential Ollama/Request errors ---
+# except RequestError as e: # Use the specific Ollama error if known
+#     print(f"[Ollama Request Error: {e}]")
+#     print("[Falling back to numerical input.]")
+    
+# --- Catch ANY other unexpected errors during detection ---
+except Exception as e: 
+    print(f"[Unexpected Error during Ollama detection: {type(e).__name__} - {e}]")
+    print("[Falling back to numerical input.]")
 
-with open('c:/Users/djche/OneDrive/WesternSim2.0/Western-Simulator-2.0/weapons', 'r') as file:
+if not USE_OLLAMA:
+     print("[Install Ollama and run 'ollama pull phi3' and 'ollama pull llama3:8b' to enable full features.]")
+# --- END DETECTION ---
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS # type: ignore
+    except AttributeError: # <-- This is more specific
+        # AttributeError is raised when _MEIPASS doesn't exist
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+base_dir = resource_path(".")
+with open(os.path.join(base_dir, "weapons"), "r") as file:
     weapons_data = yaml.safe_load(file)
 
 USE_SPEECH_INPUT = True
@@ -41,14 +84,28 @@ def background_callback(recognizer, audio):
         print("\n[Speech API unavailable, switching to typing]")
         global USE_SPEECH_INPUT
         USE_SPEECH_INPUT = False
-
+# In Western_Sim.py
 
 def start_listening():
-    global stop_listening
-    mic = sr.Microphone()  # create mic here, not globally
-    stop_listening = recognizer.listen_in_background(mic, background_callback)
-    print("[Listening... speak now, press Enter when ready]")
+    """Attempts to initialize the microphone and start background listening."""
+    # Declare globals needed within the function
+    global stop_listening, USE_SPEECH_INPUT 
 
+    try:
+        print("[Initializing microphone...]") # Feedback for the user
+        # Attempt to access the default microphone
+        mic = sr.Microphone()  
+        
+        # If microphone access succeeds, start the background listener
+        stop_listening = recognizer.listen_in_background(mic, background_callback)
+        print("[Listening... speak now, press Enter when ready]") # Prompt user
+
+    except Exception as e: 
+        # Catch any error during microphone initialization or listener start
+        print(f"\n[Microphone Error: Could not initialize microphone ({type(e).__name__}: {e})]") # Inform user of the specific error
+        print("[Switching to keyboard input.]") # Explain the fallback
+        USE_SPEECH_INPUT = False # Disable the speech feature globally
+        stop_listening = None # Ensure listener state is correctly set to None
 
 def stop_and_clear():
     global stop_listening, speech_buffer
@@ -78,7 +135,7 @@ builtins.input = speech_input
 
 choice = original_input("Would you like to use speech to text? (yes/no) ").strip().lower()
 USE_SPEECH_INPUT = choice == "yes"
-base_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
     loot_data = yaml.safe_load(file)
@@ -497,7 +554,7 @@ class Player:
                     print(action1)
                 print("-------------------------")
                 continue # Ask for input again
-            parsed = AI_File.parse_action(choice, self.possibleactions)
+            parsed = AI_File.parse_action(choice, self.possibleactions, use_ollama=USE_OLLAMA)
             print(parsed.get('action', 'none'))
             if parsed.get('action', 'none') in self.possibleactions:
                 return parsed.get('action', 'none')
@@ -846,7 +903,7 @@ class Player:
         print("Leave the jail.")
         choice = input("Enter your choice: ").strip()
         available_choices = ["pay fine", "return criminal", "ask rumors", "teach skills", "leave"]
-        choice = AI_File.parse_choice(available_choices, choice)
+        choice = AI_File.parse_choice(available_choices, choice, use_ollama=USE_OLLAMA)
         if choice == "pay fine":
             if self.Hostility > 0:
                 fine = self.Hostility * 5
@@ -905,7 +962,7 @@ class Player:
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
             skill_choice = input("Enter your choice: ").strip().lower()
             available_choices = ['durability', 'trail', 'strength', 'shadow']
-            skill_choice = AI_File.parse_choice(available_choices, skill_choice)
+            skill_choice = AI_File.parse_choice(available_choices, skill_choice, use_ollama=USE_OLLAMA)
             if skill_choice == "shadow":
                 gold = self.shadow_skill * 5
                 if gold > self.gold:
@@ -997,7 +1054,7 @@ class Player:
         ]
 
         # We don't need a buy inventory, so we pass an empty dict {}
-        trader_session = ShopSession(self, self.AI_File, "Trading Post", {})
+        trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, USE_OLLAMA)
 
         # Call our new, specialized method!
         trader_session.run_trade_session(sell_prices, trade_offers)
@@ -1012,7 +1069,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
-            AI_File.narrate_shop(game_state, event, NpC)
+            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
 
         inventory = {
             'leather armor': ShopItem('leather armor', 35, 3),
@@ -1070,8 +1127,8 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
-            AI_File.narrate_shop(game_state, event, NpC)
-        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory)
+            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, USE_OLLAMA)
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
 
@@ -1084,7 +1141,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
             NpC = "gunsmith"
-            AI_File.narrate_shop(game_state, event, NpC)
+            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
         time.sleep(2,)
 
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
@@ -1112,7 +1169,7 @@ class Player:
             'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10),
         })
 
-        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory)
+        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory, USE_OLLAMA)
         GunsmithStore.run_buy_session()
 
     def Bank(self):
@@ -1126,7 +1183,7 @@ class Player:
         print(f"Gunsmith, price to upgrade: {price3}.")
         choice = input(": ")
         available_choices = ["general store", "blacksmith", "gunsmith"]
-        choice = AI_File.parse_choice(available_choices, choice)
+        choice = AI_File.parse_choice(available_choices, choice, use_ollama=USE_OLLAMA)
         if choice == "general store":
             if self.gold < price1:
                 print("You cannot afford to do that.")
@@ -1177,7 +1234,7 @@ class Player:
                     'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory)
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, USE_OLLAMA)
                 ammo_shop.run_buy_session()
             elif choice == "3":
                 print("The armory clerk hands you a crate of supplies...")
@@ -1426,8 +1483,7 @@ class Player:
             print("A merchant walks up to you.")
             NpC = "merchant"
             event = "A merchant asks if the player will help load wagons at the stable."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
-            choice = AI_File.parse_YN(choice)
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice.strip().lower() == "yes":
                 earned = random.randint(31, 45)
                 self.gold += earned
@@ -1441,8 +1497,7 @@ class Player:
             NpC = "farmer"
             print("A farmer waves you over.")
             event = "A farmer waves the player over. 'My plow's busted—can you help fix it?'"
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
-            choice = AI_File.parse_YN(choice)
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice == "yes":
                 if "rope" in self.itemsinventory:
                     print("You tie it back together with your rope.")
@@ -1467,8 +1522,7 @@ class Player:
             print("A schoolteacher walks over.")
             NpC = "schoolteacher"
             event = "A schoolteacher asks if the player will speak to the children about survival."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
-            choice = AI_File.parse_YN(choice)
+            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice == "yes":
                 self.Time += 2
                 self.shadow_skill += 1
@@ -1652,7 +1706,7 @@ class Player:
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
         }
-        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory)
+        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, USE_OLLAMA)
         gen_shop.run_buy_session()
 
     def HostilityFunc(self):
