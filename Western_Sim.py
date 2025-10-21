@@ -501,7 +501,7 @@ class Player:
             print(parsed.get('action', 'none'))
             if parsed.get('action', 'none') in self.possibleactions:
                 return parsed.get('action', 'none')
-            elif action == "help":
+            elif parsed.get('action', 'none') == "help":
                 print("\n--- Available Actions ---")
                 for action1 in self.possibleactions:
                     print(action1)
