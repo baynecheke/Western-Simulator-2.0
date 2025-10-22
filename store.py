@@ -10,13 +10,12 @@ class ShopItem:
         self.quantity = quantity
 
 class ShopSession:
-    """Handles the entire shopping interaction (UI and logic)."""
-    def __init__(self, player, ai_file, store_name, inventory, use_ollama=True):
-        self.player = player
-        self.ai_file = ai_file
-        self.store_name = store_name
-        self.inventory = inventory # This will be a dict of {'item_name': ShopItem}
-        self.use_ollama = use_ollama
+    def __init__(self, player, ai_file, store_name, inventory, use_ollama): # Added use_ollama
+            self.player = player
+            self.ai_file = ai_file
+            self.store_name = store_name
+            self.inventory = inventory # Dict of {'item_name': ShopItem}
+            self.use_ollama = use_ollama # Store the flag
 
     def _show_player_inventory(self):
         """Internal helper to show the player's inventory."""
@@ -73,7 +72,7 @@ class ShopSession:
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
             NpC = "store owner"
-            leave = self.ai_file.narrate_shop(game_state, event, NpC)
+            leave = self.ai_file.narrate_shop(game_state, event, NpC, ollama=self.use_ollama)
             if leave == 'leave':
                 return
         
@@ -85,7 +84,7 @@ class ShopSession:
 
             actions = ['leave', 'inventory']
             complete_list = item_list + actions
-            parsed = self.ai_file.parse_purchase(complete_list, choice1)
+            parsed = self.ai_file.parse_purchase(complete_list, choice1, use_ollama=self.use_ollama)
             choice = parsed.get('choice')
             
             if not choice:
