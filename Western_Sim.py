@@ -542,30 +542,68 @@ class Player:
 
 
     def TakeActionsChose(self):
-        print("You may choose an action to take:")
-        for action1 in self.possibleactions:
-            print(action1)
-        while True:
-            choice = input("Choice: ").strip()
-            # Add a manual, non-AI "help" command
-            if choice.lower() == "help":
+            # This function will now ONLY print the list if USE_OLLAMA is false.
+            # If USE_OLLAMA is true, it prints the simple list.
+            
+            def print_action_list():
+                """Helper function to print the correct list format."""
                 print("\n--- Available Actions ---")
+                if USE_OLLAMA:
+                    for action1 in self.possibleactions:
+                        print(action1)
+                else:
+                    for i, action_text in enumerate(self.possibleactions, 1):
+                        print(f"{i}. {action_text.capitalize()}")
+                    print(f"{len(self.possibleactions) + 1}. Help")
+                print("-------------------------")
+
+            # Initial prompt
+            if USE_OLLAMA:
+                print("You may choose an action to take:")
                 for action1 in self.possibleactions:
                     print(action1)
-                print("-------------------------")
-                continue # Ask for input again
-            parsed = AI_File.parse_action(choice, self.possibleactions, use_ollama=USE_OLLAMA)
-            print(parsed.get('action', 'none'))
-            if parsed.get('action', 'none') in self.possibleactions:
-                return parsed.get('action', 'none')
-            elif parsed.get('action', 'none') == "help":
-                print("\n--- Available Actions ---")
-                for action1 in self.possibleactions:
-                    print(action1)
-                print("-------------------------")
-                continue # Ask for input again
             else:
-                print("Invalid or unavailable choice. Try again.")
+                # Print the numbered list for the first time
+                print("\nAvailable Actions:")
+                for i, action_text in enumerate(self.possibleactions, 1):
+                    print(f"{i}. {action_text.capitalize()}")
+                print(f"{len(self.possibleactions) + 1}. Help")
+
+            while True:
+                # 1. Get input
+                if USE_OLLAMA:
+                    choice = input("Choice: ").strip()
+                else:
+                    choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
+
+                # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
+                if choice.lower() == "help":
+                    print_action_list()
+                    continue # Ask for input again
+
+                # 3. Parse the action
+                # AI_File.parse_action will now handle the number-to-action conversion
+                # or the text-to-action conversion.
+                parsed = AI_File.parse_action(choice, self.possibleactions, use_ollama=USE_OLLAMA)
+                action_result = parsed.get('action', 'none')
+
+                # 4. Handle result
+                if action_result in self.possibleactions:
+                    if USE_OLLAMA:
+                        print(f"[{action_result.capitalize()}]") # Give feedback on AI choice
+                    return action_result # Success!
+                
+                elif action_result == "help":
+                    print_action_list()
+                    continue # Ask for input again
+                
+                else:
+                    # In Ollama mode, print a generic error
+                    if USE_OLLAMA:
+                        print("Invalid or unavailable choice. Try again.")
+                    # In Numerical mode, parse_action already printed the error.
+                    # We just loop to re-prompt.
+                    pass
 
     def generate_game_state(self):
         if self.invillage == True:

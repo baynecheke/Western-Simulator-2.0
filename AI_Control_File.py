@@ -248,6 +248,8 @@ class AI_Control:
 
 
 # In AI_Control_File.py
+# In AI_Control_File.py
+
     def parse_action(self, player_text: str, available_actions: list, use_ollama):
         
         if use_ollama:
@@ -295,13 +297,9 @@ class AI_Control:
             return self.action
         else:
             # --- Numerical Fallback Logic ---
-            safe_fallback = {"action": "help"}
-
-            print("\nAvailable Actions:")
-            for i, action_text in enumerate(available_actions, 1):
-                print(f"{i}. {action_text.capitalize()}")
-            # Explicitly add Help as the last option
-            print(f"{len(available_actions) + 1}. Help")
+            # This function NO LONGER prints the list.
+            # Printing is now handled by TakeActionsChose in Western_Sim.py
+            safe_fallback = {"action": "help"} # 'help' will cause TakeActionsChose to reprint the list
 
             # The 'player_text' variable holds the user's raw input (which should be a number here)
             choice_input = player_text # Use the input directly
@@ -317,8 +315,8 @@ class AI_Control:
                     self.action = {"action": "help"}
                     return self.action
                 else:
-                    print("Invalid number.")
-                    return safe_fallback
+                    print("Invalid number.") # Keep error message
+                    return safe_fallback # Return 'help' to trigger a list reprint
             except ValueError:
                 # Still allow direct name match as a fallback if they typed text
                 if choice_input.lower() in available_actions:
@@ -327,8 +325,11 @@ class AI_Control:
                 elif choice_input.lower() == "help":
                     self.action = {"action": "help"}
                     return self.action
-                print("Please enter a valid number or 'help'.")
-                return safe_fallback
+                
+                # Only print error if it's not an empty string (e.g., just pressing Enter)
+                if choice_input: 
+                    print("Please enter a valid number or 'help'.") 
+                return safe_fallback # Return 'help' to trigger a list reprint
             # --- End Numerical Fallback Logic ---
 
     def parse_dialogue_player(self, player_dialogue, choices: list, use_ollama):
