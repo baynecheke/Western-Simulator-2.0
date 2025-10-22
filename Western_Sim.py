@@ -1156,7 +1156,7 @@ class Player:
             'chain mail': ShopItem('chain mail', 75, 2),
             'boots': ShopItem('boots', 15, 5)
         }
-        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", inventory)
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", inventory, USE_OLLAMA)
         BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
