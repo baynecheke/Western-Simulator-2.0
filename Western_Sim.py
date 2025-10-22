@@ -360,6 +360,9 @@ class Player:
         player.player_effects = save_data.get("player_effects", [])
         player.iron_bonus = save_data.get("iron_bonus", 0)
         player.iron_stage = save_data.get("iron_stage", 0)
+        player.shadow_skill = save_data.get("shadow_skill", 3)
+        player.trail_skill = save_data.get("trail_skill", 3)
+        player.strength_skill = save_data.get("strength_skill", 3)
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -411,6 +414,9 @@ class Player:
                 "iron_bonus": self.iron_bonus,
                 "iron_stage": self.iron_stage,
                 "rebirth": self.rebirth,
+                "shadow_skill": self.shadow_skill,
+                "trail_skill": self.trail_skill,
+                "strength_skill": self.strength_skill,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -540,6 +546,42 @@ class Player:
                 self.add_item(loot)
         self.day_memory["loot"] = item
 
+    def perform_stat_check(self, stat_value, base_target=10):
+            """
+            Performs a stat check against a target, adjusted by game difficulty.
+            Returns True for success, False for failure.
+
+            - stat_value: The player's skill (e.g., self.strength_skill).
+            - base_target: The inherent difficulty of the task (e.g., 10 for medium).
+            """
+            roll = random.randint(1, 20)
+
+            # 1. Handle criticals (guarantees a "never 0%" chance)
+            if roll == 20:
+                return True  # Critical Success (5% chance, always wins)
+            if roll == 1:
+                return False # Critical Failure (5% chance, always fails)
+
+            # 2. Adjust target based on game difficulty
+            adjusted_target = base_target
+            if self.difficulty == 'adventure':
+                adjusted_target -= 3  # Make it easier
+            elif self.difficulty == 'savage':
+                adjusted_target += 3  # Make it harder
+            # 'frontier' uses the base_target as-is
+
+            # 3. Calculate the final score and check
+            # We use (stat_value - 3) as the bonus.
+            # This makes your starting skill of 3 a "+0" (average) bonus.
+            # A skill of 4 is +1. A skill of 2 is -1.
+            stat_bonus = stat_value - 3 
+            
+            final_score = roll + stat_bonus
+            
+            # You can uncomment this for testing:
+            # print(f"[Debug: Rolled {roll} + Bonus {stat_bonus} = {final_score} vs Target {adjusted_target}]")
+            
+            return final_score >= adjusted_target
 
     def TakeActionsChose(self):
             # This function will now ONLY print the list if USE_OLLAMA is false.
