@@ -3207,14 +3207,109 @@ class Player:
             self.play_sound("rattle_snake.mp3")
 
     def weapon_ability(self, weapon):
-        if weapon in ["revolver", "colt pistol"]:
-            if self.itemsinventory[weapon] >= 2:
-                if self.itemsinventory.get("pistol_ammo", 0) > 1:
-                    print(f"You fire pull out both {weapon}s and fire!")
-                    self.itemsinventory["pistol_ammo"] -= 1
+        # Get the weapon's data from the loaded weapons_data
+        weapon_info = weapons_data.get(weapon)
+
+        # Exit if the weapon doesn't exist or has no defined ability
+        if not weapon_info:
+            return
+        
+        ability = weapon_info.get('ability', 'none')
+        
+        if ability == 'none':
+            return
+
+        # Use a match statement to handle the different abilities
+        match ability:
+            case "dual wield":
+                # Logic for revolver, colt pistol
+                if self.itemsinventory[weapon] >= 2:
+                    if self.itemsinventory.get("pistol_ammo", 0) > 1:
+                        print(f"You pull out both {weapon}s and fire!")
+                        self.itemsinventory["pistol_ammo"] -= 1 # Only consumes 1 extra ammo for the 2nd gun
+                        self.dmg_modifier_multiply = 2
+                        self.play_sound("revolver_shot.mp3")
+                        time.sleep(1,)
+
+            case "steady aim":
+                # Logic for winchester rifle, henry rifle
+                print("You steady your aim...")
+                if random.randint(1, 4) == 1:
+                    print("A solid hit!")
+                    self.dmg_modifier_multiply = 1.5
+
+            case "multi-shot":
+                # Logic for remington pistol, derringer pistol
+                print("Would you like to fire multiple shots? yes/no")
+                choice = input(": ").lower().strip()
+                choice = AI_File.parse_YN(choice)
+                if choice == "yes":
+                    print("You fire multiple shots")
+                    # Note: The main combat loop already consumed 1 ammo. This consumes 2 *additional* ammo.
+                    if self.itemsinventory.get("pistol_ammo", 0) >= 2:
+                        Random = random.randint(0, 2)
+                        self.itemsinventory["pistol_ammo"] -= 2
+                        for i in range(Random):
+                            self.play_sound("revolver_shot.mp3")
+                            self.damage_modifier += 15
+                            time.sleep(1,)
+                    else:
+                        print("You do not have enough ammo.")
+                        time.sleep(2,)
+
+            case "double barrel":
+                # Logic for double barrel shotgun
+                print("Double Barrel! Fire both barrels? (yes/no)")
+                choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN(choice)
+                # Note: The main combat loop already consumed 1 ammo. This consumes 1 *additional* ammo.
+                if choice == "yes" and self.itemsinventory.get("shotgun_ammo", 0) >= 1:
+                    self.itemsinventory["shotgun_ammo"] -= 1 # Consume the second barrel's shell
+                    print("You fire both barrels in a devastating volley!")
                     self.dmg_modifier_multiply = 2
-                    self.play_sound("revolver_shot.mp3")
+                    self.play_sound("shotgun.mp3")
                     time.sleep(1,)
+                    print("The kickback bruises your arm.")
+                    self.Health -= 5
+                else:
+                    if choice == "yes":
+                        print("You don't have enough ammo for a double shot.")
+                    else:
+                        print("You decide not to use the double shot.")
+
+            case "throw":
+                # Logic for tomahawk
+                print("Throw your tomahawk for extra damage? (yes/no)")
+                choice = input(": ").strip().lower()
+                choice = AI_File.parse_YN(choice)
+                if choice == "yes":
+                    if self.itemsinventory.get("tomahawk", 0) > 0:
+                        self.itemsinventory["tomahawk"] -= 1
+                        if self.itemsinventory["tomahawk"] <= 0:
+                            del self.itemsinventory["tomahawk"]
+                        print("You hurl your tomahawk—deadly accuracy!")
+                        self.play_sound("tomahawk.mp3")
+                        self.dmg_modifier_multiply = 2
+                    else:
+                        print("No tomahawks left!")
+                else:
+                    print("You keep your tomahawk ready for melee.")
+
+            case "precision shot":
+                # Logic for sharps rifle
+                print("You take a steady breath for a precision shot…")
+                if random.randint(1, 4) == 1:
+                    print("Bullseye! Your shot hits extra savage.")
+                    self.dmg_modifier_multiply = 2
+
+            case "precise strike":
+                # Logic for cavalry saber
+                print("You slash with your saber, aiming for weak points.")
+                self.dmg_modifier_multiply = 1.5
+            
+            case _:
+                # Fallback for any other defined ability
+                pass
 
         if weapon in ["winchester rifle", "henry rifle"]:
             print("You steady your aim...")
@@ -3921,18 +4016,18 @@ class Combat:
             "rattlesnake": {"health": 20, "damage": 7, "speed": 4, "loot": "small","type": "animal", "special": "venomous","behavior": "aggressive",}, 
             "viper": {"health": 10, "damage": 5, "speed": 5, "loot": "small", "type": "animal","behavior": "fearful",},
             "cobra": {"health": 15, "damage": 10, "speed": 2, "loot": "small",  "type": "animal","behavior": "cautious",},
-            "wolf": {"health": 50, "damage": 15, "speed": 4, "loot": "medium", "type": "animal","behavior": "reckless",},  
+            "wolf": {"health": 50, "damage": 10, "speed": 4, "loot": "medium", "type": "animal","behavior": "reckless",},  
             "bison": {"health": 100, "damage": 15, "speed": 2, "loot": "large", "passive": True,  "type": "animal","behavior": "cautious",},
-            "pack of wolves": {"health": 70, "damage": 20, "speed": 4, "loot": "medium", "type": "pack","behavior": "desperate",},
-            "bear": {"health": 125, "damage": 20, "speed": 3, "loot": "medium",  "type": "animal","behavior": "reckless",},
+            "pack of wolves": {"health": 70, "damage": 15, "speed": 4, "loot": "medium", "type": "pack","behavior": "desperate",},
+            "bear": {"health": 125, "damage": 15, "speed": 3, "loot": "medium",  "type": "animal","behavior": "reckless",},
             "bandit": {"health": 80, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": "cautious",},
             "mounted bandit": {"health": 120, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human","behavior": "intelligent",},
             "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": "reckless",},
-            "sheriff": {"health": 65, "damage": 20, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "cautious", "desperate"]),},
-            "looter": {"health": 65, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": "cautious",},
-            "bandit leader": {"health": 100, "damage": 35, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": random.choice(["reckless", "cautious", "desperate"]),},
-            "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True,"behavior": random.choice(["reckless", "cautious", "desperate"]),},
-            "phantom gunslinger": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form","behavior": random.choice(["reckless", "cautious", "desperate"]),},
+            "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "cautious", "desperate"]),},
+            "looter": {"health": 60, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": "cautious",},
+            "bandit leader": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": random.choice(["reckless", "cautious", "desperate"]),},
+            "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True,"behavior": "boss"},
+            "phantom gunslinger": {"health": 100, "damage": 15, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form","behavior": "boss"},
             }
         self.loots = {
             "small": ["small hide", "small meat"],

@@ -3,28 +3,28 @@ derringer pistol:
   price: 10
   damage: [5, 10]
   ammo: pistol_ammo
-  ability: none
+  ability: multi-shot
 
 revolver:
   name: "revolver"
   price: 20
   damage: [10, 15]
   ammo: pistol_ammo
-  ability: none
+  ability: dual wield
 
 colt pistol:
   name: "colt pistol"
   price: 20
-  damage: [10, 15]
+  damage: [15, 20]
   ammo: pistol_ammo
-  ability: none
+  ability: dual wield
 
 remington pistol:
   name: "remington pistol"
   price: 25
   damage: [15, 25]
   ammo: pistol_ammo
-  ability: none
+  ability: multi-shot
 
 colt navy revolver:
   name: "colt navy revolver"
@@ -52,21 +52,21 @@ henry rifle:
   price: 55
   damage: [30, 35]
   ammo: rifle_ammo
-  ability: none
+  ability: steady aim
 
 sharps rifle:
   name: "sharps rifle"
   price: 100
   damage: [40, 45]
   ammo: rifle_ammo
-  ability: none
+  ability: steady aim
 
 winchester rifle:
   name: "winchester rifle"
   price: 130
   damage: [50, 55]
   ammo: rifle_ammo
-  ability: none
+  ability: precision shot
 
 shotgun:
   name: "shotgun"
@@ -87,21 +87,20 @@ double barrel shotgun:
   price: 120
   damage: [20, 50]
   ammo: shotgun_ammo
-  ability: none
-
+  ability: double barrel
 knife:
   name: "knife"
   price: 10
   damage: [5, 10]
   ammo: none
-  ability: none
+  ability: precise strike
 
 tomahawk:
   name: "tomahawk"
   price: 25
   damage: [10, 15]
   ammo: none
-  ability: none
+  ability: throw
 
 cavalry saber:
   name: "cavalry saber"
