@@ -547,7 +547,7 @@ class Player:
         self.day_memory["loot"] = item
 
     def perform_stat_check(self, stat_value, base_target=10):
-            """
+            """ 
             Performs a stat check against a target, adjusted by game difficulty.
             Returns True for success, False for failure.
 
@@ -615,6 +615,10 @@ class Player:
                 # 1. Get input
                 if USE_OLLAMA:
                     choice = input("Choice: ").strip()
+                    if choice == "67":
+                        combat = Combat(self)
+                        combat.FindAttacker("brawler")
+                        combat.Attack()
                 else:
                     choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
 
@@ -765,7 +769,6 @@ class Player:
                     self.Temporaryspdboost = 1
 
                 elif selected_item == "antivenom":
-                    self.Hunger = self.Hunger - 1
                     if self.poisoned > 0:
                         print(f"You use the antivenom.")
                         self.itemsinventory[selected_item] -= 1
@@ -1534,7 +1537,7 @@ class Player:
                 print("Invalid bet.")
         elif choice == "3":
             print("You grip a burly patron's hand and push...")
-            if random.randint(1, self.strength_skill) > 2:
+            if self.perform_stat_check(self.strength_skill, base_target=13) == True:
                 prize = 5
                 print(f"You win the arm-wrestle! +{prize} gold.")
                 self.gold += prize
@@ -1586,7 +1589,7 @@ class Player:
                         del self.itemsinventory["rope"]
                     self.gold += 10
                     print("You fix the plow. +10 gold.")
-                elif self.strength_skill >= 4:
+                elif self.perform_stat_check(self.shadow_skill, base_target=12) == True:
                     print("You heave the plow upright and wedge it in tight.")
                     self.gold += 8
                     print("The farmer gives you 8 gold for your help.")
@@ -1615,7 +1618,7 @@ class Player:
         elif roll <= 60:
             # Help the blacksmith
             print("The blacksmith grunts, 'Hand me that hammer, would ya?'")
-            if self.strength_skill >= 3:
+            if self.perform_stat_check(self.Speed, base_target=14) == True:
                 self.strength_skill += 1
                 print("He's impressed with your help. +1 Strength Skill.")
             else:
@@ -1658,9 +1661,10 @@ class Player:
 
         elif roll <= 90:
             # Crafting bonus (if tools owned)
-            if self.shadow_skill >= 4:
+            if self.perform_stat_check(self.Speed, base_target=12) == True:
                 print("A merchant sees your intelligence and teaches you a couple haggling tricks.")
                 print("You feel more confident with your skills.")
+                self.shadow_skill += 1
             else:
                 print("You chat with a merchant, but nothing comes of it.")
 
@@ -1926,7 +1930,7 @@ class Player:
         Random = Random + self.Day*5-5
             # --- Rumor quest handler ---
         if self.quest_today == False:
-            if self.quest and random.randint(1,1) == 1:
+            if self.quest and random.randint(1,2) == 1:
                 print("You remember a rumor you heard in town.")
                 quest_topic = self.quest.pop(0)  # Remove and get the oldest quest
                 self.quest_today = True
@@ -1988,11 +1992,12 @@ class Player:
             time.sleep(2,)
             if choice == "Yes":
                 print("You attempt to capture the outlaw.")
-                if self.strength_skill + self.Speed >= 7:
+                if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                     print("You successfully capture the outlaw.")
                     print("Go to the next town's jail to turn him in.")
                 else: 
                     print("The outlaw overpowers you and escapes.")
+                    print("If only you were stronger...")
                     self.Health -= 10
                     self.Hostility += 1
                     print("You are injured in the scuffle. -10 health.")
@@ -2065,8 +2070,7 @@ class Player:
             elif choice == "3":
                 print("You examine the picture...")
                 time.sleep(2,)
-                Random = random.randint(1, self.shadow_skill)
-                if Random == 1:
+                if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
                     print("You accidentally trigger the trap attached to the painting!")
                     print("Out of the darkness a blade hits you.")
                     print("You stumble out of the building.")
@@ -2114,8 +2118,9 @@ class Player:
             self.loot_drop(random.choice(self.common_loot))
             time.sleep(2,)
         else:
-            print("Invalid")
-        print("Suddenly, you here someone approaching the house.")
+            print("Invalid choice.")
+            return
+        print("Suddenly, you hear someone approaching the house.")
         print("You quickly exit the house and get back on the road.")
         time.sleep(2,)
 
@@ -2149,7 +2154,7 @@ class Player:
 
         elif choice == "2":
             print("You brace yourself and try to push the stagecoach back...")
-            if random.randint(1, self.strength_skill) > 2:
+            if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                 print("Your strength prevails! You save the stagecoach and earn a reward.")
                 reward = random.randint(10, 30)
                 self.gold += reward
@@ -2678,7 +2683,7 @@ class Player:
                 print("From the light of your lantern you notice a couple possible booby traps.")
                 print("You avoid them carefully.")
             else:
-                if random.randint(1, self.shadow_skill) >=3:
+                if self.perform_stat_check(self.strength_skill, base_target=15) == True:
                     print("You leap back just in time. No harm done.")
                 else:
                     print("An old rifle mounted on the wall fires—you're hit!")
@@ -2694,7 +2699,7 @@ class Player:
             if "rope" in self.itemsinventory:
                 print("You use the rope to loop around the closest door knob and pull yourself up.")
             else:
-                if random.randint(1, self.strength_skill) >= 3:
+                if self.perform_stat_check(self.strength_skill, base_target=12) == True:
                     print("You grab the railing and swing back to safety.")
                 else:
                     print("You crash into the cellar below—painfully bruised.")
@@ -2876,7 +2881,7 @@ class Player:
 
             # Minecart outcome
             if action == "1":
-                if self.strength_skill >= 4:
+                if self.perform_stat_check(self.strength_skill, base_target=16) == True:
                     print("You brace yourself and stop the minecart just in time! Your strength saves you.")
                     self.strength_skill += 1
                     print("+1 Strength Skill.")
@@ -2886,7 +2891,7 @@ class Player:
                     self.Health -= dmg
                     print(f"-{dmg} health.")
             elif action == "2":
-                if self.Speed >= 4:
+                if self.perform_stat_check(self.Speed, base_target=14) == True:
                     print("You leap aside with quick reflexes, narrowly avoiding the cart.")
                     self.shadow_skill += 1
                     print("+1 Shadow Skill.")
@@ -2923,7 +2928,7 @@ class Player:
 
             # Minecart outcome with bonus
             if action == "1":
-                if self.strength_skill >= 3:
+                if self.perform_stat_check(self.strength_skill, base_target=12) == True:
                     print("You brace yourself and stop the minecart just in time! Your strength saves you.")
                     self.strength_skill += 1
                     print("+1 Strength Skill.")
@@ -2933,7 +2938,7 @@ class Player:
                     self.Health -= dmg
                     print(f"-{dmg} health.")
             elif action == "2":
-                if self.Speed >= 3:
+                if self.perform_stat_check(self.Speed, base_target=14) == True:
                     print("You leap aside with quick reflexes, narrowly avoiding the cart.")
                     self.shadow_skill += 1
                     print("+1 Shadow Skill.")
@@ -2968,7 +2973,7 @@ class Player:
             self.loot_drop("gold nugget")
             print("You pick up the sack and find a gold nugget inside!")
         elif final == "2":
-            if self.shadow_skill >= 4:
+            if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
                 print("You sneak closer and see the figure uncovering a hidden stash.")
                 print("He flees, leaving the loot behind. You claim it for yourself!")
                 self.loot_drop("gold nugget")
@@ -3020,7 +3025,7 @@ class Player:
             self.Tquest = "None"
 
     def encounter_earp_stage1(self):
-        print("The Vendetta Posse rides to Pete Spence’s wood camp.")
+        print("The Vendetta Posse rides to Pete Spence's wood camp.")
         print("A known outlaw is holed up there, armed and waiting.")
         print("Options:")
         print("1) Ride in with the posse guns blazing.")
@@ -3040,13 +3045,13 @@ class Player:
                 print("You fall in the shootout. The posse drags you away as they move on.")
                 self.Tquest = "None"
         elif choice == "2":
-            if random.randint(1,10) <= self.shadow_skill + 2:
-                print("You flank the outlaw’s position, forcing him into Wyatt’s fire. Success!")
+            if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
+                print("You flank the outlaw's position, forcing him into Wyatt's fire. Success!")
                 self.gold += 15
                 self.loot_drop("revolver")
                 self.earp_bonus += 2
             else:
-                print("You trip in the brush — shots ring out! You’re hit. -12hp")
+                print("You trip in the brush — shots ring out! You're hit. -12hp")
                 self.Health -= 12
         else:
             print("You hang back. The posse fights without you.")
@@ -3071,7 +3076,7 @@ class Player:
                 self.earp_bonus += 1
                 self.gold += 20
             else:
-                print("You’re shot from ambush and collapse.")
+                print("You're shot from ambush and collapse.")
                 self.Tquest = "None"
         else:
             print("You refuse. Wyatt mutters about weak resolve.")
@@ -3081,7 +3086,7 @@ class Player:
 
     def encounter_earp_stage3(self):
         print("The posse learns the Clanton brothers are nearby.")
-        print("Wyatt declares: 'They won’t escape justice.'")
+        print("Wyatt declares: 'They won't escape justice.'")
         print("Options:")
         print("1) Confront the Clantons openly.")
         print("2) Set an ambush at the river crossing.")
@@ -3099,7 +3104,7 @@ class Player:
                 print("A Clanton bullet strikes you down. The Vendetta falters.")
                 self.Tquest = "None"
         elif choice == "2":
-            if random.randint(1,10) <= self.trail_skill + 3:
+            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                 print("Your ambush works! You take the Clantons by surprise, killing one instantly.")
                 self.gold += 25
                 self.loot_drop("cowboy rifle")
@@ -3133,7 +3138,7 @@ class Player:
                 self.loot_drop("sawed-off shotgun")
                 self.earp_bonus += 3
             else:
-                print("Curly Bill’s scattergun blast drops you. The Vendetta staggers on without you.")
+                print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
         elif choice == "2":
             if random.randint(1,10) <= self.trail_skill + 2:
@@ -3727,14 +3732,14 @@ class Player:
 
                     print("You rush into the passenger car where bandits terrorize civilians!")
                     if any(item in self.weapons["melee"] for item in self.itemsinventory):
-                        if random.randint(1, 10) <= self.Speed + 3:
+                        if self.perform_stat_check(self.Speed, base_target=11) == True:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
                         else:
                             print("The bandit shoots first, grazing your shoulder! -8hp")
                             self.Health -= 8
                     else:
-                        if random.randint(1, 10) <= self.strength_skill:
+                        if self.perform_stat_check(self.strength_skill, base_target=15) == True:
                             print("You wrestle a bandit to the ground and knock him cold!")
                             bandits_in_car -= 1
                         else:
@@ -3746,7 +3751,7 @@ class Player:
                     print("You duck behind heavy crates in the cargo car.")
                     print("You tend to your wounds. +15hp")
                     self.Health += 15
-                    if random.randint(1, 10) <= self.shadow_skill + 2:
+                    if self.perform_stat_check(self.shadow_skill, base_target=12) == True:
                         print("Bullets ping off the steel — you stay safe for now.")
                     else:
                         print("A stray shot punches through, grazing you! -4hp")
@@ -3756,7 +3761,7 @@ class Player:
                 elif choice == "4":
                     print("You charge forward, fists swinging!")
                     if bandits_in_car > 0:
-                        if random.randint(1, 10) <= self.strength_skill + 1:
+                        if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                             print("You knock a bandit out cold in brutal close combat!")
                             bandits_in_car -= 1
                         else:
@@ -4006,7 +4011,7 @@ class Combat:
         escape_boost = 0
 
         
-        while self.EnemyCombatant["health"] > 0 and self.player.Health > 0:
+        while enemy_health > 0 and self.player.Health > 0:
             for turn in TurnOrder:
                 if turn == "player":
                     print("\n--- Your Turn ---")

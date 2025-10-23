@@ -100,7 +100,7 @@ class ShopSession:
                 base_num = len(item_list) # Start numbering after the items
                 print(f"{base_num + 1}. Inventory")
                 print(f"{base_num + 2}. Leave")
-                print("\nEnter a number (for an item or option):")
+                print("\nEnter a number (e.g., '1' for the item, or '1 10' for quantity 10):")
             else:
                 # Print the text-based prompt for Ollama
                 print("\nWhat would you like to buy?")
@@ -120,7 +120,7 @@ class ShopSession:
 
             raw_quantity = parsed.get('quantity', '1')
             amount = int(raw_quantity) if raw_quantity.isdigit() and int(raw_quantity) > 0 else 1
-
+            
             if choice == 'leave':
                 print(f"Thanks for visiting the {self.store_name}.")
                 break

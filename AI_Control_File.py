@@ -193,66 +193,74 @@ class AI_Control:
         else:
             # --- Numerical Fallback Logic ---
             safe_fallback = {"choice": "leave", "quantity": "0"}
+            
+            # The 'player_text' variable holds the user's raw input
+            # E.g., "1" or "1 10" or "bread 5"
+            choice_input = player_text.strip().lower()
 
-            # Note: The calling function (ShopSession._display_wares) should have printed
-            # the numbered list including 'Leave' as an option.
+            if not choice_input:
+                # User just hit enter
+                return safe_fallback
 
-            # The 'player_text' variable holds the user's raw input (which should be a number here)
-            choice_input = player_text
+            # --- START NEW PARSING LOGIC ---
+            parts = choice_input.split()
+            item_identifier = parts[0]  # This is "1" or "bread"
+            quantity_str = "1"          # Default quantity
+
+            if len(parts) > 1:
+                # User provided a quantity, e.g., "1 10"
+                if parts[1].isdigit() and int(parts[1]) > 0:
+                    quantity_str = parts[1]
+                # (If it's not a valid number, we just ignore it and use the default "1")
+            
+            # --- END NEW PARSING LOGIC ---
 
             try:
-                choice_num = int(choice_input)
+                # --- Try parsing the identifier as a NUMBER ---
+                choice_num = int(item_identifier)
 
-                # Check if choice number is in the valid range (items + actions)
                 if 1 <= choice_num <= len(items):
                     selected_item_name = items[choice_num - 1].lower() # Get 'item1', 'inventory', or 'leave'
 
-                    # --- START FIX ---
-                    # Check if the selected name is an action FIRST
                     if selected_item_name == "leave":
-                        return safe_fallback # {"choice": "leave", "quantity": "0"}
+                        return safe_fallback
                     
                     if selected_item_name == "inventory":
                         return {"choice": "inventory", "quantity": "0"}
                     
-                    # If it's not an action, it must be an item. NOW ask for quantity.
-                    while True:
-                        qty_input = input(f"How many {selected_item_name.capitalize()}? (Enter a number > 0): ").strip()
-                        if qty_input.isdigit() and int(qty_input) > 0:
-                            self.action = {"choice": selected_item_name, "quantity": qty_input}
-                            return self.action
-                        else:
-                            print("Invalid quantity. Please enter a positive number.")
-                    # --- END FIX ---
-
+                    # It's an item. Return it with the parsed quantity.
+                    self.action = {"choice": selected_item_name, "quantity": quantity_str}
+                    return self.action
                 else:
-                    # This handles numbers outside the printed range (e.g., 5 when there are 4 options)
+                    # This handles numbers outside the printed range
                     print("Invalid number.")
                     return safe_fallback
 
             except ValueError:
-                # Allow direct name match as fallback if they typed text instead of number
-                # Check against only purchasable items first
-                if choice_input.lower() in items:
-                    selected_item_name = choice_input.lower()
-                    # Ask for quantity
-                    while True:
-                        qty_input = input(f"How many {selected_item_name.capitalize()}? (Enter a number > 0, or press Enter for 1): ").strip()
-                        if not qty_input: # Default to 1 if Enter is pressed
-                            quantity = "1"
-                            break
-                        elif qty_input.isdigit() and int(qty_input) > 0:
-                            quantity = qty_input
-                            break
-                        else:
-                            print("Invalid quantity. Please enter a positive number.")
-                    self.action = {"choice": selected_item_name, "quantity": quantity}
+                # --- Identifier was NOT a number, try it as a NAME ---
+                
+                # Check if they typed an item name directly
+                if item_identifier in items:
+                    selected_item_name = item_identifier
+                    
+                    # Double-check it's not an action
+                    if selected_item_name == "leave":
+                        return safe_fallback
+                    if selected_item_name == "inventory":
+                        return {"choice": "inventory", "quantity": "0"}
+                        
+                    # It's an item. Return it with the parsed quantity.
+                    self.action = {"choice": selected_item_name, "quantity": quantity_str}
                     return self.action
-                # Check if they explicitly typed "leave"
-                elif choice_input.lower() == "leave":
+                
+                # Handle 'leave' or 'inventory' by name
+                if item_identifier == "leave":
                     return safe_fallback
-                # If input is neither a valid number, item name, nor "leave"
-                print("Please enter the number corresponding to your choice, or 'leave'.")
+                if item_identifier == "inventory":
+                    return {"choice": "inventory", "quantity": "0"}
+
+                # If input is neither a valid number nor item name
+                print("Please enter the number or name of your choice.")
                 return safe_fallback
             # --- End Numerical Fallback Logic ---
 
