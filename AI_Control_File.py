@@ -111,8 +111,10 @@ class AI_Control:
 
     def parse_purchase(self, items: list, player_text, use_ollama):
         if use_ollama:
-            # Add "leave" as a valid item for the prompt
-            shop_items = items + ["leave"]
+            # --- START FIX ---
+            # The 'items' list passed from store.py NOW CONTAINS 'inventory' and 'leave'
+            # So we don't need to add "leave" again.
+            shop_items = items 
             
             prompt = dedent(f"""
         You are the action parser for a text RPG.
@@ -122,13 +124,16 @@ class AI_Control:
         2. "quantity" -> must always be present as a string representing an integer.
         - If the player does not specify a number, use "1" as the default.
         - If the player's choice is "leave", use "0" as the quantity.
+        - If the player's choice is "inventory", use "0" as the quantity.
         Return ONLY JSON. No explanations or extra text.
 
         Example outputs:
         {{"choice": "rifle", "quantity": "1"}}
         {{"choice": "pistol_ammo", "quantity": "3"}}
+        {{"choice": "inventory", "quantity": "0"}}
         {{"choice": "leave", "quantity": "0"}}
-        """) # NOTE: Changed the "leave" example from "" to "0" for consistency
+        """)
+            # --- END FIX ---
 
             response = ollama.chat(
                 model="phi3",
@@ -158,11 +163,11 @@ class AI_Control:
                 if choice not in valid_choices:
                     choice = "leave" # Fallback to "leave" if choice is invalid
 
-                # 6. Handle the "leave" case explicitly
-                if choice == "leave":
+                # 6. Handle the "leave" and "inventory" cases explicitly
+                if choice == "leave" or choice == "inventory":
                     quantity_final = "0"
                 else:
-                    # 7. VALIDATION PATCH: Validate 'quantity' for non-leave choices
+                    # 7. VALIDATION PATCH: Validate 'quantity' for non-action choices
                     
                     # Convert if it's an int (e.g., 1 -> "1")
                     if isinstance(quantity_raw, int):
@@ -198,11 +203,19 @@ class AI_Control:
             try:
                 choice_num = int(choice_input)
 
-                # Check if choice number corresponds to an item in the 'items' list
+                # Check if choice number is in the valid range (items + actions)
                 if 1 <= choice_num <= len(items):
-                    selected_item_name = items[choice_num - 1].lower()
+                    selected_item_name = items[choice_num - 1].lower() # Get 'item1', 'inventory', or 'leave'
 
-                    # Ask for quantity separately
+                    # --- START FIX ---
+                    # Check if the selected name is an action FIRST
+                    if selected_item_name == "leave":
+                        return safe_fallback # {"choice": "leave", "quantity": "0"}
+                    
+                    if selected_item_name == "inventory":
+                        return {"choice": "inventory", "quantity": "0"}
+                    
+                    # If it's not an action, it must be an item. NOW ask for quantity.
                     while True:
                         qty_input = input(f"How many {selected_item_name.capitalize()}? (Enter a number > 0): ").strip()
                         if qty_input.isdigit() and int(qty_input) > 0:
@@ -210,14 +223,11 @@ class AI_Control:
                             return self.action
                         else:
                             print("Invalid quantity. Please enter a positive number.")
-
-                # Check if choice number corresponds to the "Leave" option
-                # Assumes "Leave" is always listed immediately after the items
-                elif choice_num == len(items) + 1:
-                    return safe_fallback # Return the leave action
+                    # --- END FIX ---
 
                 else:
-                    print("Invalid item number.")
+                    # This handles numbers outside the printed range (e.g., 5 when there are 4 options)
+                    print("Invalid number.")
                     return safe_fallback
 
             except ValueError:

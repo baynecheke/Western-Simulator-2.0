@@ -54,15 +54,25 @@ class ShopSession:
         return int(base_price) # Fallback: just return the base price
 
     def _display_wares(self):
-        """Internal helper to print the store's inventory."""
-        print(f"\n--- {self.store_name} Inventory ---")
-        item_list = []
-        for item_name, item_obj in self.inventory.items():
-            price = self._calculate_price(item_obj, action="buy")
-            print(f"{item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
-            item_list.append(item_name)
-        print(f"\nYour Gold: ${self.player.gold:.2f}")
-        return item_list
+            """Internal helper to print the store's inventory."""
+            print(f"\n--- {self.store_name} Inventory ---")
+            item_list = []
+            
+            # We now use 'enumerate' for the numerical mode
+            for i, (item_name, item_obj) in enumerate(self.inventory.items(), 1):
+                price = self._calculate_price(item_obj, action="buy")
+                
+                if not self.use_ollama:
+                    # Numerical mode: "1. Item - $Price | Stock: X"
+                    print(f"{i}. {item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
+                else:
+                    # Ollama (text) mode: "Item - $Price | Stock: X"
+                    print(f"{item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
+                    
+                item_list.append(item_name) # This list is just names, which is correct
+                
+            print(f"\nYour Gold: ${self.player.gold:.2f}")
+            return item_list
 
     def run_buy_session(self):
         """Runs the main loop for a 'buy-only' shop."""
@@ -72,20 +82,37 @@ class ShopSession:
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
             NpC = "store owner"
-            leave = self.ai_file.narrate_shop(game_state, event, NpC, ollama=self.use_ollama)
+            leave = self.ai_file.narrate_shop(game_state, event, NpC, self.use_ollama)
             if leave == 'leave':
                 return
         
         while True:
-            item_list = self._display_wares()
-            print("\nWhat would you like to buy?")
-            print("You can 'leave' or look at your 'inventory' at any time.")
+            item_list = self._display_wares() # This now prints a numbered list if use_ollama is False
+
+            # --- START FIX ---
+            # Define actions in the order they should be numbered
+            # We want "Inventory" then "Leave"
+            actions = ['inventory', 'leave'] 
+            
+            if not self.use_ollama:
+                # Print the numbered options for actions
+                print("\nOptions:")
+                base_num = len(item_list) # Start numbering after the items
+                print(f"{base_num + 1}. Inventory")
+                print(f"{base_num + 2}. Leave")
+                print("\nEnter a number (for an item or option):")
+            else:
+                # Print the text-based prompt for Ollama
+                print("\nWhat would you like to buy?")
+                print("You can 'leave' or look at your 'inventory' at any time.")
+            
             choice1 = input(": ").strip()
 
-            actions = ['leave', 'inventory']
+            # The complete_list must match the printed number order
             complete_list = item_list + actions
             parsed = self.ai_file.parse_purchase(complete_list, choice1, use_ollama=self.use_ollama)
             choice = parsed.get('choice')
+            # --- END FIX ---
             
             if not choice:
                 print("Invalid input, please try again.")
@@ -140,15 +167,28 @@ class ShopSession:
         print("You walk into the trading post. The trader greets you.")
         time.sleep(2)
 
+        # --- START FIX ---
+        # Define the choices the parser will use
+        available_choices = ["sell", "swap", "leave"]
+        
         while True:
             print("\n--- Trading Post ---")
-            print("1) Sell items")
-            print("2) Swap items")
-            print("3) Leave")
+            if not self.use_ollama:
+                # Numerical prompt
+                print("1. Sell items")
+                print("2. Swap items")
+                print("3. Leave")
+            else:
+                # Text prompt
+                print("You can 'sell' items, 'swap' items, or 'leave'.")
 
-            choice = input("What would you like to do? ").strip()
+            raw_input = input("What would you like to do? ").strip()
+            
+            # Use the AI_Control parser
+            choice = self.ai_file.parse_choice(available_choices, raw_input, self.use_ollama)
+            # --- END FIX ---
 
-            if choice == "1":
+            if choice == "sell": # Replaced "1"
                 # --- Sell logic ---
                 if not self.player.itemsinventory:
                     print("Your inventory is empty.")
@@ -182,8 +222,7 @@ class ShopSession:
                         if self.player.itemsinventory[item_to_sell] <= 0:
                             del self.player.itemsinventory[item_to_sell]
 
-            elif choice == "2":
-                # --- Swap logic (predetermined) ---
+            elif choice == "swap": # Replaced "2"
                 print("\nAvailable trades:")
                 for idx, trade in enumerate(trade_offers, 1):
                     print(f"{idx}. Give {trade['give']}, Receive {trade['get']}")
@@ -210,7 +249,11 @@ class ShopSession:
                     else:
                         print(f"You don't have a {offer['give']} to trade.")
             
-            elif choice == "3":
+            elif choice == "leave": # Replaced "3"
                 break
             else:
-                print("Invalid choice.")
+                # This 'else' now catches the "none" or "help" fallback from parse_choice
+                if not self.use_ollama:
+                    print("Invalid number. Please try again.")
+                else:
+                    print("I'm not sure what you mean. Try 'sell', 'swap', or 'leave'.")
