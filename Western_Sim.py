@@ -162,7 +162,7 @@ class Player:
         self.itemsinventory = {}
         self.gold = 50  # Starting gold
         self.distancenext = 0
-        self.travelspeed = 3 + (self.trail_skill - 3) // 2
+        
         self.EmptyTown = False
         self.Speed = 3
         self.Hostility = 0
@@ -187,6 +187,7 @@ class Player:
         self.shadow_skill = 3
         self.trail_skill = 3
         self.strength_skill = 3
+        self.travelspeed = 3 + (self.trail_skill - 3) // 2
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
         self.enemy_effects = []
