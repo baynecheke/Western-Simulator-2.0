@@ -1,0 +1,2 @@
+cd C:\Users\djche\OneDrive\WesternSim2.0\Western-Simulator-2.0
+python -m PyInstaller --onefile --name "WesternSim" --add-data "weapons:." --add-data "loot.yaml:." --add-data "Game_Info.yaml:." --add-data "game_data.yaml:." --add-data "*.mp3:." Western_Sim.py
