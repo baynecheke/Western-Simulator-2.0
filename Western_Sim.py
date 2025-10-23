@@ -162,7 +162,7 @@ class Player:
         self.itemsinventory = {}
         self.gold = 50  # Starting gold
         self.distancenext = 0
-        self.travelspeed = 3
+        self.travelspeed = 3 + (self.trail_skill - 3) // 2
         self.EmptyTown = False
         self.Speed = 3
         self.Hostility = 0
@@ -184,9 +184,9 @@ class Player:
         self.trade_bonus = 0
         self.dmg_modifier_multiply = 1
         self.damage_modifier = 0
-        self.shadow_skill = 1
-        self.trail_skill = 1
-        self.strength_skill = 1
+        self.shadow_skill = 3
+        self.trail_skill = 3
+        self.strength_skill = 3
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
         self.enemy_effects = []
@@ -1457,10 +1457,9 @@ class Player:
         choice = AI_File.parse_YN(choice)
         if choice == "yes":
             # Determine success based on shadow skill
-            base_chance = random.randint(1, self.shadow_skill - 1)
 
             print("You try and sneak something from the townspeople.")
-            if 2 <= base_chance:
+            if self.perform_stat_check(self.shadow_skill, base_target=12):
                 loot = random.choice(["pouch of gold", "silver watch", "pistol_ammo", "bread"])
                 if loot == "pouch of gold":
                     gold_stolen = random.randint(5, 15)
@@ -1526,8 +1525,9 @@ class Player:
             if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
                 bet = int(bet)
                 self.gold -= bet
-                if random.randint(1, self.shadow_skill) >= 3:
-                    winnings = bet * 3
+
+                if self.perform_stat_check(self.shadow_skill, base_target=16):
+                    winnings = bet + 10 + bet//2
                     self.gold += winnings
                     print(f"You win! You gain {winnings} gold.")
                 else:
@@ -1589,12 +1589,13 @@ class Player:
                         del self.itemsinventory["rope"]
                     self.gold += 10
                     print("You fix the plow. +10 gold.")
-                elif self.perform_stat_check(self.shadow_skill, base_target=12) == True:
+                elif self.perform_stat_check(self.trail_skill, base_target=12) == True:
                     print("You heave the plow upright and wedge it in tight.")
-                    self.gold += 8
-                    print("The farmer gives you 8 gold for your help.")
+                    self.gold += 20
+                    print("The farmer gives you 20 gold for your help.")
                 else:
                     print("You try to help, but it's beyond your skill. The farmer thanks you anyway.")
+                    print("If only you were more skilled in trail skills.")
             else:
                 print("You decline to help the farmer.")
             
@@ -1618,7 +1619,7 @@ class Player:
         elif roll <= 60:
             # Help the blacksmith
             print("The blacksmith grunts, 'Hand me that hammer, would ya?'")
-            if self.perform_stat_check(self.Speed, base_target=14) == True:
+            if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                 self.strength_skill += 1
                 print("He's impressed with your help. +1 Strength Skill.")
             else:
@@ -1630,7 +1631,9 @@ class Player:
             # Rare: town alert
             print("A kid runs by shouting, 'Bandits near the ridge!'")
             print("The sheriff is calling for help. Do you join him? (yes/no)")
-            if input(": ").strip().lower() == "yes":
+            choice = input(": ").strip().lower()
+            choice = AI_File.parse_YN(choice)
+            if choice == "yes":
                 print("You ride with the sheriff to confront the bandits!")
                 self.Speed += 1
                 print("The sheriff tosses you a revolver and some ammo.")
@@ -1661,10 +1664,10 @@ class Player:
 
         elif roll <= 90:
             # Crafting bonus (if tools owned)
-            if self.perform_stat_check(self.Speed, base_target=12) == True:
+            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                 print("A merchant sees your intelligence and teaches you a couple haggling tricks.")
                 print("You feel more confident with your skills.")
-                self.shadow_skill += 1
+                self.trail_skill += 1
             else:
                 print("You chat with a merchant, but nothing comes of it.")
 
@@ -1715,8 +1718,8 @@ class Player:
                 self.Interaction()
 
     def town_encounter(self):
-        quest_chance = random.randint(1, 3)
-        if self.Tquest == "None" and quest_chance >= 3:
+        quest_chance = random.randint(1, 2)
+        if self.Tquest == "None" and quest_chance >= 2:
             Random = random.choice(["defend_town","iron_tracks"])
             if Random == "defend_town":
                 # Episode 1 not done yet?
@@ -3969,16 +3972,16 @@ class Combat:
         enemy_loot = self.EnemyCombatant["loot"]
         enemy_health = self.EnemyCombatant["health"]
         # After setting up the enemy combatant
-        if self.player.Day <= 7:
-            if self.player.difficulty == 'adventure':
-                enemy_health = int(self.EnemyCombatant["health"] * 0.75)
-                enemy_damage = int(self.EnemyCombatant["damage"] * 0.75)
-            elif self.player.difficulty == 'savage':
-                enemy_health = int(self.EnemyCombatant["health"] * 1.25)
-                enemy_damage = int(self.EnemyCombatant["damage"] * 1.1)
+
+        if self.player.difficulty == 'adventure':
+            enemy_health = int(self.EnemyCombatant["health"] * 0.75)
+            enemy_damage = int(self.EnemyCombatant["damage"] * 0.75)
+        elif self.player.difficulty == 'savage':
+            enemy_health = int(self.EnemyCombatant["health"] * 1.25)
+            enemy_damage = int(self.EnemyCombatant["damage"] * 1.1)
         if self.player.Day >= 5:
-                enemy_health = int(self.EnemyCombatant["health"] + (2*self.player.Day))
-                enemy_damage = int(self.EnemyCombatant["damage"] + (2*self.player.Day))
+                enemy_health = int(self.EnemyCombatant["health"] + (self.player.Day))
+                enemy_damage = int(self.EnemyCombatant["damage"] + (self.player.Day//2))
 
         print(f"\nYou face off against a {self.Enemy.capitalize()}!")
         print(f"Enemy stats — Health: {enemy_health}, Damage: {enemy_damage}, Speed: {enemy_speed}")

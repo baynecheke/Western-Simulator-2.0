@@ -1,7 +1,7 @@
 derringer pistol:
   name: "derringer pistol"
-  price: 5
-  damage: [5, 15]
+  price: 10
+  damage: [5, 10]
   ammo: pistol_ammo
   ability: none
 
@@ -105,7 +105,7 @@ tomahawk:
 
 cavalry saber:
   name: "cavalry saber"
-  price: 35
+  price: 20
   damage: [15, 25]
   ammo: none
-  ability: none
+  ability: precise strike
