@@ -184,9 +184,9 @@ class Player:
         self.trade_bonus = 0
         self.dmg_modifier_multiply = 1
         self.damage_modifier = 0
-        self.shadow_skill = 3
-        self.trail_skill = 3
-        self.strength_skill = 3
+        self.shadow_skill = 1
+        self.trail_skill = 1
+        self.strength_skill = 1
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
         self.enemy_effects = []
@@ -3141,7 +3141,7 @@ class Player:
                 print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
         elif choice == "2":
-            if random.randint(1,10) <= self.trail_skill + 2:
+            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                 print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
                 self.gold += 50
                 self.earp_bonus += 2
@@ -3681,7 +3681,7 @@ class Player:
                         continue
                     if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
                         print("You fire your rifle from the rooftop!")
-                        if random.randint(1, 10) <= self.trail_skill + 3:
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                             print("A rider drops, his horse veering off!")
                             mounted_bandits -= 1
                         else:
@@ -3694,7 +3694,7 @@ class Player:
                             self.Health -= 8
                     elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
                         print("You blast your shotgun downward at the riders!")
-                        if random.randint(1, 10) <= self.trail_skill + 2:
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                             print("A rider is blown clean off his saddle!")
                             mounted_bandits -= 1
                         else:
@@ -3707,7 +3707,7 @@ class Player:
                             self.Health -= 6
                     elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
                         print("You fire your revolver rapidly!")
-                        if random.randint(1, 10) <= self.trail_skill + 1:
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                             print("One rider tumbles off his horse!")
                             mounted_bandits -= 1
                         else:
