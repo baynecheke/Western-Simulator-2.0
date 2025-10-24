@@ -630,7 +630,11 @@ class Player:
                 if USE_OLLAMA:
                     choice = input("Choice: ").strip()
                     if choice == "67":
-                        self.ArriveTown()
+                        self.encounter_earp_intro()
+                        self.loot_drop("lever-action rifle")
+                        combat = Combat(self)
+                        combat.FindAttacker("brawler")
+                        combat.Attack()
                         continue
                 else:
                     choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
@@ -1389,12 +1393,19 @@ class Player:
             combat.Attack()
             
         elif roll == 2:
+            if "coin" in self.event:
+                print("The saloon is lively, but nothing new catches your attention.")
+                return
             print("A heated card game ends abruptly; someone storms out in a rage.")
             print("A coin rolls toward you and you pick it up. +5 gold.")
             self.gold += 5
+            self.event.append("coin")
         elif roll == 3:
             print("A piano player strikes up a ragtime tune; toes tap in time.")
         elif roll == 4:
+            if "drink" in self.event:
+                print("The saloon is lively, but nothing new catches your attention.")
+                return
             print("A drunk cowboy staggers over and offers you a swig of whiskey. (yes/no)")
             ans = input(": ").strip().lower()
             ans = AI_File.parse_YN(ans)
@@ -1407,7 +1418,8 @@ class Player:
                     print("You feel faster. +1 speed.")
                     self.Temporaryspdboost += 1
                     self.Health = min(self.Health + 5, self.MaxHealth)
-        elif roll >= 5: # Add a new chance for the quest intro
+
+        elif roll == 5: # Add a new chance for the quest intro
             if self.Tquest == "None" and "earp_vendetta" not in self.quests_done:
                 self.encounter_earp_intro()
             else:
@@ -1718,6 +1730,10 @@ class Player:
                 print("Suddenly some gunshots ring out from behind you...")
                 self.Health -= 20
                 print("Earp and his posse ambush you as you leave! -20 health.")
+        if "coin" in self.event:
+            self.event.remove("coin")
+        if "drink" in self.event:
+            self.event.remove("drink")
         self.counter = 0
         self.distancenext = random.randint(20, 25)
         print("You leave the town and head down the road.")
@@ -4212,10 +4228,6 @@ class Combat:
             else:
                 print(f"You boldly approach the {self.Enemy}.")
         
-        Choice = input("Would you like to use an item before the combat? Yes/No:").strip().lower()
-        Choice = AI_File.parse_YN(Choice)
-        if Choice == "yes":
-            self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
         if self.player.Speed > self.EnemyCombatant["speed"]:
             TurnOrder = ["player", "enemy"]
         elif self.player.Speed < self.EnemyCombatant["speed"]:
@@ -4351,9 +4363,6 @@ class Combat:
                                 self.player.Health = self.player.Health - (enemy_damage)/5
                                 turn = "enemy"
 
-                    else:
-                        print("Invalid choice.")
-                        continue
                 time.sleep(2,)
                 if enemy_health <= 0:
                     print(f"{self.Enemy.capitalize()} is dead.")
