@@ -1027,13 +1027,19 @@ class Player:
                 "earp_vendetta_quest": "It turns out that Wyatt Earp has",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
-                print(f"A patron murmurs: \"{rumor}\"")
+                print(f"The sheriff murmurs: \"{rumor}\"")
                 self.rumors[topic] = self.rumors.get(topic, 0) + 1
                 print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
                 # Example: trigger a quest after hearing a rumor 2 times
                 if self.rumors[topic] == 1:
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    self.quest.append(topic)
+                    print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
+                    choice = input(": ").strip().lower()
+                    if self.AI_File.parse_YN(choice) == "yes":
+                        self.Tquest = topic
+                        print(f"You have accepted the quest: {topic.replace('_',' ').capitalize()}!")
+                    else:
+                        print("You declined the quest for now.")
             else:
                 print("He shrugs: \"I told you all that a know.\"")
             time.sleep(2)
@@ -1945,10 +1951,7 @@ class Player:
                 elif quest_topic == "old_mine_lights":
                     self.encounter_haunted_mine()
                 elif quest_topic == "earp_vendetta_quest":
-                    print("You search east of town and, after some digging, uncover a buried chest!")
-                    self.loot_drop("gold bar")
-                    self.gold += 25
-                    print("You gain 25 gold!")
+                    self.encounter_earp_intro()
                 else:
                     print("You follow the rumor, but nothing comes of it this time.")
                 return  # Only do one quest per call
