@@ -162,6 +162,7 @@ class Player:
         self.itemsinventory = {}
         self.gold = 50  # Starting gold
         self.distancenext = 0
+        self.event = []
         
         self.EmptyTown = False
         self.Speed = 3
@@ -271,6 +272,9 @@ class Player:
         self.quest = []
         self.iron_stage = 0
         self.iron_bonus = 0
+        self.earp_stage = 0 # Add this line
+        self.earp_bonus = 0 # Add this line
+        self.quests_done = []
         self.boots_used = False
         self.town_defense_outcome   = None
         self.town_aftermath_outcome = None
@@ -364,6 +368,10 @@ class Player:
         player.shadow_skill = save_data.get("shadow_skill", 3)
         player.trail_skill = save_data.get("trail_skill", 3)
         player.strength_skill = save_data.get("strength_skill", 3)
+        player.earp_bonus = save_data.get("earp_bonus", 0)
+        player.earp_stage = save_data.get("earp_stage", 0)
+        player.quests_done = save_data.get("quests_done", [])
+        player.event = save_data.get("event", [])
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -418,6 +426,10 @@ class Player:
                 "shadow_skill": self.shadow_skill,
                 "trail_skill": self.trail_skill,
                 "strength_skill": self.strength_skill,
+                "earp_bonus": self.earp_bonus,
+                "earp_stage": self.earp_stage,
+                "quests_done": self.quests_done,
+                "event": self.event,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -617,9 +629,8 @@ class Player:
                 if USE_OLLAMA:
                     choice = input("Choice: ").strip()
                     if choice == "67":
-                        combat = Combat(self)
-                        combat.FindAttacker("brawler")
-                        combat.Attack()
+                        self.ArriveTown()
+                        continue
                 else:
                     choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
 
@@ -1024,7 +1035,6 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
-                "earp_vendetta_quest": "It turns out that Wyatt Earp has",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"The sheriff murmurs: \"{rumor}\"")
@@ -1393,6 +1403,9 @@ class Player:
                     print("You feel faster. +1 speed.")
                     self.Temporaryspdboost += 1
                     self.Health = min(self.Health + 5, self.MaxHealth)
+        elif roll >= 5: # Add a new chance for the quest intro
+            if self.Tquest == "None" and "earp_vendetta" not in self.quests_done:
+                self.encounter_earp_intro()
             else:
                 print("You decline and step aside.")
         else:
@@ -1409,7 +1422,6 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
-                "earp_vendetta_quest": "Legend has it that there is gold east of here.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"A patron murmurs: \"{rumor}\"")
@@ -1497,7 +1509,7 @@ class Player:
                         self.Hostility += 1
                         self.jail_penalty()
                     print("The sheriff falls, the entire town glares at you.")
-                    self.Hostility += 1
+                    self.Hostility += 2
                 
         else:
             print("You decide against the risk and keep singing.")
@@ -1514,7 +1526,6 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
-                "earp_vendetta_quest": "Legend has it that there is gold east of here.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"A patron murmurs: \"{rumor}\"")
@@ -1685,6 +1696,20 @@ class Player:
             self.add_item(item)
 
     def LeaveTown(self):
+        if self.event == "final_earp_confrontation":
+            print("Earp yells at you to stop, 'We need to finish Curly Bill.'")
+            print("Will you stay and help him? (yes/no)")
+            choice = input(": ").strip().lower()
+            choice = AI_File.parse_YN(choice)
+            if choice == "yes":
+                print("'Meet me at the saloon,' Earp says.")
+                return
+            else:
+                print("You decide to leave Earp to his vendetta.")
+                print("You turn your back, leaving him behind.")
+                print("Suddenly some gunshots ring out from behind you...")
+                self.Health -= 20
+                print("Earp and his possy ambush you as you leave! -20 health.")
         self.counter = 0
         self.distancenext = random.randint(20, 25)
         print("You leave the town and head down the road.")
@@ -1783,6 +1808,20 @@ class Player:
         self.possibleactions = self.BasePossibleActions[:-1]
         self.score = self.score + 5
         time.sleep(2)
+        
+        if self.Tquest == "earp_vendetta" and self.earp_stage == 4:
+                print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
+                print("'Word is Curly Bill is holed up here in town. This ends now.'")
+                time.sleep(2)
+                # Optional: Ask if ready or want to prepare
+                ready = input("Are you ready for the final confrontation? (yes/no): ").strip().lower()
+                ready = self.AI_File.parse_YN(ready)
+                if ready == "yes":
+                    self.encounter_earp_stage4() # Directly trigger the final stage
+                else:
+                    print("You tell Wyatt you need a moment to prepare.")
+                    print("Find him at the Saloon when you're ready.")
+
         self.town_encounter()
 
     def GeneralStore(self):
@@ -1938,6 +1977,22 @@ class Player:
     def PossibleQuest(self):
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
+
+        if self.Tquest == "earp_vendetta" and not self.quest_today:
+                # Check ONLY for stages 1, 2, or 3 here
+            if self.earp_stage == 1:
+                self.quest_today = True
+                self.encounter_earp_stage1()
+                return # Quest event happened
+            elif self.earp_stage == 2:
+                self.quest_today = True
+                self.encounter_earp_stage2()
+                return # Quest event happened
+            elif self.earp_stage == 3:
+                self.quest_today = True
+                self.encounter_earp_stage3()
+                return # Quest event happened
+                    
             # --- Rumor quest handler ---
         if self.quest_today == False:
             if self.quest and random.randint(1,2) == 1:
@@ -1946,12 +2001,12 @@ class Player:
                 self.quest_today = True
                 print(f"\nYou follow up on a rumor: {quest_topic.replace('_',' ').capitalize()}!")
                 # Trigger a special event based on the quest topic
-                if quest_topic == "bandits_coyote_camp":
-                    self.cayote_camp_quest()
-                elif quest_topic == "old_mine_lights":
+                if quest_topic == "bandits_coyote_camp" and not self.quests_done.__contains__("bandits_coyote_camp"):
+                    self.coyote_camp_quest()
+                    self.quests_done.append("bandits_coyote_camp")
+                elif quest_topic == "old_mine_lights" and not self.quests_done.__contains__("old_mine_lights"):
                     self.encounter_haunted_mine()
-                elif quest_topic == "earp_vendetta_quest":
-                    self.encounter_earp_intro()
+                    self.quests_done.append("old_mine_lights")
                 else:
                     print("You follow the rumor, but nothing comes of it this time.")
                 return  # Only do one quest per call
@@ -3029,6 +3084,7 @@ class Player:
             self.earp_bonus += 1
         else:
             print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
+            self.quests_done.append("earp_vendetta")
             self.Tquest = "None"
 
     def encounter_earp_stage1(self):
@@ -3094,6 +3150,15 @@ class Player:
     def encounter_earp_stage3(self):
         print("The posse learns the Clanton brothers are nearby.")
         print("Wyatt declares: 'They won't escape justice.'")
+        print("Wyatt comes up to you. 'We have limited recources, but do you need extra round or extra healing?")
+        choice = input("1 'ammo' or 2 'healing': ").strip().lower()
+        if choice ==  "1":
+            self.loot_drop("ammo cartridge")
+            print("You receive an extra ammo cartridge.")
+        else:
+            if self.Health <= 90:
+                self.Health = 90
+                print(f"You receive extra healing. You are at {self.Health} health now.")
         print("Options:")
         print("1) Confront the Clantons openly.")
         print("2) Set an ambush at the river crossing.")
@@ -3163,8 +3228,9 @@ class Player:
         print("The Vendetta Ride is over. The Cowboys are broken, scattered to the winds.")
         self.Tquest = "None"
         self.earp_stage = None
+        self.quests_done.append("earp_vendetta")
 
-    def cayote_camp_quest(self):
+    def coyote_camp_quest(self):
         print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
         combat = Combat(self)
         combat.FindAttacker("bandit")
@@ -3996,6 +4062,7 @@ class Player:
         # Quest complete
         self.Tquest = "None"
         self.iron_stage = None
+        self.quests_done.append("iron_tracks")
 
 
 class Combat:
@@ -4032,6 +4099,10 @@ class Combat:
             "bandit leader": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": random.choice(["reckless", "cautious", "desperate"]),},
             "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True,"behavior": "boss"},
             "phantom gunslinger": {"health": 100, "damage": 15, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form","behavior": "boss"},
+            "outlaw gunman": {"health": 70, "damage": 12, "speed": 4, "loot": "bandit", "type": "human", "behavior": "aggressive"},
+            "cowboy scout": {"health": 60, "damage": 10, "speed": 5, "loot": "common", "type": "human", "behavior": "cautious"},
+            "clanton gunfighter": {"health": 85, "damage": 15, "speed": 3, "loot": "rare", "type": "human", "behavior": "reckless"},
+            "curly bill": {"health": 110, "damage": 18, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
             }
         self.loots = {
             "small": ["small hide", "small meat"],
