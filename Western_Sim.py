@@ -4217,117 +4217,121 @@ class Combat:
         while enemy_health > 0 and self.player.Health > 0:
             for turn in TurnOrder:
                 if turn == "player":
-                    print("\n--- Your Turn ---")
-                    print("What will you do?")
-                    print("1. Attack")
-                    print("2. Use Item")
-                    print("3. Try to Retreat")
+                    while turn == "player":
+                        print("\n--- Your Turn ---")
+                        print("What will you do?")
+                        print("1. Attack")
+                        print("2. Use Item")
+                        print("3. Try to Retreat")
 
-                    choice = input("Choose an action: ").strip()
-
-
-                    if choice == "1":
-                        # Get list of owned weapons (weapons with known names)
-                        owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
-                        if not owned_weapons:
-                            print("You don't have any weapons, so you fight with your fists!")
-                            player_attack = random.randint(2, 5)
-                            player.play_sound("punch.mp3")
-                        else:
-                            while True:
-                                print("Choose a weapon:")
-                                for i, weapon in enumerate(owned_weapons, start=1):
-                                    info = weapons_data[weapon]
-                                    dmg = info['damage']
-                                    ammo_type = info['ammo']
-                                    ammo_info = ""
-                                    if ammo_type != 'none':
-                                        if ability_auto_ammo_belt:
-                                            self.player.itemsinventory[ammo_type] = self.player.itemsinventory.get(ammo_type, 0) + 1
-                                            print("Your ammo belt provides +1 ammo for your gun.")
-                                            ability_auto_ammo_belt = False
-                                        ammo_count = self.player.itemsinventory.get(ammo_type, 0)
-                                        ammo_info = f" | Ammo: {ammo_count}"
-                                    print(f"{i}. {weapon.capitalize()} (Damage: {dmg}){ammo_info}")
-                                print(f"{len(owned_weapons) + 1}. Fists (No weapon)")
-
-                                try:
-                                    weapon_choice = int(input("Choice: "))
-                                    if weapon_choice == len(owned_weapons) + 1:
-                                        player_attack = random.randint(2, 5)
-                                        print("You swing your fists!")
-                                        player.play_sound("punch.mp3")
-                                        break
-                                    elif 1 <= weapon_choice <= len(owned_weapons):
-                                        weapon = owned_weapons[weapon_choice - 1]
-                                        info = weapons_data[weapon]
-                                        ammo_type = info['ammo']
-                                        # check ammo
-                                        if ammo_type != 'none':
-                                            if self.player.itemsinventory.get(ammo_type, 0) < 1:
-                                                print(f"You're out of {ammo_type}! Choose another weapon.")
-                                                player.play_sound("blank_click.mp3")
-                                                time.sleep(1)
-                                                continue
-                                            else:
-                                                self.player.itemsinventory[ammo_type] -= 1
-                                                if self.player.itemsinventory[ammo_type] <= 0:
-                                                    del self.player.itemsinventory[ammo_type]
-                                                ammo_left = self.player.itemsinventory.get(ammo_type, 0)
-                                                player.weapon_ability(weapon)
-                                                print(f"You fire the {weapon}. Ammo left: {ammo_left}")
-                                                player.weapon_sound(weapon)
-                                        else:
-                                            player.play_sound("knife.mp3")
-                                            player.weapon_ability(weapon)
-
-                                        # roll damage
-                                        dmg_range = info['damage']
-                                        player_attack = random.randint(*dmg_range)
-                                        player_attack = player_attack * player.dmg_modifier_multiply
-                                        break
-                                    else:
-                                        print("Invalid selection.")
-                                except ValueError:
-                                    print("Please enter a valid number.")
-                        player_attack += player.damage_modifier
-                        if self.EnemyCombatant.get("special") == "ghostly_form":
-                            if random.randint(1, 2) == 1:
-                                print("Your attack passes harmlessly through the Phantom Gunslinger!")
-                                continue
-                        enemy_health -= player_attack
-                        print(f"You hit the {self.Enemy} for {player_attack} damage!")
-                        player.damage_modifier = 0
-                        player.dmg_modifier_multiply = 1
-                        print(f"Your health is {self.player.Health}.")
-                        print(f"Enemy health is {enemy_health}.")
-
-                    elif choice == "2":
-                        self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
+                        choice = input("Choose an action: ").strip()
 
 
-                    elif choice == "3":
-                        new_speed = self.player.Speed + escape_boost
-                        if self.EnemyCombatant.get("bound", False) == True:
-                            print("The enemy blocks your escape, you can't flee!")
-                            continue
-                        if enemy_speed <= new_speed:
-                            print("You manage to escape!")
-                            escape = True
-                            escape_boost = 0
-                            self.player.Health = round(self.player.Health)
-                            self.player.Armor_Boost = 1
-                            player.dmg_modifier_multiply = 1
-                            if player.invillage == True:
-                                player.change_music("Town.mp3", -1)
+                        if choice == "1":
+                            # Get list of owned weapons (weapons with known names)
+                            owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
+                            if not owned_weapons:
+                                print("You don't have any weapons, so you fight with your fists!")
+                                player_attack = random.randint(2, 5)
+                                player.play_sound("punch.mp3")
                             else:
-                                player.change_music("game_theme.mp3", -1)
-                                
-                            return escape
-                        else:
-                            escape_boost += 1
-                            print("You failed to escape!")
-                            self.player.Health = self.player.Health - (enemy_damage)/5
+                                while True:
+                                    print("Choose a weapon:")
+                                    for i, weapon in enumerate(owned_weapons, start=1):
+                                        info = weapons_data[weapon]
+                                        dmg = info['damage']
+                                        ammo_type = info['ammo']
+                                        ammo_info = ""
+                                        if ammo_type != 'none':
+                                            if ability_auto_ammo_belt:
+                                                self.player.itemsinventory[ammo_type] = self.player.itemsinventory.get(ammo_type, 0) + 1
+                                                print("Your ammo belt provides +1 ammo for your gun.")
+                                                ability_auto_ammo_belt = False
+                                            ammo_count = self.player.itemsinventory.get(ammo_type, 0)
+                                            ammo_info = f" | Ammo: {ammo_count}"
+                                        print(f"{i}. {weapon.capitalize()} (Damage: {dmg}){ammo_info}")
+                                    print(f"{len(owned_weapons) + 1}. Fists (No weapon)")
+
+                                    try:
+                                        weapon_choice = int(input("Choice: "))
+                                        if weapon_choice == len(owned_weapons) + 1:
+                                            player_attack = random.randint(2, 5)
+                                            print("You swing your fists!")
+                                            player.play_sound("punch.mp3")
+                                            turn = "enemy"
+                                            break
+                                        elif 1 <= weapon_choice <= len(owned_weapons):
+                                            weapon = owned_weapons[weapon_choice - 1]
+                                            info = weapons_data[weapon]
+                                            ammo_type = info['ammo']
+                                            # check ammo
+                                            if ammo_type != 'none':
+                                                if self.player.itemsinventory.get(ammo_type, 0) < 1:
+                                                    print(f"You're out of {ammo_type}! Choose another weapon.")
+                                                    player.play_sound("blank_click.mp3")
+                                                    time.sleep(1)
+                                                    continue
+                                                else:
+                                                    self.player.itemsinventory[ammo_type] -= 1
+                                                    if self.player.itemsinventory[ammo_type] <= 0:
+                                                        del self.player.itemsinventory[ammo_type]
+                                                    ammo_left = self.player.itemsinventory.get(ammo_type, 0)
+                                                    player.weapon_ability(weapon)
+                                                    print(f"You fire the {weapon}. Ammo left: {ammo_left}")
+                                                    player.weapon_sound(weapon)
+                                            else:
+                                                player.play_sound("knife.mp3")
+                                                player.weapon_ability(weapon)
+
+                                            # roll damage
+                                            dmg_range = info['damage']
+                                            player_attack = random.randint(*dmg_range)
+                                            player_attack = player_attack * player.dmg_modifier_multiply
+                                            turn = "enemy"
+                                            break
+                                        else:
+                                            print("Invalid selection.")
+                                    except ValueError:
+                                        print("Please enter a valid number.")
+                            player_attack += player.damage_modifier
+                            if self.EnemyCombatant.get("special") == "ghostly_form":
+                                if random.randint(1, 2) == 1:
+                                    print("Your attack passes harmlessly through the Phantom Gunslinger!")
+                                    continue
+                            enemy_health -= player_attack
+                            print(f"You hit the {self.Enemy} for {player_attack} damage!")
+                            player.damage_modifier = 0
+                            player.dmg_modifier_multiply = 1
+                            print(f"Your health is {self.player.Health}.")
+                            print(f"Enemy health is {enemy_health}.")
+
+                        elif choice == "2":
+                            self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
+
+
+                        elif choice == "3":
+                            new_speed = self.player.Speed + escape_boost
+                            if self.EnemyCombatant.get("bound", False) == True:
+                                print("The enemy blocks your escape, you can't flee!")
+                                continue
+                            if enemy_speed <= new_speed:
+                                print("You manage to escape!")
+                                escape = True
+                                escape_boost = 0
+                                self.player.Health = round(self.player.Health)
+                                self.player.Armor_Boost = 1
+                                player.dmg_modifier_multiply = 1
+                                if player.invillage == True:
+                                    player.change_music("Town.mp3", -1)
+                                else:
+                                    player.change_music("game_theme.mp3", -1)
+                                    
+                                return escape
+                            else:
+                                escape_boost += 1
+                                print("You failed to escape!")
+                                self.player.Health = self.player.Health - (enemy_damage)/5
+                                turn = "enemy"
 
                     else:
                         print("Invalid choice.")
