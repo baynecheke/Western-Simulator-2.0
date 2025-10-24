@@ -4117,20 +4117,20 @@ class Combat:
             "rattlesnake": {"health": 20, "damage": 7, "speed": 4, "loot": "small","type": "animal", "special": "venomous","behavior": "aggressive",}, 
             "viper": {"health": 10, "damage": 5, "speed": 5, "loot": "small", "type": "animal","behavior": "fearful",},
             "cobra": {"health": 15, "damage": 10, "speed": 2, "loot": "small",  "type": "animal","behavior": "cautious",},
-            "wolf": {"health": 50, "damage": 10, "speed": 4, "loot": "medium", "type": "animal","behavior": "reckless",},  
+            "wolf": {"health": 50, "damage": 10, "speed": 4, "loot": "medium", "type": "animal","behavior": random.choice(["reckless", "none", "none"]),},
             "bison": {"health": 100, "damage": 15, "speed": 2, "loot": "large", "passive": True,  "type": "animal","behavior": "cautious",},
-            "pack of wolves": {"health": 70, "damage": 15, "speed": 4, "loot": "medium", "type": "pack","behavior": "desperate",},
+            "pack of wolves": {"health": 70, "damage": 15, "speed": 4, "loot": "medium", "type": "pack","behavior": random.choice(["reckless", "cautious", "none"]),},
             "bear": {"health": 125, "damage": 15, "speed": 3, "loot": "medium",  "type": "animal","behavior": "reckless",},
-            "bandit": {"health": 80, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": "cautious",},
+            "bandit": {"health": 80, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious"]),},
             "mounted bandit": {"health": 120, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human","behavior": "intelligent",},
-            "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": "reckless",},
-            "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "cautious", "desperate"]),},
-            "looter": {"health": 60, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": "cautious",},
-            "bandit leader": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": random.choice(["reckless", "cautious", "desperate"]),},
+            "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "none"]),},
+            "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["cautious", "desperate", "none"]),},
+            "looter": {"health": 60, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": random.choice(["fearful", "cautious"]),},
+            "bandit leader": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": "boss"},
             "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True,"behavior": "boss"},
             "phantom gunslinger": {"health": 100, "damage": 15, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form","behavior": "boss"},
             "outlaw gunman": {"health": 70, "damage": 12, "speed": 4, "loot": "bandit", "type": "human", "behavior": "aggressive"},
-            "cowboy scout": {"health": 60, "damage": 10, "speed": 5, "loot": "common", "type": "human", "behavior": "cautious"},
+            "cowboy scout": {"health": 60, "damage": 10, "speed": 5, "loot": "common", "type": "human", "behavior": random.choice(["cautious", "desperate"])},
             "clanton gunfighter": {"health": 85, "damage": 15, "speed": 3, "loot": "rare", "type": "human", "behavior": "reckless"},
             "curly bill": {"health": 110, "damage": 18, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
             }
@@ -4397,8 +4397,10 @@ class Combat:
                         case "cautious":
                             # If below 50% of its *starting* max HP
                             if curr_hp < (base_enemy_health * 0.5): 
-                                if random.randint(1, 10) <= 4: # 40% chance to defend
+                                if random.randint(1, 10) <= 3: # 30% chance to defend
                                     print(f"The {self.Enemy} seems cautious and waits for an opening.")
+                                    enemy_health += int(base_enemy_health * 0.1) # Regain 10% of starting health
+                                    print(f"It regains {int(base_enemy_health * 0.1)} health!")
                                     action_taken = True # Skips the attack this turn
                         
                         case "fearful":
@@ -4439,15 +4441,16 @@ class Combat:
                     # --- Standard Miss/Hit Logic (Modified) ---
                     
                     # Base miss chance: 1 in 5
+                    miss_threshold = 0
                     if self.EnemyCombatant.get("special") == "alert":
                         miss_threshold = 0  # No chance to miss
                     else:
                         miss_threshold = 1
                         # Use base_enemy_health as benchmark
                         if curr_hp < base_enemy_health * 0.5:
-                            miss_threshold = 2
+                            miss_threshold = miss_threshold + 2
                         if curr_hp < base_enemy_health * 0.25:
-                            miss_threshold = 5
+                            miss_threshold = miss_threshold + 5
 
                     if miss_threshold > 0 and random.randint(1, 15) <= miss_threshold:
                         print(f"The {self.Enemy} attacks but you manage to dodge it.")
