@@ -4348,7 +4348,6 @@ class Combat:
                     self.player.score = self.player.score + 5
                     self.player.Health = round(self.player.Health)
                     self.player.Armor_Boost = 1
-                    self.player.escape_boost = 0
 
                     player.dmg_modifier_multiply = 1
                     time.sleep(2,)
@@ -4468,6 +4467,21 @@ class Combat:
                     if self.player.Health <= 0:
                         self.player.Death("You have been defeated by the " + self.Enemy + ".")
                     time.sleep(2,)
+        if enemy_health <= 0:
+                print(f"{self.Enemy.capitalize()} is dead.")
+                loot_item = random.choice(self.loots[enemy_loot])
+                self.player.loot_drop(loot_item)
+                self.player.score = self.player.score + 5
+                self.player.Health = round(self.player.Health)
+                self.player.Armor_Boost = 1
+
+                player.dmg_modifier_multiply = 1
+                time.sleep(2,)
+                if player.invillage == True:
+                    player.change_music("Town.mp3", -1)
+                else:
+                    player.change_music("game_theme.mp3", -1)
+                return escape
 
 player = Player()
 
