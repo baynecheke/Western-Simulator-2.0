@@ -163,6 +163,7 @@ class Player:
         self.gold = 50  # Starting gold
         self.distancenext = 0
         self.event = []
+
         
         self.EmptyTown = False
         self.Speed = 3
@@ -744,6 +745,7 @@ class Player:
                 "flashbang": "Can be thrown at enemies. Stuns them for one turn. Only usable in combat.",
                 "bandage": "Heals 25 health. Only usable outside of combat.",
                 "field dressing kit": "prevents 50% of next damage. Only usable in combat.",
+                "vendetta badge": "A one-time call for help. Summons an echo of the Earp posse for a devastating attack. Only usable in combat.",
             }
 
             for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
@@ -956,7 +958,9 @@ class Player:
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
-
+                elif selected_item == "vendetta badge":
+                    print("\nYou hold the badge high. You hear the thunder of hooves and a volley of gunfire rings out!")
+                    self.player_effects.append("posse_help")
                 else:
                     print(f"You can't use {selected_item} right now.")
                     time.sleep(2,)
@@ -4222,6 +4226,12 @@ class Combat:
             for turn in TurnOrder:
                 if turn == "player":
                     while turn == "player":
+                        if "posse_help" in self.player.player_effects:
+                            print("The Earp posse comes in, guns blazing!")
+                            posse_damage = random.randint(70, 90)
+                            print(f"They deal {posse_damage} damage to the {self.Enemy}!")
+                            enemy_health -= posse_damage
+                            del self.player.player_effects["posse_help"]
                         print("\n--- Your Turn ---")
                         print("What will you do?")
                         print("1. Attack")
@@ -4457,6 +4467,8 @@ class Combat:
                         
                     # Apply damage using the (potentially modified) current_turn_damage
                     Nenemy_damage = current_turn_damage * self.player.Armor_Boost
+                    if "half_incoming_damage" in self.player.player_effects:
+                        Nenemy_damage = Nenemy_damage / 2
                     self.player.Health -= Nenemy_damage
                     print(f"The {self.Enemy} strikes you for {Nenemy_damage} damage!")
                     print(f"Your health: {self.player.Health}")
