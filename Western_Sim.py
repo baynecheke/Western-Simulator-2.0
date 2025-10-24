@@ -1132,17 +1132,17 @@ class Player:
 
         # Define the data here, but pass the logic to the session
         sell_prices = {
-            "small hide": 5, "medium hide": 10, "large hide": 25,
-            "small meat": 5, "medium meat": 10, "large meat": 20,
-            "horn": 35, "bread": 2, "knife": 5,
-            "revolver": 20, "colt pistol": 20, "sharps rifle": 40,
+            "small hide": 12, "medium hide": 20, "large hide": 40,
+            "small meat": 12, "medium meat": 20, "large meat": 40,
+            "horn": 45, "bread": 2, "knife": 5,
+            "revolver": 15, "colt pistol": 20, "sharps rifle": 40,
             "rifle": 15, "shotgun": 25,
             "pistol_ammo": 1, "rifle_ammo": 2, "shotgun_ammo": 3,
             "winchester rifle": 50, "carved horn": 40,
-            "gold nugget": random.randint(10, 40),
-            "silver watch": random.randint(5, 15),
-            "silver bar": random.randint(30, 40),
-            "gold bar": random.randint(45, 75)
+            "gold nugget": random.randint(15, 45),
+            "silver watch": random.randint(10, 20),
+            "silver bar": random.randint(40, 60),
+            "gold bar": random.randint(45, 100)
         }
 
         trade_offers = [
@@ -1709,7 +1709,7 @@ class Player:
                 print("You turn your back, leaving him behind.")
                 print("Suddenly some gunshots ring out from behind you...")
                 self.Health -= 20
-                print("Earp and his possy ambush you as you leave! -20 health.")
+                print("Earp and his posse ambush you as you leave! -20 health.")
         self.counter = 0
         self.distancenext = random.randint(20, 25)
         print("You leave the town and head down the road.")
@@ -3088,6 +3088,10 @@ class Player:
             self.Tquest = "None"
 
     def encounter_earp_stage1(self):
+        if self.Health < 90:
+            print("The posse tends to your wounds.")
+            self.Health = 90
+            print("You are healed to 90 health.")
         print("The Vendetta Posse rides to Pete Spence's wood camp.")
         print("A known outlaw is holed up there, armed and waiting.")
         print("Options:")
@@ -3123,6 +3127,10 @@ class Player:
         self.earp_stage = 2
 
     def encounter_earp_stage2(self):
+        if self.Health < 90:
+            print("The posse tends to your wounds.")
+            self.Health = 90
+            print("You are healed to 90 health.")
         print("At dawn, word comes: Florentino Cruz, a Cowboy, is spotted near the San Pedro River.")
         print("Wyatt growls, 'He helped ambush Morgan.'")
         print("Options:")
@@ -3159,6 +3167,9 @@ class Player:
             if self.Health <= 90:
                 self.Health = 90
                 print(f"You receive extra healing. You are at {self.Health} health now.")
+            else:
+                print("Your health is already full. No healing needed.")
+                self.loot_drop("ammo cartridge")
         print("Options:")
         print("1) Confront the Clantons openly.")
         print("2) Set an ambush at the river crossing.")
@@ -3172,6 +3183,8 @@ class Player:
             if self.Health > 0:
                 print("In a fierce shootout, one Clanton falls dead in the dust.")
                 self.earp_bonus += 2
+                self.gold += 35
+                self.loot_drop("lever-action rifle")
             else:
                 print("A Clanton bullet strikes you down. The Vendetta falters.")
                 self.Tquest = "None"
@@ -3179,7 +3192,7 @@ class Player:
             if self.perform_stat_check(self.trail_skill, base_target=12) == True:
                 print("Your ambush works! You take the Clantons by surprise, killing one instantly.")
                 self.gold += 25
-                self.loot_drop("cowboy rifle")
+                self.loot_drop("lever-action rifle")
                 self.earp_bonus += 2
             else:
                 print("The Clantons sense danger. They escape into the hills.")
@@ -3213,13 +3226,18 @@ class Player:
                 print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
         elif choice == "2":
-            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+            if self.perform_stat_check(self.trail_skill, base_target=18) == True:
                 print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
-                self.gold += 50
+                self.gold += 30
                 self.earp_bonus += 2
             else:
                 print("Your shot misses! Curly Bill fires back, grazing you. -10hp")
+                print("If only you had better trail skills...")
                 self.Health -= 10
+                print("Curly Bill charges your position!")
+                combat = Combat(self)
+                combat.FindAttacker("curly bill")
+                combat.Attack()
         else:
             print("You freeze. The others charge ahead without you.")
             self.earp_bonus -= 2
@@ -3228,6 +3246,18 @@ class Player:
         print("The Vendetta Ride is over. The Cowboys are broken, scattered to the winds.")
         self.Tquest = "None"
         self.earp_stage = None
+        rewards = 20 + (self.earp_bonus * 10)
+        print(f"You receive {rewards} gold for your efforts.")
+        if self.earp_bonus <= 0:
+            print("Your neutral actions earned you no bonus or penalty.")
+        elif self.earp_bonus == 1:
+            print("Your efforts were noted.")
+            self.loot_drop("pendant of recognition")
+        elif self.earp_bonus >= 2:
+            print("Your valor stood out! You are hailed as a hero of the Vendetta.")
+            self.loot_drop("golden badge")
+            print("'You have done well today,' Wyatt says with a grin.")
+            print("'Use this badge and the posse will help you once more if needed.'")
         self.quests_done.append("earp_vendetta")
 
     def coyote_camp_quest(self):
