@@ -1590,7 +1590,7 @@ class Player:
             event = "A merchant asks if the player will help load wagons at the stable."
             choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice.strip().lower() == "yes":
-                earned = random.randint(31, 45)
+                earned = random.randint(20, 40)
                 self.gold += earned
                 self.Time += 2
                 print(f"You work and earn {earned} gold.")
@@ -1609,11 +1609,11 @@ class Player:
                     self.itemsinventory["rope"] -= 1
                     if self.itemsinventory["rope"] <= 0:
                         del self.itemsinventory["rope"]
-                    self.gold += 10
+                    self.gold += 30
                     print("You fix the plow. +10 gold.")
                 elif self.perform_stat_check(self.trail_skill, base_target=12) == True:
                     print("You heave the plow upright and wedge it in tight.")
-                    self.gold += 20
+                    self.gold += 30
                     print("The farmer gives you 20 gold for your help.")
                 else:
                     print("You try to help, but it's beyond your skill. The farmer thanks you anyway.")
@@ -1674,7 +1674,9 @@ class Player:
                     print("As the final bandit falls under you and the sherrifs fury, you breath a sigh of relief.")
                     print("The sheriff slaps your back and thanks you.")
                     print("You return his revolver, and he gives you a pouch of gold.")
-                    self.gold += 15
+                    self.gold += 35
+                    self.Health = self.MaxHealth
+                    print("You feel rejuvenated. Health fully restored.")
                     selected_item = "revolver"
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
