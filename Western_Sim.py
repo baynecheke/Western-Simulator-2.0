@@ -1581,7 +1581,7 @@ class Player:
             print("You've chatted for a while; there are no new conversations right now.")
             return
 
-        roll = random.randint(1, 45)
+        roll = random.randint(1, 100)
 
         if roll <= 15:
             # Basic job
@@ -1679,10 +1679,12 @@ class Player:
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
+                time.sleep(2)
                     
 
             else:
                 print("You stay back, watching from a safe distance.")
+                time.sleep(2,)
 
         elif roll <= 90:
             # Crafting bonus (if tools owned)
