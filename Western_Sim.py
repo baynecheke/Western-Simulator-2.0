@@ -4167,6 +4167,10 @@ class Combat:
         if not self.EnemyCombatant:
             print("There is no enemy to fight.")
             return
+        base_enemy_health = self.EnemyCombatant["health"]
+        base_enemy_damage = self.EnemyCombatant["damage"]
+        base_enemy_speed = self.EnemyCombatant["speed"]
+
         enemy_damage = self.EnemyCombatant["damage"]
         enemy_speed = self.EnemyCombatant["speed"]
         enemy_loot = self.EnemyCombatant["loot"]
@@ -4356,6 +4360,8 @@ class Combat:
                 # Enemy's turn
                 elif turn == "enemy":
                     print(f"\n--- {self.Enemy.capitalize()}'s Turn ---")
+                    
+                    # --- Status Effect Checks (EXISTING) ---
                     if "stun" in self.player.enemy_effects:
                         stunned = True
                         self.player.enemy_effects.remove("stun")
@@ -4369,33 +4375,96 @@ class Combat:
                         print("The enemy is dazed, unable to attack.")
                         stunned = False
                         continue
-                    #Look up enemy's original max health
-                    max_hp = self.Enemies[self.Enemy]["health"]
-                    curr_hp = enemy_health
+                    
+                    # --- START NEW BEHAVIOR LOGIC ---
+                    behavior = self.EnemyCombatant.get("behavior", "aggressive")
+                    # Use starting_enemy_health as the benchmark for percentages
+                    curr_hp = enemy_health 
+                    
+                    # This is the damage for THIS turn, which we can modify
+                    current_turn_damage = enemy_damage 
+                    action_taken = False # Flag to skip attack if behavior dictates
+
+                    match behavior:
+                        case "reckless":
+                            if random.randint(1, 10) <= 3: # 30% chance
+                                print(f"The {self.Enemy} attacks recklessly!")
+                                current_turn_damage = int(current_turn_damage * 1.5)
+                                recoil = int(current_turn_damage * 0.25)
+                                enemy_health -= recoil
+                                print(f"It takes {recoil} recoil damage!")
+                        
+                        case "cautious":
+                            # If below 50% of its *starting* max HP
+                            if curr_hp < (base_enemy_health * 0.5): 
+                                if random.randint(1, 10) <= 4: # 40% chance to defend
+                                    print(f"The {self.Enemy} seems cautious and waits for an opening.")
+                                    action_taken = True # Skips the attack this turn
+                        
+                        case "fearful":
+                            if random.randint(1, 10) <= 3: # 30% chance to flee
+                                print(f"The {self.Enemy} attempts to flee!")
+                                if enemy_speed < self.player.Speed:
+                                    self.player.perform_stat_check(enemy_speed, base_target=12 + self.player.Speed)
+                                    print("It successfully flees the battle!")
+                                    return escape # Enemy flees
+                                action_taken = True # Skips the attack this turn
+
+                        case "desperate":
+                            # If below 30% of its *starting* max HP
+                            if curr_hp < (base_enemy_health * 0.3): 
+                                print(f"The {self.Enemy} is desperate and attacks with fury!")
+                                current_turn_damage = int(current_turn_damage * 1.3)
+                        
+                        case "intelligent":
+                            if self.player.Health < (self.player.MaxHealth * 0.4): # Player is hurt
+                                print(f"The {self.Enemy} sees an opening and strikes hard!")
+                                current_turn_damage = int(current_turn_damage * 1.25)
+                            elif self.player.Health > (self.player.MaxHealth * 0.75): # Player is healthy
+                                if random.randint(1, 10) <= 4: # 40% chance of a probing attack
+                                    print(f"The {self.Enemy} makes a quick, probing attack.")
+                                    current_turn_damage = int(current_turn_damage * 0.5)
+                        
+                        case "boss" | "aggressive":
+                            pass # Fall through to standard attack logic
+                        
+                        case _: # Default for any other behavior
+                            pass # Fall through to standard attack
+
+                    if action_taken:
+                        continue # The behavior (e.g., cower, defend) skipped the attack
+
+                    # --- END NEW BEHAVIOR LOGIC ---
+
+                    # --- Standard Miss/Hit Logic (Modified) ---
+                    
                     # Base miss chance: 1 in 5
                     if self.EnemyCombatant.get("special") == "alert":
                         miss_threshold = 0  # No chance to miss
                     else:
                         miss_threshold = 1
-                        if curr_hp < max_hp * 0.5:
+                        # Use base_enemy_health as benchmark
+                        if curr_hp < base_enemy_health * 0.5:
                             miss_threshold = 2
-                        if curr_hp < max_hp * 0.25:
+                        if curr_hp < base_enemy_health * 0.25:
                             miss_threshold = 5
 
                     if miss_threshold > 0 and random.randint(1, 15) <= miss_threshold:
                         print(f"The {self.Enemy} attacks but you manage to dodge it.")
                         continue
-                    Nenemy_damage = enemy_damage*self.player.Armor_Boost
+                        
+                    # Apply damage using the (potentially modified) current_turn_damage
+                    Nenemy_damage = current_turn_damage * self.player.Armor_Boost
                     self.player.Health -= Nenemy_damage
                     print(f"The {self.Enemy} strikes you for {Nenemy_damage} damage!")
                     print(f"Your health: {self.player.Health}")
                     print(f"Enemy health: {enemy_health}")
+                    
                     if self.EnemyCombatant.get("special") == "venomous":
                         self.player.poisoned = 1
                     if self.player.Health <= 0:
                         self.player.Death("You have been defeated by the " + self.Enemy + ".")
                     time.sleep(2,)
-
 
 player = Player()
 
