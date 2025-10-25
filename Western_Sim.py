@@ -163,6 +163,7 @@ class Player:
         self.gold = 50  # Starting gold
         self.distancenext = 0
         self.event = []
+        self.number_of_towns_visited = 0
 
         
         self.EmptyTown = False
@@ -373,6 +374,7 @@ class Player:
         player.earp_stage = save_data.get("earp_stage", 0)
         player.quests_done = save_data.get("quests_done", [])
         player.event = save_data.get("event", [])
+        player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
@@ -431,6 +433,7 @@ class Player:
                 "earp_stage": self.earp_stage,
                 "quests_done": self.quests_done,
                 "event": self.event,
+                "number_of_towns_visited": self.number_of_towns_visited
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -632,6 +635,7 @@ class Player:
                     if choice == "67":
                         self.encounter_earp_intro()
                         self.loot_drop("lever-action rifle")
+                        self.wandering_trader()
                         combat = Combat(self)
                         combat.FindAttacker("brawler")
                         combat.Attack()
@@ -750,6 +754,7 @@ class Player:
                 "bandage": "Heals 25 health. Only usable outside of combat.",
                 "field dressing kit": "prevents 50% of next damage. Only usable in combat.",
                 "vendetta badge": "A one-time call for help. Summons an echo of the Earp posse for a devastating attack. Only usable in combat.",
+                "pendant of recognition": "A memorandom of the vendetta ride. Grants +20 score at the end of the game.",
             }
 
             for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
@@ -1735,7 +1740,7 @@ class Player:
         if "drink" in self.event:
             self.event.remove("drink")
         self.counter = 0
-        self.distancenext = random.randint(20, 25)
+        self.distancenext = random.randint(15, 20) + self.number_of_towns_visited * 3
         print("You leave the town and head down the road.")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
@@ -1819,6 +1824,7 @@ class Player:
         self.play_sound("horse_neigh.mp3")
         print(f"You arrive in the town of {name}!")
         self.change_music("Town.mp3", -1)
+        self.number_of_towns_visited += 1
 
         if "family" in self.caravan:
             self.travel_bonus += 1
@@ -2543,55 +2549,57 @@ class Player:
 
     def wandering_trader(self):
         print("\nYou encounter a wandering trader on the trail.")
-        all_items = {
-            "colt pistol": 20,
-            "remington pistol": 25,
-            "henry rifle": 45,
-            "bread": 4,
-            'derringer pistol': 5,
-            'carbine rifle': 35,
-            'double barrel shotgun' :80,
-            'tomahawk': 25,
-            'sharps rifle': 100,
-            'lever-action rifle': 70,
-            'sawed-off shotgun': 55,
-            'colt navy revolver': 30,
-            'cavalry saber': 35,
-        }
+        time.sleep(1)
+        print("The trader tips his hat. 'Got some fine goods, if you’ve got the coin.'")
+        time.sleep(1)
 
-        print(f"\nYour gold: {self.gold}")
-        print("Your inventory:")
-        for item, qty in self.itemsinventory.items():
-            print(f"  {item}: {qty}")
-        print()
+        # --- Trader's curated pool of possible goods ---
+        trader_pool = [
+            # Common weapons
+            "colt pistol", "revolver", "derringer pistol", "carbine rifle",
+            "shotgun", "sawed-off shotgun", "tomahawk", "knife",
+            # Rare / high-tier weapons
+            "henry rifle", "lever-action rifle", "sharps rifle",
+            "double barrel shotgun", "winchester rifle",
+            # Supplies
+            "bread", "bandage", "antivenom", "gun oil",
+            "field dressing kit", "ammo cartridge",
+            # Misc valuable or unique items
+            "gold nugget", "silver watch", "boots"
+        ]
 
-        # Pick 3 random items to sell
-        available_items = dict(random.sample(list(all_items.items()), 3))
+        # --- Randomly choose up to 5 unique items ---
+        trader_selection = random.sample(trader_pool, min(5, len(trader_pool)))
 
-        # Show items for sale
-        print("The trader offers the following items:")
-        for i, (item, price) in enumerate(available_items.items(), start=1):
-            print(f"  {i}. {item} - {price} gold")
-
-        # Let the player buy
-        while True:
-            choice = input("Enter the number of the item you want to buy (or '0' to leave): ").strip()
-            if choice == "0":
-                print("You move on from the trader.\n")
-                break
-            if choice.isdigit() and 1 <= int(choice) <= len(available_items):
-                item_name = list(available_items.keys())[int(choice) - 1]
-                item_price = available_items[item_name]
-
-                if self.gold >= item_price:
-                    self.gold -= item_price
-                    self.itemsinventory[item_name] = self.itemsinventory.get(item_name, 0) + 1
-                    print(f"You bought 1 {item_name} for {item_price} gold.")
-                    print(f"Remaining gold: {self.gold}")
-                else:
-                    print("You don't have enough gold.")
+        # --- Build inventory dynamically ---
+        wandering_trader_inventory = {}
+        for name in trader_selection:
+            # Look up price from weapons_data if available
+            if name in weapons_data:
+                base_price = weapons_data[name].get("price", random.randint(10, 50))
             else:
-                print("Invalid input. Try again.")
+                # Fallback prices for non-weapon items
+                fallback_prices = {
+                    "bread": 4, "bandage": 10, "antivenom": 12,
+                    "gun oil": 15, "field dressing kit": 20,
+                    "ammo cartridge": 10, "gold nugget": 35,
+                    "silver watch": 15, "boots": 10
+                }
+                base_price = fallback_prices.get(name, random.randint(5, 25))
+
+            # Add slight random markup/discount (10%–20% variance)
+            price = round(base_price * random.uniform(0.9, 1.2))
+            quantity = random.randint(2, 6)
+
+            wandering_trader_inventory[name] = ShopItem(name, price, quantity)
+
+        # --- Open shop session ---
+        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory, USE_OLLAMA)
+        trader_shop.run_buy_session()
+
+        print("You thank the trader and continue down the dusty trail.")
+        time.sleep(1)
+        
 
     def encounter_hermit_challenge(self):
         print("\nWhile traveling, you stumble upon an old hermit sitting by a fire.")
@@ -3279,7 +3287,7 @@ class Player:
             self.loot_drop("pendant of recognition")
         elif self.earp_bonus >= 2:
             print("Your valor stood out! You are hailed as a hero of the Vendetta.")
-            self.loot_drop("golden badge")
+            self.loot_drop("vendetta badge")
             print("'You have done well today,' Wyatt says with a grin.")
             print("'Use this badge and the posse will help you once more if needed.'")
         self.quests_done.append("earp_vendetta")
@@ -4241,7 +4249,8 @@ class Combat:
         while enemy_health > 0 and self.player.Health > 0:
             for turn in TurnOrder:
                 if turn == "player":
-                    while turn == "player":
+                    player_turn_complete = False
+                    while not player_turn_complete:
                         if "posse_help" in self.player.player_effects:
                             print("The Earp posse comes in, guns blazing!")
                             posse_damage = random.randint(70, 90)
@@ -4258,6 +4267,7 @@ class Combat:
 
 
                         if choice == "1":
+                            player_turn_complete = True
                             # Get list of owned weapons (weapons with known names)
                             owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
                             if not owned_weapons:
@@ -4288,7 +4298,6 @@ class Combat:
                                             player_attack = random.randint(2, 5)
                                             print("You swing your fists!")
                                             player.play_sound("punch.mp3")
-                                            turn = "enemy"
                                             break
                                         elif 1 <= weapon_choice <= len(owned_weapons):
                                             weapon = owned_weapons[weapon_choice - 1]
@@ -4317,7 +4326,7 @@ class Combat:
                                             dmg_range = info['damage']
                                             player_attack = random.randint(*dmg_range)
                                             player_attack = player_attack * player.dmg_modifier_multiply
-                                            turn = "enemy"
+
                                             break
                                         else:
                                             print("Invalid selection.")
@@ -4340,6 +4349,7 @@ class Combat:
 
 
                         elif choice == "3":
+                            player_turn_complete = True
                             new_speed = self.player.Speed + escape_boost
                             if self.EnemyCombatant.get("bound", False) == True:
                                 print("The enemy blocks your escape, you can't flee!")
