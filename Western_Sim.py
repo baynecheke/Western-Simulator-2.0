@@ -1782,11 +1782,11 @@ class Player:
         quest_chance = random.randint(1, 2)
         if self.Tquest == "None" and quest_chance >= 2:
             Random = random.choice(["defend_town","iron_tracks"])
-            if Random == "defend_town":
+            if Random == "defend_town" and "defend_town" not in self.quests_done:
                 # Episode 1 not done yet?
                 if self.town_defense_outcome is None:
                     self.encounter_town_part1()
-            elif Random == "iron_tracks":
+            elif Random == "iron_tracks" and "iron_tracks" not in self.quests_done:
                     self.encounter_iron_intro()
                     return
         if self.Tquest == "defend_town":
@@ -2544,6 +2544,7 @@ class Player:
             self.town_final_outcome = "abandoned"
             print("You ride away, leaving the town to its fate.")
         self.Tquest = "None"
+        self.quests_done.append("defend_town")
 
         time.sleep(2)
 
