@@ -36,6 +36,7 @@ class AI_Control:
                 response = ollama.chat(
                     model="phi3",
                     format="json",
+                    options={"temperature": 0},   # deterministic & faster
                     messages=[
                         {"role": "system", "content": prompt},
                         {"role": "user", "content": player_text}
@@ -138,6 +139,7 @@ class AI_Control:
             response = ollama.chat(
                 model="phi3",
                 format="json",
+                options={"temperature": 0},   # deterministic & faster
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": player_text}
@@ -377,6 +379,7 @@ class AI_Control:
                 response = ollama.chat(
                     model="phi3",
                     format="json",
+                    options={"temperature": 0},   # deterministic & faster
                     messages=[
                         {"role": "system", "content": prompt},
                         {"role": "user", "content": player_dialogue}

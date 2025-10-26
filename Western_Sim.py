@@ -149,6 +149,7 @@ with open(os.path.join(base_dir, "game_data.yaml"), "w") as f:
 class Player:
     def __init__(self):
         #Basic player stuff
+        self.player_name = "default"
         self.rumors = {}
         self.Day = 1
         self.AI_File = AI_File
@@ -286,25 +287,25 @@ class Player:
         self.diary_entries = []
         
 
-        self.BasePossibleActions = [
-            "town jail", 
-            "doctor's office", 
-            "general store", 
-            "gunsmith's shop", 
-            "bank", 
-            "saloon", 
-            "talk townspeople",
-            "trading post",
-            "blacksmith shop",
-            "leave town",
-            "use item",
-            "inventory",
-            "travel road"
+        self.town_actions = [
+            "town jail", "doctor's office", "general store", "gunsmith's shop", 
+            "bank", "saloon", "talk townspeople", "trading post", 
+            "blacksmith shop", "leave town"
         ]
-        self.possibleactions = self.BasePossibleActions[:-1]  # Exclude "(J) Continue..."
+        
+        # Actions only available WHILE traveling
+        self.travel_actions = ["travel road"]
+        
+        # Actions available in BOTH states
+        self.universal_actions = ["use item", "inventory"]
+        
+        # This list will be built dynamically
+        self.possibleactions = []
 
         self.TownNames1 = ["Gray", "Dust", "Buffalo", "Coyote", "Gold", "Post", "North"]
         self.TownNames2 = ["Town", "Ridge", "Camp", "Fort", "Settlement"]
+        self.current_town_name = "Dustbowl"
+        self.update_actions()
 
     @classmethod
     def load_game(cls):
@@ -375,14 +376,13 @@ class Player:
         player.quests_done = save_data.get("quests_done", [])
         player.event = save_data.get("event", [])
         player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
+        player.player_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
+        player.current_town_name = save_data.get("current_town_name", "Dustbowl")
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
         player.save_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
-        if player.invillage:
-            player.possibleactions = player.BasePossibleActions[:-1] # all except explore
-        else:
-            player.possibleactions = player.BasePossibleActions[-3:] # inventory check & explore
+        player.update_actions()
         return player
 
     def save_game(self):
@@ -433,7 +433,9 @@ class Player:
                 "earp_stage": self.earp_stage,
                 "quests_done": self.quests_done,
                 "event": self.event,
-                "number_of_towns_visited": self.number_of_towns_visited
+                "number_of_towns_visited": self.number_of_towns_visited,
+                "player_name": self.player_name,
+                "current_town_name": self.current_town_name,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 
@@ -535,6 +537,19 @@ class Player:
             else:
                 print("Continuing your adventure...")
                 time.sleep(4,)
+
+    def update_actions(self):
+        """
+        Builds the self.possibleactions list based on
+        whether the player is in a village or not.
+        This keeps all action-switching logic in one place.
+        """
+        if self.invillage:
+            # In town: Show town actions + universal actions
+            self.possibleactions = self.town_actions + self.universal_actions
+        else:
+            # Traveling: Show travel actions + universal actions
+            self.possibleactions = self.travel_actions + self.universal_actions
 
     def lose_random_item(self, amount):
         if not self.itemsinventory:
@@ -755,6 +770,8 @@ class Player:
                 "field dressing kit": "prevents 50% of next damage. Only usable in combat.",
                 "vendetta badge": "A one-time call for help. Summons an echo of the Earp posse for a devastating attack. Only usable in combat.",
                 "pendant of recognition": "A memorandom of the vendetta ride. Grants +20 score at the end of the game.",
+                "winchester barrel": "Bring it to the blacksmith with a winchester stock to make a winchester rifle.",
+                "winchester stock": "Bring it to the blacksmith with a winchester barrel to make a winchester rifle.",
             }
 
             for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
@@ -879,6 +896,14 @@ class Player:
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
 
+                elif selected_item == "whetstone":
+                    print("You run the whetstone along your melee weapon, sharpening it to a razor edge.")
+                    print("Your next melee attack will deal extra damage.")
+                    self.player_effects.append("sharpened_blade")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+
                 elif selected_item == "tobacco pouch":
                     print("You puff on the tobacco pouch and feel emboldened.")
                     print("You will be faster and stronger in the fight to come. +1 damage, +1 speed")
@@ -984,10 +1009,7 @@ class Player:
         print(f"Max health: {self.MaxHealth}")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
-        if self.watch:
-            print(f"It is {self.Time}:00 o'clock.")
-        else:
-            print("It is morning." if self.Time < 13 else "It is afternoon.")
+        print(f"It is {self.Time}:00 o'clock.")
         print(f"You have {self.gold} gold in your pouch.")
         print("Your inventory contains:")
         if self.itemsinventory:
@@ -1043,29 +1065,32 @@ class Player:
             else:
                 print("You have no criminals to turn in.")
         elif choice == "ask rumors":
-            if "sheriff_rumor" not in self.rumors_heard:
-                self.rumors_heard.append("sheriff_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-                "old_mine_lights": "Nobody goes near the old mine anymore.",
-                }
-                topic, rumor = random.choice(list(rumor_topics.items()))
-                print(f"The sheriff murmurs: \"{rumor}\"")
-                self.rumors[topic] = self.rumors.get(topic, 0) + 1
-                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-                # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 1:
-                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
-                    choice = input(": ").strip().lower()
-                    if self.AI_File.parse_YN(choice) == "yes":
-                        self.Tquest = topic
-                        print(f"You have accepted the quest: {topic.replace('_',' ').capitalize()}!")
-                    else:
-                        print("You declined the quest for now.")
-            else:
-                print("He shrugs: \"I told you all that a know.\"")
+            if random.randint(1, 3) == 3:
+
+                if "sheriff_rumor" not in self.rumors_heard:
+                    self.rumors_heard.append("sheriff_rumor")
+                    rumor_topics = {
+                    "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                    "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    }
+                    topic, rumor = random.choice(list(rumor_topics.items()))
+                    print(f"The sheriff murmurs: \"{rumor}\"")
+                    self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                    print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                    # Example: trigger a quest after hearing a rumor 2 times
+                    if self.rumors[topic] == 1:
+                        print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                        print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
+                        choice = input(": ").strip().lower()
+                        if self.AI_File.parse_YN(choice) == "yes":
+                            self.Tquest = topic
+                            print(f"You have accepted the quest: {topic.replace('_',' ').capitalize()}!")
+                        else:
+                            print("You declined the quest for now.")
+                else:
+                    print("He shrugs: \"I told you all that a know.\"")
             time.sleep(2)
+
         elif choice == "teach skills":
             print("The sheriff can teach you some skills.")
             print("Choose a skill to learn:")
@@ -1176,6 +1201,22 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You walk into the blacksmith.")
         print("The smith gives you a nod.")
+        base_level = self.TownUpgrades["blacksmith"]["level"]
+        effective_level = base_level
+        if "Fort" in self.current_town_name or "Ridge" in self.current_town_name:
+            effective_level += 1
+            print("The blacksmith's shop is more advanced due to the town's fortifications.")
+        print(f"The blacksmith's current upgrade level is {effective_level}.")
+        if "winchester barrel" in self.itemsinventory and "winchester stock" in self.itemsinventory:
+            print("You have the parts to assemble a Winchester rifle.")
+            print("Would you like to assemble it now? (yes/no)")
+            choice = input(": ").strip().lower()
+            choice = AI_File.parse_YN(choice)
+            if choice == "yes":
+                self.itemsinventory.pop("winchester barrel")
+                self.itemsinventory.pop("winchester stock")
+                self.add_item("winchester rifle")
+                print("You have assembled a Winchester rifle!")
         time.sleep(2,)
         if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
@@ -1184,12 +1225,30 @@ class Player:
             NpC = "blacksmith"
             AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
 
-        inventory = {
-            'leather armor': ShopItem('leather armor', 35, 3),
-            'chain mail': ShopItem('chain mail', 75, 2),
-            'boots': ShopItem('boots', 15, 5)
+        item_prices = {
+            'boots': 15,
+            'leather armor': 35,
+            'chain mail': 75,
+            'whetstone': 20,  # Our new item
+            'gun oil': 7,
         }
-        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", inventory, USE_OLLAMA)
+
+        # Build the list of available items based on the effective level
+        available_items = ['boots']
+        if effective_level >= 1:
+            available_items.append('leather armor')
+            available_items.append('gun oil')
+        if effective_level >= 2:
+            available_items.append('chain mail')
+        if effective_level >= 3:
+            available_items.append('whetstone') # Whetstone is a level 3+ item
+
+        # Create the final inventory dict for the ShopSession
+        shop_inventory = {}
+        for name in available_items:
+            # Use a default quantity of 5 for this example
+            shop_inventory[name] = ShopItem(name, item_prices[name], 5)
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory, USE_OLLAMA)
         BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
@@ -1288,9 +1347,9 @@ class Player:
     def Bank(self):
         print("You walk into the Bank. The air smells of leather and dust.")
         print("What town building would you like to invest in?")
-        price1 = self.TownUpgrades["general store"]["level"]*20
-        price2 = self.TownUpgrades["blacksmith"]["level"]*20
-        price3 = self.TownUpgrades["gunsmith"]["level"]*20
+        price1 = self.TownUpgrades["general store"]["level"]*10
+        price2 = self.TownUpgrades["blacksmith"]["level"]*10
+        price3 = self.TownUpgrades["gunsmith"]["level"]*10
         print(f"General store, price to upgrade: {price1}.")
         print(f"Blacksmith, price to upgrade: {price2}.")
         print(f"Gunsmith, price to upgrade: {price3}.")
@@ -1552,7 +1611,7 @@ class Player:
         choice = input("Choice: ").strip()
         if choice == "1":
             if "patron_rumor" not in self.rumors_heard:
-                if random.randint(1, 2) == 2:
+                if random.randint(1, 3) == 3:
                     self.rumors_heard.append("patron_rumor")
                     rumor_topics = {
                     "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
@@ -1701,7 +1760,7 @@ class Player:
                 if self.Health > 0:
                     loot = random.choice(["ammo cartridge", "bread", "tobacco pouch", "gold nugget"])
                     self.loot_drop(loot)
-                    print("As the final bandit falls under you and the sherrifs fury, you breath a sigh of relief.")
+                    print("As the final bandit falls under you and the sheriff's fury, you breath a sigh of relief.")
                     print("The sheriff slaps your back and thanks you.")
                     print("You return his revolver, and he gives you a pouch of gold.")
                     self.gold += 35
@@ -1753,6 +1812,7 @@ class Player:
         if "drink" in self.event:
             self.event.remove("drink")
         self.counter = 0
+        self.current_town_name = "none"
         self.distancenext = random.randint(15, 20) + self.number_of_towns_visited * 3
         print("You leave the town and head down the road.")
         if "surveyor's kit" in self.itemsinventory:
@@ -1761,7 +1821,7 @@ class Player:
         self.change_music("game_theme.mp3", -1)
         self.invillage = False
         self.Hostility = 0
-        self.possibleactions = self.BasePossibleActions[-3:]  
+        self.update_actions()
         time.sleep(2,)
 
     def Interaction(self):
@@ -1783,6 +1843,7 @@ class Player:
         travel = self.travelspeed + self.travel_bonus
         if self.distancenext <= travel:
             self.ArriveTown()
+            
         else:
             self.distancenext -= travel
             Random = random.randint(1,5)
@@ -1838,6 +1899,7 @@ class Player:
         print(f"You arrive in the town of {name}!")
         self.change_music("Town.mp3", -1)
         self.number_of_towns_visited += 1
+        self.current_town_name = name
 
         if "family" in self.caravan:
             self.travel_bonus += 1
@@ -1848,7 +1910,7 @@ class Player:
         print("You feel a sense of relief as you enter the town.")
         print("You gain 10 gold from your travels.")
         self.invillage = True
-        self.possibleactions = self.BasePossibleActions[:-1]
+        self.update_actions()
         self.score = self.score + 5
         time.sleep(2)
         
@@ -1878,7 +1940,6 @@ class Player:
             'fire cracker': ShopItem('fire cracker', 5, 10),
             'antivenom': ShopItem('antivenom', 5, 10),
             'tobacco pouch': ShopItem('tobacco pouch', 7, 7),
-            'gun oil': ShopItem('gun oil', 7, 3),
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
         }
@@ -4333,6 +4394,10 @@ class Combat:
                                                     print(f"You fire the {weapon}. Ammo left: {ammo_left}")
                                                     player.weapon_sound(weapon)
                                             else:
+                                                if "sharpened_blade" in self.player.player_effects:
+                                                    print(f"Your blade is extra sharp, +10 damage!")
+                                                    player.damage_modifier += 10
+                                                    del self.player.player_effects["sharpened_blade"]
                                                 player.play_sound("knife.mp3")
                                                 player.weapon_ability(weapon)
 
