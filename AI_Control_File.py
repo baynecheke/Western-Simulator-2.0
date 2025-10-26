@@ -8,8 +8,6 @@ class AI_Control:
     def __init__(self,):
         self.action = None
 
-# In AI_Control_File.py
-
     def parse_choice(self, available_choices, player_text, use_ollama):
         safe_fallback = "none"
         if "leave" in available_choices:
@@ -266,10 +264,6 @@ class AI_Control:
                 return safe_fallback
             # --- End Numerical Fallback Logic ---
 
-
-# In AI_Control_File.py
-# In AI_Control_File.py
-
     def parse_action(self, player_text: str, available_actions: list, use_ollama):
         
         if use_ollama:
@@ -437,38 +431,6 @@ class AI_Control:
                 return self.action
             # --- End Numerical Fallback Logic ---
 
-    # def narrate_action(self, game_state, possible_actions, past_actions):
-    #     action = self.action.get("action")
-    #     args = self.action.get("args", {})
-
-    #     # Create a dynamic prompt
-    #     prompt = dedent(f"""
-    # You are the narrator for a western text RPG.
-    # The world state is: {game_state}.
-    # Past actions: {past_actions}.
-    # The player has chosen the action: {action} with arguments {args}.
-    # Write a short narration (1-2 sentences max) describing what happens next.
-    # Keep it immersive and consistent with the world state.
-    # Suggest a few possible actions, consistent with {possible_actions} and include them in the narration subtly.
-    # """)
-        
-    #     response_stream = ollama.chat(
-    #         model="llama3:8b",
-    #         messages=[
-    #             {"role": "system", "content": prompt}
-    #         ],
-    #         stream=True
-    #     )
-        
-    #     narration = ""
-    #     for chunk in response_stream:
-    #         # Ollama yields dicts with incremental content
-    #         token = chunk["message"]["content"]
-    #         print(token, end="", flush=True)   # print as it arrives
-    #         narration += token
-    #     print()
-    #     return narration
-
     def narrate_shop(self, game_state, event, NPC, use_ollama):
         if use_ollama:
             # Create a dynamic prompt
@@ -596,8 +558,3 @@ class AI_Control:
             # --- End Numerical Fallback Logic ---
             
 
-
-
-    #AI = AI_Control()
-    #AI.parse_example()
-    #AI.narrate_action()

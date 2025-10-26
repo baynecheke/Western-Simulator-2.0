@@ -155,7 +155,6 @@ class Player:
         self.AI_File = AI_File
         self.Time = 9
         self.Speed = 3
-        self.watch = False
         self.counter = 0
         self.Hunger = 0
         self.Health = 100
@@ -175,7 +174,6 @@ class Player:
         self.rumors_collected = 0
         self.rumors_heard = []
         self.rebirth = False
-        self.rumor = False
 
         #stuff
         self.score = 0
@@ -268,8 +266,6 @@ class Player:
 
 
 
-
-        self.cheat_code = False
         self.Tquest = "None"  
         self.quest_today = False
         self.quest = []
@@ -3501,6 +3497,23 @@ class Player:
                         print("No tomahawks left!")
                 else:
                     print("You keep your tomahawk ready for melee.")
+            case "quick draw":
+                print("Would you like to attempt a quick draw follow-up shot? (yes/no)")
+                choice = self.AI_File.parse_YN(input(": ").strip().lower())
+                if choice == "yes":
+                    if self.itemsinventory.get("rifle_ammo", 0) >= 1:
+                        if random.randint(1, 2) == 1: # 50% chance for a bonus hit
+                            self.dmg_modifier_multiply += 0.75 
+                            self.play_sound("rifle_shot.mp3")
+                            print("The quick draw is successful! The follow-up shot hit for 75% damage.")
+                        else:
+                            print("The follow-up shot misses!")
+                        self.itemsinventory["rifle_ammo"] -= 1 # Consume extra ammo
+                        if self.itemsinventory["rifle_ammo"] <= 0:
+                            del self.itemsinventory["rifle_ammo"]
+                    else:
+                        print("You don't have enough rifle ammo for a quick draw.")
+                return
 
             case "precision shot":
                 # Logic for sharps rifle
@@ -3518,67 +3531,6 @@ class Player:
                 # Fallback for any other defined ability
                 pass
 
-        if weapon in ["winchester rifle", "henry rifle"]:
-            print("You steady your aim...")
-            if random.randint(1, 4) == 1:
-                self.dmg_modifier_multiply = 1.5
-        if weapon in ["remington pistol", "derringer pistol"]:
-            print("Would you like to fire multiple shots? yes/no")
-            choice = input(": ").lower().strip()
-            choice = AI_File.parse_YN(choice)
-            if choice == "yes":
-                print("You fire multiple shots")
-                if self.itemsinventory.get("pistol_ammo", 0) >= 2:
-                    Random = random.randint(0, 2)
-                    self.itemsinventory["pistol_ammo"] -= 2
-                    for i in range(Random):
-                        self.play_sound("revolver_shot.mp3")
-                        self.damage_modifier += 15
-                        time.sleep(1,)
-                else:
-                    print("You do not have enough ammo.")
-                    time.sleep(2,)
-        if weapon == "double barrel shotgun":
-            print("Double Barrel! Fire both barrels? (yes/no)")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
-            if choice == "yes" and self.itemsinventory.get("shotgun_ammo", 0) >= 2:
-                self.itemsinventory["shotgun_ammo"] -= 2
-                print("You fire both barrels in a devastating volley!")
-                self.dmg_modifier_multiply = 2
-                self.play_sound("shotgun.mp3")
-                time.sleep(1,)
-                print("The kickback bruizes your arm.")
-                self.Health -= 5
-            else:
-                print("You decide not to use the double shot.")
-
-        if weapon == "tomahawk":
-            print("Throw your tomahawk for extra damage? (yes/no)")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
-            if choice == "yes":
-                if self.itemsinventory.get("tomahawk", 0) > 0:
-                    self.itemsinventory["tomahawk"] -= 1
-                    if self.itemsinventory["tomahawk"] <= 0:
-                        del self.itemsinventory["tomahawk"]
-                    print("You hurl your tomahawk—deadly accuracy!")
-                    self.play_sound("tomahawk.mp3")
-                    self.dmg_modifier_multiply = 2
-                else:
-                    print("No tomahawks left!")
-            else:
-                print("You keep your tomahawk ready for melee.")
-
-        if weapon == "sharps rifle":
-            print("You take a steady breath for a precision shot…")
-            if random.randint(1, 4) == 1:
-                print("Bullseye! Your shot hits extra savage.")
-                self.dmg_modifier_multiply = 2
-
-        if weapon == "cavalry saber":
-            print("You slash with your saber, aiming for weak points.")
-            self.dmg_modifier_multiply = 1.5
 
     def donate_supplies(self):
         if not self.itemsinventory:

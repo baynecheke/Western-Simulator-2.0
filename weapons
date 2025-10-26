@@ -40,6 +40,13 @@ rifle:
   ammo: rifle_ammo
   ability: none
 
+carbine rifle:
+  name: "carbine rifle"
+  price: 50
+  damage: [25, 30]
+  ammo: rifle_ammo
+  ability: quick draw
+
 lever-action rifle:
   name: "lever-action rifle"
   price: 60
