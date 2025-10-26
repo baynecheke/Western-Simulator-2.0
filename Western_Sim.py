@@ -2697,7 +2697,6 @@ class Player:
         print("You thank the trader and continue down the dusty trail.")
         time.sleep(1)
         
-
     def encounter_hermit_challenge(self):
         print("\nWhile traveling, you stumble upon an old hermit sitting by a fire.")
         time.sleep(1)
