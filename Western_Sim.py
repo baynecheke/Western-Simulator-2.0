@@ -1344,43 +1344,66 @@ class Player:
         GunsmithStore.run_buy_session()
 
     def Bank(self):
-        print("You walk into the Bank. The air smells of leather and dust.")
-        print("What town building would you like to invest in?")
-        price1 = self.TownUpgrades["general store"]["level"]*10
-        price2 = self.TownUpgrades["blacksmith"]["level"]*10
-        price3 = self.TownUpgrades["gunsmith"]["level"]*10
-        print(f"General store, price to upgrade: {price1}.")
-        print(f"Blacksmith, price to upgrade: {price2}.")
-        print(f"Gunsmith, price to upgrade: {price3}.")
-        choice = input(": ")
-        available_choices = ["general store", "blacksmith", "gunsmith"]
-        choice = AI_File.parse_choice(available_choices, choice, use_ollama=USE_OLLAMA)
-        if choice == "general store":
-            if self.gold < price1:
-                print("You cannot afford to do that.")
-                return
-            self.gold -= price1
-            self.TownUpgrades["general store"]["level"] += 1
-            print(f"General Store level:{self.TownUpgrades['general store']['level']}")
-        if choice == "blacksmith":
-            if self.gold < price2:
-                print("You cannot afford to do that.")
-                return
-            self.gold -= price2
-            price = self.TownUpgrades["blacksmith"]["level"]*20
-            print(f"Price to upgrade: {price}")
-            self.TownUpgrades["blacksmith"]["level"] += 1
-            print(f"blacksmith level:{self.TownUpgrades['blacksmith']['level']}")
-        if choice == "gunsmith":
-            if self.gold < price3:
-                print("You cannot afford to do that.")
-                return
-            self.gold -= price3
-            price = self.TownUpgrades["gunsmith"]["level"]*20
-            print(f"Price to upgrade: {price}")
-            self.TownUpgrades['gunsmith']['level'] += 1
-            print(f"gunsmith level:{self.TownUpgrades['gunsmith']['level']}")
+            print("You walk into the Bank. The air smells of leather and dust.")
+            print("What town building would you like to invest in?")
 
+            # 1. Define buildings and their upgrade prices in a dictionary
+            buildings_to_upgrade = {
+                "general store": self.TownUpgrades["general store"]["level"] * 10,
+                "blacksmith": self.TownUpgrades["blacksmith"]["level"] * 10,
+                "gunsmith": self.TownUpgrades["gunsmith"]["level"] * 10,
+            }
+
+            # 2. Create the list of valid choices for the parser
+            # We add "leave" so the parser knows it's a valid option.
+            available_choices = list(buildings_to_upgrade.keys()) + ["leave"]
+
+            # 3. Display the options to the user
+            # The parse_choice function will handle numbering if USE_OLLAMA is False
+            print("\n--- Town Investments ---")
+            for building, price in buildings_to_upgrade.items():
+                current_level = self.TownUpgrades[building]['level']
+                # This text will be shown in both modes
+                print(f"{building.capitalize()} (Level {current_level}) - Price to upgrade: {price} gold.")
+            
+            if USE_OLLAMA:
+                print("Leave") # Explicitly tell Ollama users they can leave
+            
+            # 4. Get and parse the user's input
+            choice_input = input("Choice: ").strip()
+            # Pass the full list, including "leave", to the parser
+            choice = self.AI_File.parse_choice(available_choices, choice_input, use_ollama=USE_OLLAMA)
+
+            # 5. Handle the parsed choice
+            if choice == "leave":
+                print("You decide not to invest right now and leave the bank.")
+                return
+
+            # Check if the choice is a valid building (it should be, if not 'leave')
+            if choice in buildings_to_upgrade:
+                price_to_pay = buildings_to_upgrade[choice]
+
+                # Check affordability
+                if self.gold < price_to_pay:
+                    print("You check your coin purse. You cannot afford that investment.")
+                    return
+                
+                # Process the upgrade
+                self.gold -= price_to_pay
+                self.TownUpgrades[choice]["level"] += 1
+                
+                # Get new level for confirmation message
+                new_level = self.TownUpgrades[choice]["level"]
+                new_price = new_level * 10 # Calculate the *next* price
+                
+                print(f"\nYou paid {price_to_pay} gold.")
+                print(f"The {choice.capitalize()} has been upgraded to Level {new_level}!")
+                print(f"(The next upgrade will cost {new_price} gold.)")
+            
+            else:
+                # This case should rarely happen if parse_choice is working, but it's safe
+                print(f"Invalid choice '{choice}'. Leaving the bank.")
+                return
 
     def Armory(self):
         print("You enter the Armory, a shattered house on the edge of town.")
