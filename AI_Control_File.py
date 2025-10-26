@@ -450,10 +450,11 @@ class AI_Control:
             # --- START FIX ---
             # Define keywords that trigger actions
             leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya"}
-            buy_words = {"buy", "shop", "wares", "see wares", "let's trade", "show me", "what do you have", "see what you have"}
+            buy_words = {"buy", "shop", "wares", "see wares", "trade", "show me", "what do you have", "see what you have", "purchase"}
             # --- END FIX ---
 
             leave = False
+            count = 0
             while leave == False:
                 prompt = [base_prompt[0]]
                 prompt.extend(dialogue_history[-3:])
@@ -503,7 +504,14 @@ class AI_Control:
                 # 3. If not leaving or buying, it's just talk.
                 dialogue_history.append({"role": "user", "content": player_input})
                 
-                # The loop will now repeat, and the AI will respond to the player's last statement.       
+                # The loop will now repeat, and the AI will respond to the player's last statement.
+                count = count + 1    
+                if count > 3:
+                    print(f"{NPC}: Well, if you're not buying, I gotta get back to work.")
+                if count > 4:
+                    print(f"{NPC}: Safe travels, stranger.")
+                    leave = True
+                    return 'leave'   
         else:
             # --- Numerical Fallback Logic ---
             # Simple, direct approach for non-AI mode
