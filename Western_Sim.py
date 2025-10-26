@@ -139,13 +139,8 @@ USE_SPEECH_INPUT = choice == "yes"
 
 with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
     loot_data = yaml.safe_load(file)
-# Read Game_Info.yaml
-with open(os.path.join(base_dir, "Game_Info.yaml"), "r") as file:
-    data = yaml.safe_load(file)
 
-# Write game_data.yaml
-with open(os.path.join(base_dir, "game_data.yaml"), "w") as f:
-    yaml.safe_dump(data, f, sort_keys=False)
+
 class Player:
     def __init__(self):
         #Basic player stuff
