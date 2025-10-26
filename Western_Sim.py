@@ -564,6 +564,9 @@ class Player:
 
     def loot_drop(self, item):
         loot = item
+        if item in ["winchester barrel", "winchester stock"]:
+            print("You found a part for a Winchester rifle!")
+            print("You can take it to a blacksmith to assemble it once you get all the parts.")
         if item in ["pistol_ammo", "rifle_ammo", "shotgun_ammo"]:
             self.itemsinventory[item] = self.itemsinventory.get(item, 0) + 3
             print(f"You found 3 x {item}!")
