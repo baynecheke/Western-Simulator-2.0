@@ -758,7 +758,7 @@ class Player:
                 "rope": "Halves the health of animal-type enemies. Only usable in combat.",
                 "fire cracker": "Halves health of pack-type enemies and stuns them. Only usable in combat.",
                 "rope": "Could be used during events. Only usable outside of combat.",
-                "ammo cartridge": "Gives 5 of a given ammo. Only usable outside of combat.",
+                "ammo cartridge": "Gives 5 of a given ammo. Usable whenever.",
                 "tobacco pouch": "Boosts morale: +5 to your next attack. Only usable in combat.",
                 "gun oil":       "Apply to weapon: +5 damage on next attack. Only usable in combat.",
                 "coffee tin":    "Drink for a speed boost: +1 travel speed in next combat. Only usable outside of combat.",
@@ -766,7 +766,7 @@ class Player:
                 "bandit's map":  "Study to reveal a hidden stash. Only usable outside of combat.",
                 "diary": "Open your journal and read past entries. Only usable outside of combat.",
                 "flashbang": "Can be thrown at enemies. Stuns them for one turn. Only usable in combat.",
-                "bandage": "Heals 25 health. Only usable outside of combat.",
+                "bandage": f"Heals 25 health. Usable only outside of combat. Health = {self.Health}/{self.MaxHealth}.",
                 "field dressing kit": "prevents 50% of next damage. Only usable in combat.",
                 "vendetta badge": "A one-time call for help. Summons an echo of the Earp posse for a devastating attack. Only usable in combat.",
                 "pendant of recognition": "A memorandom of the vendetta ride. Grants +20 score at the end of the game.",
@@ -977,14 +977,6 @@ class Player:
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
                     print(f"The {enemy_name} is stunned!")
-
-                elif selected_item == "bandage":
-                    heal_amount = 25
-                    self.Health = min(self.Health + heal_amount, self.MaxHealth)
-                    print(f"You apply the bandage. You regain {heal_amount} health.")
-                    self.itemsinventory[selected_item] -= 1
-                    if self.itemsinventory[selected_item] <= 0:
-                        del self.itemsinventory[selected_item]
 
                 elif selected_item == "field dressing kit":
                     print("You quickly apply a field dressing, bracing for the next attack.")
