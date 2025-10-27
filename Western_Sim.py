@@ -1105,7 +1105,7 @@ class Player:
             available_choices = ['durability', 'trail', 'strength', 'shadow']
             skill_choice = AI_File.parse_choice(available_choices, skill_choice, use_ollama=USE_OLLAMA)
             if skill_choice == "shadow":
-                gold = self.shadow_skill * 5
+                gold = (self.shadow_skill - 2) * 5
                 if gold > self.gold:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
@@ -1133,7 +1133,7 @@ class Player:
                 else:
                     print("You decided not to pay for the lesson.")
             elif skill_choice == "strength":
-                gold = self.strength_skill * 5
+                gold = (self.strength_skill - 2) * 5
                 if gold > self.gold:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
@@ -1147,7 +1147,7 @@ class Player:
                 else:
                     print("You decided not to pay for the lesson.")
             elif skill_choice == "durability":
-                gold = (self.MaxHealth-95)/5 * 10
+                gold = (self.MaxHealth-95)/5 * 5
                 if gold > self.gold:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
@@ -1523,7 +1523,6 @@ class Player:
 
         else:
             print("Lot's of people gather around the saloon's door and inside.")
-
 
     def saloon_barkeeper(self):
         print("\nThe barkeeper polishes a glass and nods.")
@@ -3784,8 +3783,6 @@ class Player:
         self.iron_stage = None
         self.quests_done.append("iron_tracks")
 
-
-
     def coyote_camp_quest(self):
         print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
         combat = Combat(self)
@@ -3795,6 +3792,8 @@ class Player:
             print("You defeat the bandits and find some loot.")
             self.loot_drop("gold nugget")
             self.loot_drop("pistol_ammo")
+
+    #Generic Game Stuff
 
     def change_music(self, filename, loop):
         music_path = os.path.join(os.path.dirname(__file__), filename)
@@ -3953,7 +3952,6 @@ class Player:
             case _:
                 # Fallback for any other defined ability
                 pass
-
 
     def donate_supplies(self):
         if not self.itemsinventory:
