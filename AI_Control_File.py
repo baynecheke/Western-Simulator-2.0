@@ -565,4 +565,58 @@ class AI_Control:
             return choice # Return 'yes' or 'no'
             # --- End Numerical Fallback Logic ---
             
+    def generate_diary_entry(self, game_state, player_health, max_health, day_memory, tone):
+        """
+        Uses Ollama to generate a creative diary entry based on the day's events.
+        """
+        fallback_entry = "Another day done. The trail is long." # Safe fallback
+        
+        # --- Build Context ---
+        # Handle empty day_memory items gracefully
+        encounter_desc = day_memory.get('encounter') or "nothing special"
+        loot_desc = day_memory.get('loot') or "nothing of note"
+
+        prompt_content = dedent(f"""
+        You are the personal diary of a western adventurer.
+        You must write a very brief diary entry (2-3 sentences max) for the end of the day.
+        You MUST write in a {tone} tone.
+        Do NOT use "Dear Diary". Do NOT sign off.
+
+        --- Context for the entry ---
+        World State: {game_state}
+        Health: {player_health} / {max_health}
+        Today's Encounter: {encounter_desc}
+        Today's Loot: {loot_desc}
+        """)
+
+        prompt_messages = [
+            {"role": "system", "content": prompt_content}
+        ]
+
+        try:
+            response_stream = ollama.chat(
+                model="llama3:8b",
+                messages=prompt_messages,
+                stream=True
+            )
+            
+            full_entry = ""
+            print("\n— Your diary entry —")
+            for chunk in response_stream:
+                token = chunk["message"]["content"]
+                print(token, end="", flush=True) # Print as it arrives
+                full_entry += token
+            
+            print() # Newline after streaming
+            
+            # Return the full entry, stripping any leading/trailing whitespace
+            return full_entry.strip()
+
+        except Exception as e:
+            print(f"[AI_Control Error in generate_diary_entry]: {e}")
+            print(f"[AI_Control]: Falling back to default diary entry.")
+            # Print the fallback so the user sees *something*
+            print("\n— Your diary entry —")
+            print(fallback_entry)
+            return fallback_entry
 

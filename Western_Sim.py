@@ -3999,45 +3999,58 @@ class Player:
         tone = self.select_tone()
 
         lines = []
+        if USE_OLLAMA:
+            # Use the new AI function to generate and print the entry
+            game_state = self.generate_game_state()
+            # The AI_File is self.AI_File
+            generated_entry = self.AI_File.generate_diary_entry(
+                game_state, 
+                self.Health, 
+                self.MaxHealth, 
+                self.day_memory, 
+                tone
+            )
+            
+            # Save the generated entry
+            # We save it as a list with one item to match the old format
+            lines = [generated_entry]
 
-        # Health line
-        lines.append(
-            f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}."
-        )
+        else:
+            # --- This is your ORIGINAL template-based code ---
+            lines = []
 
-        # Combat line
-        if self.day_memory["encounter"]:
-            # day_memory["encounter"] already contains e.g. "a buffalo"
+            # Health line
             lines.append(
-                f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}."
+                f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}."
             )
 
-        # Loot line
-        if self.day_memory["loot"]:
-            lines.append(
-                f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
-            )
+            # Combat line
+            if self.day_memory["encounter"]:
+                # day_memory["encounter"] already contains e.g. "a buffalo"
+                lines.append(
+                    f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}."
+                )
 
-        add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
-        if add == 'yes':
-            custom = input("Enter your custom diary line: ").strip()
-            if custom:
-                lines.append(custom)
+            # Loot line
+            if self.day_memory["loot"]:
+                lines.append(
+                    f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
+                )
 
-        # Cap lines at 3
-        lines = lines[:4]
+            add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
+            if add == 'yes':
+                custom = input("Enter your custom diary line: ").strip()
+                if custom:
+                    lines.append(custom)
 
-        # Save it
-        self.diary_entries.append({
-            "Day": self.Day,
-            "Tone": tone,
-            "Entry": lines
-        })
+            # Cap lines at 3
+            lines = lines[:4]
 
-        # Display
-        print("\n— Your diary entry —")
-        for l in lines:
-            print("  " + l)
+            # Display
+            print("\n— Your diary entry —")
+            for l in lines:
+                print("  " + l)
+        
 
         diary_milestones = {
             10:  ("Hopeful Spirit", "Max health +5"),
