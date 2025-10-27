@@ -1003,13 +1003,13 @@ class Player:
 
     def hunger_check(self):
         if self.Hunger >= 3:
-            print("You are ravenously hungry.")
+            return "You are ravenously hungry."
         elif self.Hunger == 2:
-            print("You are quite hungry.")
+            return "You are quite hungry."
         elif self.Hunger == 1:
-            print("You feel a bit hungry.")
+            return "You feel a bit hungry."
         elif self.Hunger == 0:
-            print("You are well fed.")
+            return "You are well fed."
 
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
@@ -1028,7 +1028,7 @@ class Player:
         else:
             print(" - (empty)")
         #print(f"Your role is {self.active_role.name.capitalize()} (XP: {self.active_role.xp}).")
-        self.hunger_check()
+        print(self.hunger_check())
         print(f"Your health is {self.Health}.")
         input("Press Enter to continue:")
 
