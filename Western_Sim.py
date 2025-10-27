@@ -648,6 +648,12 @@ class Player:
                         combat = Combat(self)
                         combat.FindAttacker("brawler")
                         combat.Attack()
+                        self.day_memory = {
+                            "encounter": "bandit",   # e.g. "bandit", "rattlesnake"
+                            "loot": "double barrel shotgun",        # e.g. "Winchester rifle"
+                            "town_event": "helped wyatt earp on revenge"   # e.g. "rebuilding Dust Camp"
+                        }
+                        self.write_diary_entry()
                         continue
                 else:
                     choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
@@ -3994,96 +4000,134 @@ class Player:
         print(f"Total town defense bonus: {self.town_defense_bonus}")          
 
     def write_diary_entry(self):
-        # 1) Ask for tone once
-        print("\n Night falls. Time to write your diary.")
-        tone = self.select_tone()
-
-        lines = []
-        if USE_OLLAMA:
-            # Use the new AI function to generate and print the entry
-            game_state = self.generate_game_state()
-            # The AI_File is self.AI_File
-            generated_entry = self.AI_File.generate_diary_entry(
-                game_state, 
-                self.Health, 
-                self.MaxHealth, 
-                self.day_memory, 
-                tone
-            )
+            # 1) Ask for tone once
+            print("\n Night falls. Time to write your diary.")
+            tone = self.select_tone()
             
-            # Save the generated entry
-            # We save it as a list with one item to match the old format
-            lines = [generated_entry]
-
-        else:
-            # --- This is your ORIGINAL template-based code ---
-            lines = []
-
-            # Health line
-            lines.append(
-                f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}."
-            )
-
-            # Combat line
+            # --- START FIX: Calculate Activity Score ---
+            # We will calculate an "activity score" to make the bonus
+            # system fair for both AI and template users.
+            # This score is what the bonus milestones will track, NOT the number of lines.
+            activity_score = 1 # Base score for writing in the diary
+            
             if self.day_memory["encounter"]:
-                # day_memory["encounter"] already contains e.g. "a buffalo"
-                lines.append(
-                    f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}."
-                )
-
-            # Loot line
+                activity_score += 1
+            
             if self.day_memory["loot"]:
+                activity_score += 1
+            
+            custom_line_added = False # Flag for numerical mode
+            # --- END FIX ---
+            
+            if USE_OLLAMA:
+                # Use the new AI function to generate and print the entry
+                game_state = self.generate_game_state()
+                # The AI_File is self.AI_File
+                generated_entry = self.AI_File.generate_diary_entry(
+                    game_state, 
+                    self.Health, 
+                    self.MaxHealth, 
+                    self.day_memory, 
+                    tone
+                )
+                
+                # Save the generated entry
+                # We save it as a list with one item to match the old format
+                lines = [generated_entry]
+                
+                # AI mode gets a bonus point to simulate the "custom line" option
+                activity_score += 1 
+
+            else:
+                # --- This is your ORIGINAL template-based code ---
+                lines = []
+
+                # Health line
                 lines.append(
-                    f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
+                    f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}."
                 )
 
-            add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
-            if add == 'yes':
-                custom = input("Enter your custom diary line: ").strip()
-                if custom:
-                    lines.append(custom)
+                # Combat line
+                if self.day_memory["encounter"]:
+                    lines.append(
+                        f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}."
+                    )
 
-            # Cap lines at 3
-            lines = lines[:4]
+                # Loot line
+                if self.day_memory["loot"]:
+                    lines.append(
+                        f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
+                    )
 
-            # Display
-            print("\n— Your diary entry —")
-            for l in lines:
-                print("  " + l)
-        
+                add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
+                if add == 'yes':
+                    custom = input("Enter your custom diary line: ").strip()
+                    if custom:
+                        lines.append(custom)
+                        custom_line_added = True # Set flag
+                        
+                # --- START FIX: Add score for custom line ---
+                if custom_line_added:
+                    activity_score += 1
+                # --- END FIX ---
 
-        diary_milestones = {
-            10:  ("Hopeful Spirit", "Max health +5"),
-            20:  ("Sharpened Mind", "Shadow skill +1"),
-            35:  ("Strong Constitution", "Hunger reduced by 2."),
-            50: ("Frontier Wisdom", "Travel speed +1"),
-            75: ("Iron Will", "Max health increased by 10."),
-            }
+                # Cap lines at 4 (was 3, but health+encounter+loot+custom = 4)
+                lines = lines[:4]
+
+                # Display
+                print("\n— Your diary entry —")
+                for l in lines:
+                    print("  " + l)
 
 
-        # Reset for next day
-        self.day_memory = {k: None for k in self.day_memory}
-        # Passive bonus check
-        entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
-        for milestone, (title, bonus) in diary_milestones.items():
-            bonus = f"day_{self.Day}_bonus"
-            if entry_count >= milestone and title not in self.diary_bonuses:
-                print(f"\nAs you close your journal, you feel a change within you…")
-                
-                print(f"[Diary Bonus] {title}: {bonus}")
-                self.diary_bonuses.append(title)
+            # Save it
+            self.diary_entries.append({
+                "Day": self.Day,
+                "Tone": tone,
+                "Entry": lines,
+                "Activity": activity_score # --- FIX: Save the new activity score ---
+            })
 
-                # Apply effects
-                if title == "Hopeful Spirit":
-                    self.MaxHealth += 5
-                elif title == "Sharpened Mind":
-                    self.shadow_skill += 1
-                elif title == "Strong Constitution":
-                    self.Hunger -= 2
-                elif title == "Frontier Wisdom":
-                    self.travelspeed += 1
-                elif title == "Iron Will":
-                    self.MaxHealth += 10
+            diary_milestones = {
+                10:  ("Hopeful Spirit", "Max health +5"),
+                20:  ("Sharpened Mind", "Shadow skill +1"),
+                35:  ("Strong Constitution", "Hunger reduced by 2."),
+                50: ("Frontier Wisdom", "Travel speed +1"),
+                75: ("Iron Will", "Max health increased by 10."),
+                }
+
+
+            # Reset for next day (Same as before)
+            self.day_memory = {k: None for k in self.day_memory}
+            
+            # --- START FIX: Change bonus check to use Activity Score ---
+            # Passive bonus check
+            # OLD: entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
+            # NEW:
+            entry_count = sum(entry.get("Activity", 1) for entry in self.diary_entries)
+            # We use .get("Activity", 1) as a fallback for old save files
+            # that don't have the "Activity" key, so they are counted as 1.
+            # --- END FIX ---
+            
+            for milestone, (title, bonus) in diary_milestones.items():
+                bonus = f"day_{self.Day}_bonus"
+                if entry_count >= milestone and title not in self.diary_bonuses:
+                    print(f"\nAs you close your journal, you feel a change within you…")
+                    
+                    print(f"[Diary Bonus] {title}: {bonus}")
+                    self.diary_bonuses.append(title)
+
+                    # Apply effects
+                    if title == "Hopeful Spirit":
+                        self.MaxHealth += 5
+                    elif title == "Sharpened Mind":
+                        self.shadow_skill += 1
+                    elif title == "Strong Constitution":
+                        self.Hunger -= 2
+                    elif title == "Frontier Wisdom":
+                        self.travelspeed += 1
+                    elif title == "Iron Will":
+                        self.MaxHealth += 10
 
     def select_tone(self):
         tones = ["witty", "serious", "nervous", "hopeful"]
