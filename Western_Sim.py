@@ -3221,7 +3221,6 @@ class Player:
             self.earp_bonus += 1
         else:
             print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
-            self.quests_done.append("earp_vendetta")
             self.Tquest = "None"
 
     def encounter_earp_stage1(self):
@@ -3396,6 +3395,396 @@ class Player:
             print("'You have done well today,' Wyatt says with a grin.")
             print("'Use this badge and the posse will help you once more if needed.'")
         self.quests_done.append("earp_vendetta")
+
+    def encounter_iron_intro(self):
+        if "iron_tracks" in self.quests_done:
+            print("You have already completed the Iron Tracks quest.")
+            return
+        print("At the saloon, you overhear a group of railroad men talking.")
+        print("'Tracks are coming through this territory... but bandits don't like progress.'")
+        choice = input("Do you agree to help the railroad? (yes/no): ").strip().lower()
+        choice = AI_File.parse_YN(choice)
+        if choice == "yes":
+            print("You agree to aid the foreman in keeping the line safe.")
+            self.Tquest = "iron_tracks"
+            self.iron_stage = 1
+            print("They give you a reward of 10 gold and a box of ammo cartridges.")
+            self.gold += 10
+            self.loot_drop("ammo cartridge")
+            self.iron_bonus += 2
+        else:
+            print("You shake your head. The railroad men mutter that you're missing an opportunity.")
+            self.Tquest = "None"
+        time.sleep(2,)
+
+    def encounter_iron_stage1(self):
+        print("The railroad foreman storms into town.")
+        print("'A wagon full of steel rails and tools never arrived. Bandits must've taken it!'")
+        print("Options:")
+        print("1) Track the missing wagon.")
+        print("2) Refuse to help.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            if self.Health < 90:
+                print("The foreman sees your wounds and tends to them.")
+                self.Health = 90
+                print("You are healed to 90 health.")
+            print("You ride out and find the wagon under bandit guard!")
+            if self.perform_stat_check(self.trail_skill, base_target=14) == True:
+                print("You sneak up and catch the bandits off guard, taking them down silently.")
+                self.gold += 15
+                self.loot_drop("ammo cartridge")
+                self.iron_bonus += 2
+                self.trail_skill += 1
+            else:
+                print("The bandits spot you! A fight breaks out.")
+                combat = Combat(self)
+                combat.FindAttacker("bandit")
+                escape = combat.Attack()
+                if escape == False:
+                    print("You defeat the bandits and recover the supplies.")
+                    self.gold += 20
+                    self.loot_drop("ammo cartridge")
+                    self.iron_bonus += 1
+                else:
+                    print("You retreat to save yourself.")
+                    self.Tquest = "None"
+                    self.iron_bonus -= 1
+        else:
+            print("The foreman scowls. 'Fine, I'll find someone else.'")
+            self.iron_bonus -= 2
+        self.iron_stage = 2
+        time.sleep(2,)
+
+    def encounter_iron_stage2(self):
+        print("Night falls. You hear shouting at the new train depot!")
+        print("Options:")
+        print("1) Investigate the depot.")
+        print("2) Stay away.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            print("You sneak into the depot and spot saboteurs planting dynamite.")
+            if self.perform_stat_check(self.shadow_skill, base_target=16) == True:
+                print("You catch one saboteur alive. He blurts out about a coming train heist.")
+                self.iron_stage = 3
+            else:
+                print("The saboteurs notice you! A fight breaks out.")
+                combat = Combat(self)
+                combat.FindAttacker("saboteur")
+                escape = combat.Attack()
+                if escape == False:
+                    if self.Health > 0:
+                        print("You stop the sabotage, but the plot deepens.")
+                        self.iron_stage = 3
+                    else:
+                        print("You fall at the depot. The railroad effort is doomed.")
+                        self.Tquest = "None"
+                else:
+                    print("You flee, unable to stop the saboteurs.")
+                    self.iron_bonus -= 1
+        else:
+            print("You ignore the commotion. In the morning, the depot lies in ruins.")
+            self.Hostility += 1
+            self.Tquest = "None"
+        time.sleep(2,)
+
+    def encounter_iron_stage3(self):
+        bonus_used = False
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
+        print("Word spreads: the first train is rolling in with gold and passengers.")
+        print("Bandits plan a heist! The foreman begs for your help.")
+        print("Options:")
+        print("1) Defend the train.")
+        print("2) Let the bandits have it.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            print("You climb aboard as the train whistles into the valley...")
+            print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
+            time.sleep(2,)
+            print("As the train chugs along, 7 mounted bandits ride up, firing their pistols at the train!")
+            if self.iron_bonus >= 2:
+                print("You may spend two bonus points you have gained to gain a temporary boost!")
+                print("Will you spend them now?")
+                choice = input(": ").strip()
+                if choice.lower() == "yes":
+                    self.iron_bonus -= 2
+                    self.MaxHealth += 20
+                    self.Health += 20
+                    bonus_used = True
+                    
+                    print("You feel invigorated!")
+                else:
+                    print("You choose to save your bonus points.")
+            mounted_bandits = 5   # riders outside
+            bandits_in_car = 2    # already onboard
+            car_health = 100
+            turns_elapsed = 0
+            while car_health > 0 and turns_elapsed < 7:
+                print(f"\nMounted bandits outside: {mounted_bandits}")
+                print(f"Bandits in passenger cars: {bandits_in_car}")
+                print(f"Your Health: {self.Health}")
+                print(f"Train car health: {car_health}")
+                print(f"If the train loses all health, it will be derailed!")
+                print(f"Turns until escape: {8 - turns_elapsed}")
+                input("Press Enter to continue...")
+
+                print("\nChoose your action:")
+                print("1) Climb onto the roof and shoot at mounted bandits.")
+                print("2) Defend with your melee in the passenger cars.")
+                print("3) Take cover and heal behind crates.")
+                print("4) Rush forward and fight with your fists.")
+
+                choice = input(": ").strip()
+
+                # --- Option 1: Shoot from roof ---
+                if choice == "1":
+                    if mounted_bandits <= 0:
+                        print("No mounted bandits left to shoot at!")
+                        continue
+                    print("Which weapon would you like to use?")
+                    print("1) Rifle")
+                    print("2) Shotgun")
+                    print("3) Revolver")
+                    weapon_choice = input(": ").strip()
+                    if weapon_choice not in ["1", "2", "3"]:
+                        print("Invalid choice. You lose your chance to shoot!")
+                        continue
+                    if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
+                        print("You fire your rifle from the rooftop!")
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                            print("A rider drops, his horse veering off!")
+                            mounted_bandits -= 1
+                        else:
+                            if any(item in self.weapons["rifle"] for item in self.itemsinventory) == False:
+                                print("You have no rifle!")
+                                print("A shot grazes you. -8hp")
+                                self.Health -= 8
+                                continue
+                            print("You miss! A shot grazes you. -8hp")
+                            self.Health -= 8
+                    elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
+                        print("You blast your shotgun downward at the riders!")
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                            print("A rider is blown clean off his saddle!")
+                            mounted_bandits -= 1
+                        else:
+                            if any(item in self.weapons["shotgun"] for item in self.itemsinventory) == False:
+                                print("You have no shotgun!")
+                                print("A shot grazes your arm. -6hp")
+                                self.Health -= 6
+                                continue
+                            print("Pellets scatter wide. A return shot hits your arm! -6hp")
+                            self.Health -= 6
+                    elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
+                        print("You fire your revolver rapidly!")
+                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                            print("One rider tumbles off his horse!")
+                            mounted_bandits -= 1
+                        else:
+                            if any(item in self.weapons["revolver"] for item in self.itemsinventory) == False:
+                                print("You have no revolver!")
+                                print("A rider's bullet clips you. -5hp")
+                                self.Health -= 5
+                                continue
+                            else:
+                                print("You miss under pressure. A rider's bullet clips you! -5hp")
+                                self.Health -= 5
+                    else:
+                        print("You have no gun! The riders fire at you mercilessly. -10 hp")
+                        self.Health -= 10
+                    time.sleep(2)
+
+                # --- Option 2: Defend inside cars ---
+                elif choice == "2":
+                    if bandits_in_car <= 0:
+                        print("No bandits are inside the cars right now.")
+                        continue
+
+                    print("You rush into the passenger car where bandits terrorize civilians!")
+                    if any(item in self.weapons["melee"] for item in self.itemsinventory):
+                        if self.perform_stat_check(self.Speed, base_target=11) == True:
+                            print("You slash a bandit and throw him out the window!")
+                            bandits_in_car -= 1
+                        else:
+                            print("The bandit shoots first, grazing your shoulder! -8hp")
+                            self.Health -= 8
+                    else:
+                        if self.perform_stat_check(self.strength_skill, base_target=15) == True:
+                            print("You wrestle a bandit to the ground and knock him cold!")
+                            bandits_in_car -= 1
+                        else:
+                            print("He clubs you with his revolver butt! -6hp")
+                            self.Health -= 6
+
+                # --- Option 3: Take cover ---
+                elif choice == "3":
+                    print("You duck behind heavy crates in the cargo car.")
+                    print("You tend to your wounds. +15hp")
+                    self.Health += 15
+                    if self.perform_stat_check(self.shadow_skill, base_target=12) == True:
+                        print("Bullets ping off the steel — you stay safe for now.")
+                    else:
+                        print("A stray shot punches through, grazing you! -4hp")
+                        self.Health -= 4
+
+                # --- Option 4: Melee rush ---
+                elif choice == "4":
+                    print("You charge forward, fists swinging!")
+                    if bandits_in_car > 0:
+                        if self.perform_stat_check(self.strength_skill, base_target=14) == True:
+                            print("You knock a bandit out cold in brutal close combat!")
+                            bandits_in_car -= 1
+                        else:
+                            print("He smashes you with the butt of his gun! -7hp")
+                            self.Health -= 7
+                    else:
+                        print("There's nobody nearby to fight in melee!")
+                elif choice == "5":
+                    print("You take a moment to catch your breath and tend to your wounds. +15hp")
+                    self.Health += 15
+                else:
+                    print("Invalid choice.")
+                    turns_elapsed -= 1
+                    continue
+                turns_elapsed += 1
+
+                # --- Bandit boarding mechanic ---
+                Random = random.randint(1, 4)
+                if  Random <= 2:
+                    print("A rider leaps onto the train roof and drops into a car!")
+                    if mounted_bandits > 2:
+                        mounted_bandits -= 1
+                        bandits_in_car += 1
+                elif Random == 3:
+                    if mounted_bandits > 0:
+                        print("The bandits attempt to shoot you while riding.")
+                        if random.randint(1, 10) <= self.shadow_skill:
+                            print("You dodge the bullets!")
+                        else:
+                            self.Health -= 15
+                            print("You lost 15 health.")
+                    else:
+                        print("No bandits are mounted.")
+                else:
+                    print("You gain a moment of respite.")
+
+                if bandits_in_car > 0:
+                    print("Bandits are still looting the car!")
+                    car_health -= bandits_in_car * 10
+
+                # --- Check for defeat ---
+                if self.Health <= 0 or car_health <= 0:
+                    if self.Health <= 0:
+                        print("You collapse on the train floor. The bandits overrun it.")
+                        print("A passenger revives you, but the bandits have already left with the loot.")
+                        self.Health = 20
+                        self.iron_bonus -= 2
+                    else:
+                        self.iron_bonus -= 1
+                        print("The car burns around you.")
+                        print("The bandits have already taken everything of value.")
+                    if bonus_used == True:
+                        self.MaxHealth -= 20
+                    return
+
+                # --- Check for victory ---
+                if mounted_bandits <= 0 and bandits_in_car <= 0:
+                    print("\nThe last bandit falls! The train passengers cheer your bravery!")
+                    break
+
+            else:
+                print("\nThe train arrives safely at the next station.")
+                print("You helped save the railroad! The foreman rewards you handsomely. +35 gold")
+                self.gold += 35
+                self.loot_drop(random.choice(self.rare_loot))
+                self.iron_stage = 4
+            if bonus_used == True:
+                self.MaxHealth -= 20
+
+        else:
+            print("You stay behind. The train arrives looted, passengers shaken.")
+            self.Hostility += 2
+            self.Tquest = "None"
+        time.sleep(2,)
+
+    def encounter_iron_stage4(self):
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
+        print("The railroad foreman rushes to you. 'They're going to blow the bridge!'")
+        print("Options:")
+        print("1) Race ahead with guards to stop the dynamite gang.")
+        print("2) Ignore it.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("saboteur chief")
+            combat.Attack()
+            if self.Health > 0:
+                print("You save the bridge! The train can continue.")
+                self.iron_stage = 5
+            else:
+                print("You fall. The bridge collapses. The railroad halts here forever.")
+                self.Tquest = "None"
+        else:
+            print("You turn away. Hours later, the bridge collapses with a thunderous roar.")
+            self.Hostility += 2
+            self.Tquest = "None"
+        time.sleep(2,)
+
+    def encounter_iron_stage5(self):
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
+        print("A notorious outlaw, the Dynamite Kid, rides into town with crates of explosives.")
+        print("He plans to stop the railroad once and for all.")
+        print("Options:")
+        print("1) Confront him in the streets.")
+        print("2) Try to ambush him.")
+        print("3) Walk away.")
+        choice = input(": ").strip()
+
+        if choice == "1":
+            combat = Combat(self)
+            combat.FindAttacker("dynamite dave")
+            combat.Attack()
+            if self.Health > 0:
+                print("You defeat Dynamite Dave in a blazing showdown!")
+                if self.iron_bonus <= 0:
+                    print("")
+                self.gold += 70
+                self.loot_drop("winchester rifle")
+                print("The railroad is saved. The railroad has been added to the towns!")
+            else:
+                print("The Dynamite Dave plants his bombs. The town burns.")
+                self.Hostility += 3
+        elif choice == "2":
+            if random.randint(1,10) <= self.shadow_skill:
+                print("You ambush him successfully, taking his explosives.")
+                self.loot_drop("ammo belt")
+                self.gold += 75
+            else:
+                print("The ambush fails. You're caught in a blast!")
+                self.Health -= 30
+        else:
+            print("You walk away. By dusk, explosions echo across the prairie.")
+            self.Hostility += 2
+
+        # Quest complete
+        self.Tquest = "None"
+        self.iron_stage = None
+        self.quests_done.append("iron_tracks")
+
+
 
     def coyote_camp_quest(self):
         print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
@@ -3835,396 +4224,6 @@ class Player:
         print(f"You lose {health_loss} health from poor conditions in the cell.")
 
         time.sleep(2)
-
-    def encounter_iron_intro(self):
-        if "iron_tracks" in self.quests_done:
-            print("You have already completed the Iron Tracks quest.")
-            return
-        print("At the saloon, you overhear a group of railroad men talking.")
-        print("'Tracks are coming through this territory... but bandits don't like progress.'")
-        choice = input("Do you agree to help the railroad? (yes/no): ").strip().lower()
-        choice = AI_File.parse_YN(choice)
-        if choice == "yes":
-            print("You agree to aid the foreman in keeping the line safe.")
-            self.Tquest = "iron_tracks"
-            self.iron_stage = 1
-            print("They give you a reward of 10 gold and a box of ammo cartridges.")
-            self.gold += 10
-            self.loot_drop("ammo cartridge")
-            self.iron_bonus += 2
-        else:
-            print("You shake your head. The railroad men mutter that you're missing an opportunity.")
-            self.Tquest = "None"
-            self.quests_done.append("iron_tracks")
-        time.sleep(2,)
-
-    def encounter_iron_stage1(self):
-        print("The railroad foreman storms into town.")
-        print("'A wagon full of steel rails and tools never arrived. Bandits must've taken it!'")
-        print("Options:")
-        print("1) Track the missing wagon.")
-        print("2) Refuse to help.")
-        choice = input(": ").strip()
-
-        if choice == "1":
-            if self.Health < 90:
-                print("The foreman sees your wounds and tends to them.")
-                self.Health = 90
-                print("You are healed to 90 health.")
-            print("You ride out and find the wagon under bandit guard!")
-            if self.perform_stat_check(self.trail_skill, base_target=14) == True:
-                print("You sneak up and catch the bandits off guard, taking them down silently.")
-                self.gold += 15
-                self.loot_drop("ammo cartridge")
-                self.iron_bonus += 2
-                self.trail_skill += 1
-            else:
-                print("The bandits spot you! A fight breaks out.")
-                combat = Combat(self)
-                combat.FindAttacker("bandit")
-                escape = combat.Attack()
-                if escape == False:
-                    print("You defeat the bandits and recover the supplies.")
-                    self.gold += 20
-                    self.loot_drop("ammo cartridge")
-                    self.iron_bonus += 1
-                else:
-                    print("You retreat to save yourself.")
-                    self.Tquest = "None"
-                    self.iron_bonus -= 1
-        else:
-            print("The foreman scowls. 'Fine, I'll find someone else.'")
-            self.iron_bonus -= 2
-        self.iron_stage = 2
-        time.sleep(2,)
-
-    def encounter_iron_stage2(self):
-        print("Night falls. You hear shouting at the new train depot!")
-        print("Options:")
-        print("1) Investigate the depot.")
-        print("2) Stay away.")
-        choice = input(": ").strip()
-
-        if choice == "1":
-            print("You sneak into the depot and spot saboteurs planting dynamite.")
-            if self.perform_stat_check(self.shadow_skill, base_target=16) == True:
-                print("You catch one saboteur alive. He blurts out about a coming train heist.")
-                self.iron_stage = 3
-            else:
-                print("The saboteurs notice you! A fight breaks out.")
-                combat = Combat(self)
-                combat.FindAttacker("saboteur")
-                escape = combat.Attack()
-                if escape == False:
-                    if self.Health > 0:
-                        print("You stop the sabotage, but the plot deepens.")
-                        self.iron_stage = 3
-                    else:
-                        print("You fall at the depot. The railroad effort is doomed.")
-                        self.Tquest = "None"
-                else:
-                    print("You flee, unable to stop the saboteurs.")
-                    self.iron_bonus -= 1
-        else:
-            print("You ignore the commotion. In the morning, the depot lies in ruins.")
-            self.Hostility += 1
-            self.Tquest = "None"
-        time.sleep(2,)
-
-    def encounter_iron_stage3(self):
-        bonus_used = False
-        if self.Health < 90:
-            print("The foreman sees your wounds and tends to them.")
-            self.Health = 90
-            print("You are healed to 90 health.")
-        print("Word spreads: the first train is rolling in with gold and passengers.")
-        print("Bandits plan a heist! The foreman begs for your help.")
-        print("Options:")
-        print("1) Defend the train.")
-        print("2) Let the bandits have it.")
-        choice = input(": ").strip()
-
-        if choice == "1":
-            print("You climb aboard as the train whistles into the valley...")
-            print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
-            time.sleep(2,)
-            print("As the train chugs along, 7 mounted bandits ride up, firing their pistols at the train!")
-            if self.iron_bonus >= 2:
-                print("You may spend two bonus points you have gained to gain a temporary boost!")
-                print("Will you spend them now?")
-                choice = input(": ").strip()
-                if choice.lower() == "yes":
-                    self.iron_bonus -= 2
-                    self.MaxHealth += 20
-                    self.Health += 20
-                    bonus_used = True
-                    
-                    print("You feel invigorated!")
-                else:
-                    print("You choose to save your bonus points.")
-            mounted_bandits = 5   # riders outside
-            bandits_in_car = 2    # already onboard
-            car_health = 100
-            turns_elapsed = 0
-            while car_health > 0 and turns_elapsed < 7:
-                print(f"\nMounted bandits outside: {mounted_bandits}")
-                print(f"Bandits in passenger cars: {bandits_in_car}")
-                print(f"Your Health: {self.Health}")
-                print(f"Train car health: {car_health}")
-                print(f"If the train loses all health, it will be derailed!")
-                print(f"Turns until escape: {8 - turns_elapsed}")
-                input("Press Enter to continue...")
-
-                print("\nChoose your action:")
-                print("1) Climb onto the roof and shoot at mounted bandits.")
-                print("2) Defend with your melee in the passenger cars.")
-                print("3) Take cover and heal behind crates.")
-                print("4) Rush forward and fight with your fists.")
-
-                choice = input(": ").strip()
-
-                # --- Option 1: Shoot from roof ---
-                if choice == "1":
-                    if mounted_bandits <= 0:
-                        print("No mounted bandits left to shoot at!")
-                        continue
-                    print("Which weapon would you like to use?")
-                    print("1) Rifle")
-                    print("2) Shotgun")
-                    print("3) Revolver")
-                    weapon_choice = input(": ").strip()
-                    if weapon_choice not in ["1", "2", "3"]:
-                        print("Invalid choice. You lose your chance to shoot!")
-                        continue
-                    if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
-                        print("You fire your rifle from the rooftop!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider drops, his horse veering off!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["rifle"] for item in self.itemsinventory) == False:
-                                print("You have no rifle!")
-                                print("A shot grazes you. -8hp")
-                                self.Health -= 8
-                                continue
-                            print("You miss! A shot grazes you. -8hp")
-                            self.Health -= 8
-                    elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
-                        print("You blast your shotgun downward at the riders!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider is blown clean off his saddle!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["shotgun"] for item in self.itemsinventory) == False:
-                                print("You have no shotgun!")
-                                print("A shot grazes your arm. -6hp")
-                                self.Health -= 6
-                                continue
-                            print("Pellets scatter wide. A return shot hits your arm! -6hp")
-                            self.Health -= 6
-                    elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
-                        print("You fire your revolver rapidly!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("One rider tumbles off his horse!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["revolver"] for item in self.itemsinventory) == False:
-                                print("You have no revolver!")
-                                print("A rider's bullet clips you. -5hp")
-                                self.Health -= 5
-                                continue
-                            else:
-                                print("You miss under pressure. A rider's bullet clips you! -5hp")
-                                self.Health -= 5
-                    else:
-                        print("You have no gun! The riders fire at you mercilessly. -10 hp")
-                        self.Health -= 10
-                    time.sleep(2)
-
-                # --- Option 2: Defend inside cars ---
-                elif choice == "2":
-                    if bandits_in_car <= 0:
-                        print("No bandits are inside the cars right now.")
-                        continue
-
-                    print("You rush into the passenger car where bandits terrorize civilians!")
-                    if any(item in self.weapons["melee"] for item in self.itemsinventory):
-                        if self.perform_stat_check(self.Speed, base_target=11) == True:
-                            print("You slash a bandit and throw him out the window!")
-                            bandits_in_car -= 1
-                        else:
-                            print("The bandit shoots first, grazing your shoulder! -8hp")
-                            self.Health -= 8
-                    else:
-                        if self.perform_stat_check(self.strength_skill, base_target=15) == True:
-                            print("You wrestle a bandit to the ground and knock him cold!")
-                            bandits_in_car -= 1
-                        else:
-                            print("He clubs you with his revolver butt! -6hp")
-                            self.Health -= 6
-
-                # --- Option 3: Take cover ---
-                elif choice == "3":
-                    print("You duck behind heavy crates in the cargo car.")
-                    print("You tend to your wounds. +15hp")
-                    self.Health += 15
-                    if self.perform_stat_check(self.shadow_skill, base_target=12) == True:
-                        print("Bullets ping off the steel — you stay safe for now.")
-                    else:
-                        print("A stray shot punches through, grazing you! -4hp")
-                        self.Health -= 4
-
-                # --- Option 4: Melee rush ---
-                elif choice == "4":
-                    print("You charge forward, fists swinging!")
-                    if bandits_in_car > 0:
-                        if self.perform_stat_check(self.strength_skill, base_target=14) == True:
-                            print("You knock a bandit out cold in brutal close combat!")
-                            bandits_in_car -= 1
-                        else:
-                            print("He smashes you with the butt of his gun! -7hp")
-                            self.Health -= 7
-                    else:
-                        print("There's nobody nearby to fight in melee!")
-                elif choice == "5":
-                    print("You take a moment to catch your breath and tend to your wounds. +15hp")
-                    self.Health += 15
-                else:
-                    print("Invalid choice.")
-                    turns_elapsed -= 1
-                    continue
-                turns_elapsed += 1
-
-                # --- Bandit boarding mechanic ---
-                Random = random.randint(1, 4)
-                if  Random <= 2:
-                    print("A rider leaps onto the train roof and drops into a car!")
-                    if mounted_bandits > 2:
-                        mounted_bandits -= 1
-                        bandits_in_car += 1
-                elif Random == 3:
-                    if mounted_bandits > 0:
-                        print("The bandits attempt to shoot you while riding.")
-                        if random.randint(1, 10) <= self.shadow_skill:
-                            print("You dodge the bullets!")
-                        else:
-                            self.Health -= 15
-                            print("You lost 15 health.")
-                    else:
-                        print("No bandits are mounted.")
-                else:
-                    print("You gain a moment of respite.")
-
-                if bandits_in_car > 0:
-                    print("Bandits are still looting the car!")
-                    car_health -= bandits_in_car * 10
-
-                # --- Check for defeat ---
-                if self.Health <= 0 or car_health <= 0:
-                    if self.Health <= 0:
-                        print("You collapse on the train floor. The bandits overrun it.")
-                        print("A passenger revives you, but the bandits have already left with the loot.")
-                        self.Health = 20
-                        self.iron_bonus -= 2
-                    else:
-                        self.iron_bonus -= 1
-                        print("The car burns around you.")
-                        print("The bandits have already taken everything of value.")
-                    if bonus_used == True:
-                        self.MaxHealth -= 20
-                    return
-
-                # --- Check for victory ---
-                if mounted_bandits <= 0 and bandits_in_car <= 0:
-                    print("\nThe last bandit falls! The train passengers cheer your bravery!")
-                    break
-
-            else:
-                print("\nThe train arrives safely at the next station.")
-                print("You helped save the railroad! The foreman rewards you handsomely. +35 gold")
-                self.gold += 35
-                self.loot_drop(random.choice(self.rare_loot))
-                self.iron_stage = 4
-            if bonus_used == True:
-                self.MaxHealth -= 20
-
-        else:
-            print("You stay behind. The train arrives looted, passengers shaken.")
-            self.Hostility += 2
-            self.Tquest = "None"
-        time.sleep(2,)
-
-    def encounter_iron_stage4(self):
-        if self.Health < 90:
-            print("The foreman sees your wounds and tends to them.")
-            self.Health = 90
-            print("You are healed to 90 health.")
-        print("The railroad foreman rushes to you. 'They're going to blow the bridge!'")
-        print("Options:")
-        print("1) Race ahead with guards to stop the dynamite gang.")
-        print("2) Ignore it.")
-        choice = input(": ").strip()
-
-        if choice == "1":
-            combat = Combat(self)
-            combat.FindAttacker("saboteur chief")
-            combat.Attack()
-            if self.Health > 0:
-                print("You save the bridge! The train can continue.")
-                self.iron_stage = 5
-            else:
-                print("You fall. The bridge collapses. The railroad halts here forever.")
-                self.Tquest = "None"
-        else:
-            print("You turn away. Hours later, the bridge collapses with a thunderous roar.")
-            self.Hostility += 2
-            self.Tquest = "None"
-        time.sleep(2,)
-
-    def encounter_iron_stage5(self):
-        if self.Health < 90:
-            print("The foreman sees your wounds and tends to them.")
-            self.Health = 90
-            print("You are healed to 90 health.")
-        print("A notorious outlaw, the Dynamite Kid, rides into town with crates of explosives.")
-        print("He plans to stop the railroad once and for all.")
-        print("Options:")
-        print("1) Confront him in the streets.")
-        print("2) Try to ambush him.")
-        print("3) Walk away.")
-        choice = input(": ").strip()
-
-        if choice == "1":
-            combat = Combat(self)
-            combat.FindAttacker("dynamite dave")
-            combat.Attack()
-            if self.Health > 0:
-                print("You defeat Dynamite Dave in a blazing showdown!")
-                if self.iron_bonus <= 0:
-                    print("")
-                self.gold += 70
-                self.loot_drop("winchester rifle")
-                print("The railroad is saved. The railroad has been added to the towns!")
-            else:
-                print("The Dynamite Dave plants his bombs. The town burns.")
-                self.Hostility += 3
-        elif choice == "2":
-            if random.randint(1,10) <= self.shadow_skill:
-                print("You ambush him successfully, taking his explosives.")
-                self.loot_drop("ammo belt")
-                self.gold += 75
-            else:
-                print("The ambush fails. You're caught in a blast!")
-                self.Health -= 30
-        else:
-            print("You walk away. By dusk, explosions echo across the prairie.")
-            self.Hostility += 2
-
-        # Quest complete
-        self.Tquest = "None"
-        self.iron_stage = None
-        self.quests_done.append("iron_tracks")
-
 
 class Combat:
     def __init__(self, player):
