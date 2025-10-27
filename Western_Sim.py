@@ -1510,13 +1510,13 @@ class Player:
                     self.Temporaryspdboost += 1
                     self.Health = min(self.Health + 5, self.MaxHealth)
 
-        elif roll == 5: # Add a new chance for the quest intro
+        elif roll == 5 or roll == 6: # Add a new chance for the quest intro
             if self.Tquest == "None" and "earp_vendetta" not in self.quests_done:
                 self.encounter_earp_intro()
             else:
                 print("You decline and step aside.")
 
-        elif roll == 6:
+        elif roll == 7 or roll == 8:
             self.encounter_iron_intro()
 
         else:
@@ -2028,9 +2028,9 @@ class Player:
         time.sleep(1,)
         print("Music/audio effects: Freesound.com")
         time.sleep(1,)
-        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke")
+        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
         time.sleep(1,)
-        print("Other contributions: ChatGPT")
+        print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         time.sleep(1,)
         if choice == "yes":
             print("Restarting game...")
@@ -3840,6 +3840,9 @@ class Player:
         time.sleep(2)
 
     def encounter_iron_intro(self):
+        if "iron_tracks" in self.quests_done:
+            print("You have already completed the Iron Tracks quest.")
+            return
         print("At the saloon, you overhear a group of railroad men talking.")
         print("'Tracks are coming through this territory... but bandits don't like progress.'")
         choice = input("Do you agree to help the railroad? (yes/no): ").strip().lower()
@@ -3855,6 +3858,7 @@ class Player:
         else:
             print("You shake your head. The railroad men mutter that you're missing an opportunity.")
             self.Tquest = "None"
+            self.quests_done.append("iron_tracks")
         time.sleep(2,)
 
     def encounter_iron_stage1(self):
