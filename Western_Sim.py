@@ -2468,13 +2468,16 @@ class Player:
             print("You rush in to defend them!")
             combat = Combat(self)
             combat.FindAttacker("bandit")
-            combat.Attack()
-            if self.Health > 0:
-                reward = random.randint(15, 30)
-                self.gold += reward
-                print(f"The grateful merchants reward you with {reward} gold.")
-                print("They also give you some supplies.")
-                self.loot_drop("bandage")
+            escape = combat.Attack()
+            if escape == True:
+                return
+            else:
+                if self.Health > 0:
+                    reward = random.randint(15, 30)
+                    self.gold += reward
+                    print(f"The grateful merchants reward you with {reward} gold.")
+                    print("They also give you some supplies.")
+                    self.loot_drop("bandage")
         elif Choice == "2":
             print("You stay hidden until it's over. No one notices you.")
         else:
