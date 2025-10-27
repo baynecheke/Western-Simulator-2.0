@@ -743,7 +743,7 @@ class Player:
         while use_continue == True:
             print("\nYour Inventory:")
             item_descriptions = {
-                "bread": "Restores 5 health or reduces 1 hunger. Can be used outside of combat.",
+                "bread": f"Restores 5 health or reduces 1 hunger if you are hungry. Can be used whenever. {self.hunger_check()}",
                 "antivenom": "Cures poison if poisoned. Only usable outside of combat.",
                 "lantern": "Gives you 1 extra hour of time. Only usable outside of combat.",
                 "boots": "Increases travel speed by 1. Only usable outside of combat.",
@@ -995,6 +995,16 @@ class Player:
                                 
             time.sleep(2,)
 
+    def hunger_check(self):
+        if self.Hunger >= 3:
+            print("You are ravenously hungry.")
+        elif self.Hunger == 2:
+            print("You are quite hungry.")
+        elif self.Hunger == 1:
+            print("You feel a bit hungry.")
+        elif self.Hunger == 0:
+            print("You are well fed.")
+
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
         print(f"Shadow skill: {self.shadow_skill}.")
@@ -1012,7 +1022,7 @@ class Player:
         else:
             print(" - (empty)")
         #print(f"Your role is {self.active_role.name.capitalize()} (XP: {self.active_role.xp}).")
-        print(f"Your hunger is {self.Hunger}.")
+        self.hunger_check()
         print(f"Your health is {self.Health}.")
         input("Press Enter to continue:")
 
@@ -2043,6 +2053,13 @@ class Player:
         print("You step out of your wagon and stretch.")
         time.sleep(2,)
         while self.Time < 21:
+            if self.Hunger == 3:
+                print("You feel ravenous. You need to eat something soon.")
+                if random.randint(1,3) == 1:
+                    print("You stumble and fall weakly to the ground.")
+                    print("You find the strength to get back up after half an hour.")
+                    self.Time += 0.5
+                    continue
             self.DoAction()
             print()
             if self.Hunger < 0:
@@ -4234,8 +4251,8 @@ class Combat:
             "bison": {"health": 100, "damage": 15, "speed": 2, "loot": "large", "passive": True,  "type": "animal","behavior": "cautious",},
             "pack of wolves": {"health": 70, "damage": 15, "speed": 4, "loot": "medium", "type": "pack","behavior": random.choice(["reckless", "cautious", "none"]),},
             "bear": {"health": 125, "damage": 15, "speed": 3, "loot": "medium",  "type": "animal","behavior": "reckless",},
-            "bandit": {"health": 70, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious"]),},
-            "mounted bandit": {"health": 120, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human","behavior": "intelligent",},
+            "bandit": {"health": 55, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious"]),},
+            "mounted bandit": {"health": 110, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human","behavior": "intelligent",},
             "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "none"]),},
             "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["cautious", "desperate", "none"]),},
             "looter": {"health": 60, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": random.choice(["fearful", "cautious"]),},
@@ -4248,13 +4265,13 @@ class Combat:
             "curly bill": {"health": 110, "damage": 18, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
             "saboteur": {"health": 65, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
             "saboteur chief": {"health": 75, "damage": 15, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
-            "dynamite dave": {"health": 90, "damage": 20, "speed": 3, "loot": "bandit",  "type": "human","behavior": "dynamite dave",},
+            "dynamite dave": {"health": 90, "damage": 20, "speed": 3, "loot": "bandit",  "type": "human","behavior": "dynamite dave","bound": True,},
             }
         self.loots = {
             "small": ["small hide", "small meat"],
             "medium": ["medium hide", "medium meat"],
             "large": ["large hide", "large meat", "horn"],
-            "bandit": ["revolver", "pistol_ammo", "bread"],
+            "bandit": ["revolver", "pistol_ammo", "bread", "rifle"],
             "townsperson": ["whiskey", "knife", "antivenom"],
             "common": [random.choice(player.common_loot)],
             "uncommon": [random.choice(player.uncommon_loot)],
