@@ -3838,6 +3838,7 @@ class Player:
         else:
             print("You shake your head. The railroad men mutter that you're missing an opportunity.")
             self.Tquest = "None"
+        time.sleep(2,)
 
     def encounter_iron_stage1(self):
         print("The railroad foreman storms into town.")
@@ -3848,24 +3849,36 @@ class Player:
         choice = input(": ").strip()
 
         if choice == "1":
+            if self.Health < 90:
+                print("The foreman sees your wounds and tends to them.")
+                self.Health = 90
+                print("You are healed to 90 health.")
             print("You ride out and find the wagon under bandit guard!")
-            combat = Combat(self)
-            combat.FindAttacker("bandit")
-            escape = combat.Attack()
-            if escape == False:
-                print("You defeat the bandits and recover the supplies.")
-                self.gold += 20
+            if self.perform_stat_check(self.trail_skill, base_target=14) == True:
+                print("You sneak up and catch the bandits off guard, taking them down silently.")
+                self.gold += 15
                 self.loot_drop("ammo cartridge")
-                self.iron_bonus += 1
+                self.iron_bonus += 2
+                self.trail_skill += 1
             else:
-                print("You retreat to save yourself.")
-                self.Tquest = "None"
-                self.iron_bonus -= 1
+                print("The bandits spot you! A fight breaks out.")
+                combat = Combat(self)
+                combat.FindAttacker("bandit")
+                escape = combat.Attack()
+                if escape == False:
+                    print("You defeat the bandits and recover the supplies.")
+                    self.gold += 20
+                    self.loot_drop("ammo cartridge")
+                    self.iron_bonus += 1
+                else:
+                    print("You retreat to save yourself.")
+                    self.Tquest = "None"
+                    self.iron_bonus -= 1
         else:
             print("The foreman scowls. 'Fine, I'll find someone else.'")
             self.iron_bonus -= 2
         self.iron_stage = 2
-            
+        time.sleep(2,)
 
     def encounter_iron_stage2(self):
         print("Night falls. You hear shouting at the new train depot!")
@@ -3876,27 +3889,36 @@ class Player:
 
         if choice == "1":
             print("You sneak into the depot and spot saboteurs planting dynamite.")
-            if random.randint(1,10) <= self.shadow_skill + 2:
+            if self.perform_stat_check(self.shadow_skill, base_target=16) == True:
                 print("You catch one saboteur alive. He blurts out about a coming train heist.")
                 self.iron_stage = 3
             else:
                 print("The saboteurs notice you! A fight breaks out.")
                 combat = Combat(self)
                 combat.FindAttacker("saboteur")
-                combat.Attack()
-                if self.Health > 0:
-                    print("You stop the sabotage, but the plot deepens.")
-                    self.iron_stage = 3
+                escape = combat.Attack()
+                if escape == False:
+                    if self.Health > 0:
+                        print("You stop the sabotage, but the plot deepens.")
+                        self.iron_stage = 3
+                    else:
+                        print("You fall at the depot. The railroad effort is doomed.")
+                        self.Tquest = "None"
                 else:
-                    print("You fall at the depot. The railroad effort is doomed.")
-                    self.Tquest = "None"
+                    print("You flee, unable to stop the saboteurs.")
+                    self.iron_bonus -= 1
         else:
             print("You ignore the commotion. In the morning, the depot lies in ruins.")
             self.Hostility += 1
             self.Tquest = "None"
+        time.sleep(2,)
 
     def encounter_iron_stage3(self):
         bonus_used = False
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
         print("Word spreads: the first train is rolling in with gold and passengers.")
         print("Bandits plan a heist! The foreman begs for your help.")
         print("Options:")
@@ -4112,8 +4134,13 @@ class Player:
             print("You stay behind. The train arrives looted, passengers shaken.")
             self.Hostility += 2
             self.Tquest = "None"
+        time.sleep(2,)
 
     def encounter_iron_stage4(self):
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
         print("The railroad foreman rushes to you. 'They're going to blow the bridge!'")
         print("Options:")
         print("1) Race ahead with guards to stop the dynamite gang.")
@@ -4134,8 +4161,13 @@ class Player:
             print("You turn away. Hours later, the bridge collapses with a thunderous roar.")
             self.Hostility += 2
             self.Tquest = "None"
+        time.sleep(2,)
 
     def encounter_iron_stage5(self):
+        if self.Health < 90:
+            print("The foreman sees your wounds and tends to them.")
+            self.Health = 90
+            print("You are healed to 90 health.")
         print("A notorious outlaw, the Dynamite Kid, rides into town with crates of explosives.")
         print("He plans to stop the railroad once and for all.")
         print("Options:")
@@ -4146,15 +4178,17 @@ class Player:
 
         if choice == "1":
             combat = Combat(self)
-            combat.FindAttacker("dynamite kid")
+            combat.FindAttacker("dynamite dave")
             combat.Attack()
             if self.Health > 0:
-                print("You defeat the Dynamite Kid in a blazing showdown!")
-                self.gold += 100
-                self.loot_drop("railway rifle")
-                print("The railroad is saved. Fast travel between towns is now safer!")
+                print("You defeat Dynamite Dave in a blazing showdown!")
+                if self.iron_bonus <= 0:
+                    print("")
+                self.gold += 70
+                self.loot_drop("winchester rifle")
+                print("The railroad is saved. The railroad has been added to the towns!")
             else:
-                print("The Dynamite Kid plants his bombs. The town burns.")
+                print("The Dynamite Dave plants his bombs. The town burns.")
                 self.Hostility += 3
         elif choice == "2":
             if random.randint(1,10) <= self.shadow_skill:
@@ -4200,7 +4234,7 @@ class Combat:
             "bison": {"health": 100, "damage": 15, "speed": 2, "loot": "large", "passive": True,  "type": "animal","behavior": "cautious",},
             "pack of wolves": {"health": 70, "damage": 15, "speed": 4, "loot": "medium", "type": "pack","behavior": random.choice(["reckless", "cautious", "none"]),},
             "bear": {"health": 125, "damage": 15, "speed": 3, "loot": "medium",  "type": "animal","behavior": "reckless",},
-            "bandit": {"health": 80, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious"]),},
+            "bandit": {"health": 70, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious"]),},
             "mounted bandit": {"health": 120, "damage": 15, "speed": 7, "loot": "bandit",  "type": "human","behavior": "intelligent",},
             "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "none"]),},
             "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["cautious", "desperate", "none"]),},
@@ -4212,6 +4246,9 @@ class Combat:
             "cowboy scout": {"health": 60, "damage": 10, "speed": 5, "loot": "common", "type": "human", "behavior": random.choice(["cautious", "desperate"])},
             "clanton gunfighter": {"health": 85, "damage": 15, "speed": 3, "loot": "rare", "type": "human", "behavior": "reckless"},
             "curly bill": {"health": 110, "damage": 18, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
+            "saboteur": {"health": 65, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
+            "saboteur chief": {"health": 75, "damage": 15, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
+            "dynamite dave": {"health": 90, "damage": 20, "speed": 3, "loot": "bandit",  "type": "human","behavior": "dynamite dave",},
             }
         self.loots = {
             "small": ["small hide", "small meat"],
@@ -4442,6 +4479,7 @@ class Combat:
                     return escape
                 # Enemy's turn
                 elif turn == "enemy":
+                    current_turn_damage = enemy_damage 
                     print(f"\n--- {self.Enemy.capitalize()}'s Turn ---")
                     
                     # --- Status Effect Checks (EXISTING) ---
@@ -4465,7 +4503,7 @@ class Combat:
                     curr_hp = enemy_health 
                     
                     # This is the damage for THIS turn, which we can modify
-                    current_turn_damage = enemy_damage 
+
                     action_taken = False # Flag to skip attack if behavior dictates
 
                     match behavior:
@@ -4509,6 +4547,25 @@ class Combat:
                                 if random.randint(1, 10) <= 4: # 40% chance of a probing attack
                                     print(f"The {self.Enemy} makes a quick, probing attack.")
                                     current_turn_damage = int(current_turn_damage * 0.5)
+                        case "dynamite dave":
+                            if enemy_health > (base_enemy_health * 0.4) and random.randint(1, 10) <= 4: # 40% chance
+                                print(f"Dynamite Dave hurls a stick of dynamite at you!")
+                                if self.player.perform_stat_check(self.player.Speed, base_target=15) == False:
+                                    current_turn_damage = current_turn_damage + 10
+                                    print("You are too slow, and the dynamite explodes on impact!")
+                                else:
+                                    print("You dodge the flying dynamite just in time!")
+                            elif enemy_health < (base_enemy_health * 0.4):
+                                print(f"Dynamite Dave is desperate and lights multiple sticks of dynamite!")
+                                if random.randint(1, 10) <= 5: # 50% chance
+                                    if self.player.perform_stat_check(self.player.Speed, base_target=12) == False:
+                                        current_turn_damage = current_turn_damage + 15
+                                        print("You fail to dodge the explosion! If only you had been faster...")
+                                        print(f"The explosion deals massive damage +15 damage!")
+                                else:
+                                    print("He throws them wildly, and accidentally hits himself!")
+                                    enemy_health -= 10
+                                    print("Dynamite Dave takes 10 damage from the blast!")
                         
                         case "boss" | "aggressive":
                             pass # Fall through to standard attack logic
