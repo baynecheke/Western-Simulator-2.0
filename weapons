@@ -56,7 +56,7 @@ lever-action rifle:
 
 henry rifle:
   name: "henry rifle"
-  price: 55
+  price: 60
   damage: [30, 35]
   ammo: rifle_ammo
   ability: steady aim
@@ -70,8 +70,8 @@ sharps rifle:
 
 winchester rifle:
   name: "winchester rifle"
-  price: 130
-  damage: [50, 55]
+  price: 175
+  damage: [60, 65]
   ammo: rifle_ammo
   ability: precision shot
 
@@ -92,7 +92,7 @@ sawed-off shotgun:
 double barrel shotgun:
   name: "double barrel shotgun"
   price: 120
-  damage: [20, 50]
+  damage: [30, 50]
   ammo: shotgun_ammo
   ability: double barrel
 knife:

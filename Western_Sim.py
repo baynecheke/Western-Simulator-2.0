@@ -2853,6 +2853,18 @@ class Player:
         self.loot_drop(loot_item)
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
         print("You have learned from this adventure, you become more agile. +1 speed.")
+        print("You may choose either a strength, shadow, or trail skill increase.")
+        choice = input("Which skill do you choose to improve? (strength/shadow/trail): ").strip().lower()
+        skill_choice = AI_File.parse_choice(["strength", "shadow", "trail"], choice, use_ollama=USE_OLLAMA).strip().lower()
+        if choice == "strength":
+            self.strength_skill += 2
+            print("Your strength skill increases by 2.")
+        elif choice == "shadow":
+            self.shadow_skill += 2
+            print("Your shadow skill increases by 2.")
+        elif choice == "trail":
+            self.trail_skill += 2
+            print("Your trail skill increases by 2.")
         time.sleep(2,)
 
     def encounter_haunted_house(self):
