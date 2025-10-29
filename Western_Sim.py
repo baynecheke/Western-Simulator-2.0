@@ -1477,6 +1477,9 @@ class Player:
         if "Earp_Saloon" in self.event and "earp_vendetta" not in self.quests_done:
             roll = 5
             self.event.remove("Earp_Saloon")
+        if "final_earp_confrontation" in self.event:
+            self.encounter_earp_stage4()
+            self.event.remove("final_earp_confrontation")
         if roll == 1:
             print("A brawl erupts in the corner—chairs fly as punches land.")
             combat = Combat(self)
@@ -1518,6 +1521,7 @@ class Player:
 
         elif roll == 7 or roll == 8:
             self.encounter_iron_intro()
+
 
         else:
             print("Lot's of people gather around the saloon's door and inside.")
@@ -1936,18 +1940,18 @@ class Player:
         time.sleep(2)
         
         if self.Tquest == "earp_vendetta" and self.earp_stage == 4:
-                print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
-                print("'Word is Curly Bill is holed up here in town. This ends now.'")
-                time.sleep(2)
-                # Optional: Ask if ready or want to prepare
-                ready = input("Are you ready for the final confrontation? (yes/no): ").strip().lower()
-                ready = self.AI_File.parse_YN(ready)
-                if ready == "yes":
-                    self.encounter_earp_stage4() # Directly trigger the final stage
-                else:
-                    print("You tell Wyatt you need a moment to prepare.")
-                    print("Find him at the Saloon when you're ready.")
-
+            print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
+            print("'Word is Curly Bill is holed up here in town. This ends now.'")
+            time.sleep(2)
+            # Optional: Ask if ready or want to prepare
+            ready = input("Are you ready for the final confrontation? (yes/no): ").strip().lower()
+            ready = self.AI_File.parse_YN(ready)
+            if ready == "yes":
+                self.encounter_earp_stage4() # Directly trigger the final stage
+            else:
+                print("You tell Wyatt you need a moment to prepare.")
+                print("Find him at the Saloon when you're ready.")
+                self.event.append("final_earp_confrontation")
         self.town_encounter()
 
     def GeneralStore(self):
