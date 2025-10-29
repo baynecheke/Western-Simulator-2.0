@@ -4542,7 +4542,7 @@ class Combat:
                                 escape_boost += 1
                                 print("You failed to escape!")
                                 self.player.Health = self.player.Health - (enemy_damage)/5
-                                turn = "enemy"
+                                break
 
                 time.sleep(2,)
                 if enemy_health <= 0:
