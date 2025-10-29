@@ -5,7 +5,7 @@ a = Analysis(
     ['Western_Sim.py'],
     pathex=[],
     binaries=[],
-    datas=[('weapons', '.'), ('loot.yaml', '.'), ('Game_Info.yaml', '.'), ('game_data.yaml', '.'), ('*.mp3', '.')],
+    datas=[('weapons', '.'), ('loot.yaml', '.'), ('*.mp3', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
