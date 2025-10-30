@@ -642,19 +642,13 @@ class Player:
                 if USE_OLLAMA:
                     choice = input("Choice: ").strip()
                     if choice == "67":
+                        self.coffee_mill_showdown()
+                        self.gold += 100
                         self.encounter_earp_intro()
-                        self.loot_drop("lever-action rifle")
-                        self.wandering_trader()
-                        combat = Combat(self)
-                        combat.FindAttacker("brawler")
-                        combat.Attack()
-                        self.day_memory = {
-                            "encounter": "bandit",   # e.g. "bandit", "rattlesnake"
-                            "loot": "double barrel shotgun",        # e.g. "Winchester rifle"
-                            "town_event": "helped wyatt earp on revenge"   # e.g. "rebuilding Dust Camp"
-                        }
-                        self.write_diary_entry()
-                        continue
+                        self.loot_drop("sharps rifle")
+                        self.loot_drop("tomahawk")
+                        self.run_final_mission()
+                        print("executed")
                 else:
                     choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
 
@@ -3842,9 +3836,9 @@ class Player:
         print("Sneak along the riverbank to get closer (Shadow Skill Check)")
         
         boarded = False
-        choice = input("Choice (1-3): ").strip()
+        choice = input("Choice (swim, rope, or sneak: ").strip()
         choice =  AI_File.parse_choice((["swim", "rope", "sneak"]), choice, USE_OLLAMA)
-        if choice == "1":
+        if choice == "swim":
             if self.perform_stat_check(self.strength_skill, base_target=15):
                 print("You dive into the churning water and power through the current, climbing aboard!")
                 boarded = True
@@ -3854,7 +3848,7 @@ class Player:
                 self.Health -= 15
                 boarded = True
 
-        elif choice == "2":
+        elif choice == "rope":
             if "rope" in self.itemsinventory and self.perform_stat_check(self.trail_skill, base_target=12):
                 print("You swing across like a hawk, landing hard on the deck!")
                 self.itemsinventory["rope"] -= 1 # Use the rope
@@ -3865,7 +3859,7 @@ class Player:
                 self.Health -= 20
                 boarded = True
 
-        elif choice == "3":
+        elif choice == "sneak":
             if self.perform_stat_check(self.shadow_skill, base_target=14):
                 print("You slip through the shadows and climb onto the back of the boat unnoticed!")
                 boarded = True
@@ -3904,6 +3898,7 @@ class Player:
 # In Western_Sim.py, as another new method in the Player class
 
     def coffee_mill_showdown(self):
+        self.change_music("The Last Stand.mp3", -1)
         boss_health = 150
         ship_integrity = 100
         gun_overheated = False
@@ -3915,7 +3910,7 @@ class Player:
         print("The cold steel feels good in your hands as you figure out how the gun works.")
         if self.perform_stat_check(self.trail_skill, base_target=15):
             print("You quickly get the hang of the Coffee Mill's firing mechanism.")
-            extra_damage = 5
+            extra_damage += 5
         if self.perform_stat_check(self.shadow_skill, base_target=15):
             print("You search the deck and find some extra ammo for the Coffee Mill!")
             ammo += 20
@@ -3924,84 +3919,112 @@ class Player:
             gun_overheat_ever = False
 
         print("\n--- FINAL SHOWDOWN ---")
-        
-
+        turn = "player"
         while boss_health > 0 and self.Health > 0 and ship_integrity > 0:
-            
-            print("\n--- YOUR TURN ---")
-            print(f"Your Health: {self.Health} | Warlord: {boss_health} | Ship Integrity: {ship_integrity}")
-            print(f"Coffee Mill Ammo: {ammo}")
-            if ammo < 1:
-                print("You're out of ammo! You must reload.")
-                ammo += 50
+            if turn == "player":
+                print("\n--- YOUR TURN ---")
+                print(f"Your Health: {self.Health} | Warlord: {boss_health} | Ship Integrity: {ship_integrity}")
                 print(f"Coffee Mill Ammo: {ammo}")
-            if gun_overheated:
-                print("The gun is overheated! You must let it cool or take cover!")
-                print("1) Take cover and tend wounds (Use Bandage)")
-                print("2) Let it cool (Skip turn)")
-                gun_overheated = False # It cools after one turn
-            else:
-                print("1) Fire a long burst at the Warlord (High Damage, risks overheat)")
-                print("2) Fire a short, accurate burst (Low Damage, safe)")
-                print("3) Spray the deck to clear out his guards (Damages ship)")
-            
-            choice = input("Action: ").strip()
-
-            # --- Player Action ---
-            if gun_overheated:
-                if choice == "1" and "bandage" in self.itemsinventory:
-                    self.Health = min(self.MaxHealth, self.Health + 25)
-                    self.itemsinventory["bandage"] -= 1
-                    print("You duck and apply a bandage. +25 Health.")
+                if ammo < 1:
+                    self.play_sound("no_ammo_coffee")
+                    print("You're out of ammo! You must reload.")
+                    ammo += 50
+                    print(f"Coffee Mill Ammo: {ammo}")
+                    time.sleep(4,)
+                    continue
+                if gun_overheated:
+                    print("The gun is overheated! You must let it cool or take cover!")
+                    print("1) Take cover and tend wounds (Use Bandage)")
+                    print("2) Let it cool (Skip turn)")
+                    choice = input("Action: ").strip()
+                    if choice == "1" and "bandage" in self.itemsinventory:
+                        self.Health = min(self.MaxHealth, self.Health + 25)
+                        self.itemsinventory["bandage"] -= 1
+                        print("You duck and apply a bandage. +25 Health.")
+                    else:
+                        print("You wait for the gun to cool...")
+                    gun_overheated = False # It cools after one turn
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
                 else:
-                    print("You wait for the gun to cool...")
-            
-            elif choice == "1":
-                dmg = random.randint(30, 45)
-                boss_health -= dmg
-                print(f"You spray the cabin! The Warlord is hit for {dmg} damage!")
-                if gun_overheat_ever:
-                    if random.randint(1, 3) == 1: # 33% chance to overheat
-                        print("The gun barrel is glowing red! It's overheated!")
-                        gun_overheated = True
-                else: 
-                    print("Your cooling system keeps the gun from overheating.")
-            
-            elif choice == "2":
-                dmg = random.randint(15, 20)
-                boss_health -= dmg
-                print(f"You land an accurate burst! The Warlord is hit for {dmg} damage.")
-            
-            elif choice == "3":
-                ship_dmg = random.randint(10, 15)
-                ship_integrity -= ship_dmg
-                print(f"You clear the deck, but damage the ship! -{ship_dmg} Integrity.")
-                print("The Warlord has fewer men to command next turn.")
+                    print("1) Fire a long burst at the Warlord (High Damage, risks overheat)")
+                    print("2) Fire a short, accurate burst (Low Damage, safe)")
+                    print("3) Spray the deck to clear out his guards (Damages ship)")
                 
-            time.sleep(2)
-            
-            # --- Boss Turn ---
-            if boss_health <= 0:
-                break # Player wins
+                choice = input("Action: ").strip()
 
-            print("\n--- WARLORD'S TURN ---")
-            boss_action = random.randint(1, 3)
-            
-            if boss_action == 1:
-                dmg = random.randint(15, 20)
-                self.Health -= dmg
-                print(f"The Warlord snipes you from the cabin! -{dmg} Health.")
-            
-            elif boss_action == 2:
-                print("The Warlord orders his men to fire a cannon at the cliff!")
-                print("The Marshal and his men are forced to take cover!")
+                # --- Player Action ---
                 
-            elif boss_action == 3:
-                print("The Warlord yells, 'Scuttle the ship! Blow it all to hell!'")
-                ship_integrity -= 20
-                print("Explosions rock the boat! -20 Ship Integrity.")
+                if choice == "1":
+                    dmg = random.randint(30, 45)
+                    boss_health -= dmg
+                    ammo -= 25
+                    print(f"You spray the cabin! The Warlord is hit for {dmg} damage!")
+                    self.play_sound("coffee_mill_gun_fire.mp3")
+                    if gun_overheat_ever:
+                        if random.randint(1, 3) == 1: # 33% chance to overheat
+                            print("The gun barrel is glowing red! It's overheated!")
+                            self.play_sound("overheat.mp3")
+                            gun_overheated = True
+                    else: 
+                        print("Your cooling system keeps the gun from overheating.")
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
+                
+                elif choice == "2":
+                    dmg = random.randint(15, 20)
+                    ammo -= 10
+                    boss_health -= dmg
+                    print(f"You land an accurate burst! The Warlord is hit for {dmg} damage.")
+                    self.play_sound("coffee_mill_gun_fire.mp3")
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
+                
+                elif choice == "3":
+                    ship_dmg = random.randint(10, 15)
+                    ship_integrity -= ship_dmg
+                    print(f"You clear the deck, but damage the ship! -{ship_dmg} Integrity.")
+                    print("The Warlord has fewer men to command next turn.")
+                    self.play_sound("coffee_mill_gun_fire.mp3")
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
 
-            time.sleep(2)
+            else:
+                
+                # --- Boss Turn ---
+                if boss_health <= 0:
+                    break # Player wins
+
+                print("\n--- WARLORD'S TURN ---")
+                boss_action = random.randint(1, 3)
+                
+                if boss_action == 1:
+                    dmg = random.randint(15, 20)
+                    self.Health -= dmg
+                    print(f"The Warlord snipes you from the cabin! -{dmg} Health.")
+                    turn = 'player'
+                    time.sleep(2,)
+
+                
+                elif boss_action == 2:
+                    print("The Warlord orders his men to fire a cannon at the cliff!")
+                    print("The Marshal and his men are forced to take cover!")
+                    turn = 'player'
+                    time.sleep(2,)
+
+                    
+                elif boss_action == 3:
+                    print("The Warlord yells, 'Scuttle the ship! Blow it all to hell!'")
+                    ship_integrity -= 20
+                    print("Explosions rock the boat! -20 Ship Integrity.")
+                    turn = 'player'
+                    time.sleep(2,)
+
+
 
             # --- Check Lose Conditions ---
             if self.Health <= 0:
@@ -4022,9 +4045,8 @@ class Player:
         self.score += 500 # A massive score bonus
         
         # Call the end game/credits (by borrowing from your Death() function)
-        print("\nYour final score:")
+        print(f"\nYour final score: {self.score}")
         print(f"Days survived: {self.Day}")
-        print(f"Score: {self.score}")
         self.Statcheck()
         
         print("\nCredits: Bayne Cheke, Designer and Programmer.")
