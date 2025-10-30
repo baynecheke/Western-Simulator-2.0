@@ -3810,6 +3810,232 @@ class Player:
             self.loot_drop("gold nugget")
             self.loot_drop("pistol_ammo")
 
+# In Western_Sim.py, as a new method in the Player class
+
+    def run_final_mission(self):
+        print("\nYou arrive at Devil's Canyon. The river roars below.")
+        print("The US Marshal points. 'He's barricaded at the far end. We need to clear the pass!'")
+        input("Press Enter to begin the assault...")
+
+        # --- Part 1: The Canyon Battle ---
+        print("\nThe Marshal's men give you covering fire. You move up to take out the warlord's lieutenants.")
+        self.damage_modifier += 15
+        self.player_effects.append("Steel Wall")
+        combat = Combat(self)
+        combat.FindAttacker("warlord_lieutenant")
+        combat.Attack()
+        self.damage_modifier = 0 # Clear the bonus
+        if self.Health <= 0:
+            self.Death("You fall in the canyon. The assault fails...")
+
+        print("\nThe lieutenant falls! But a deafening horn echoes from the river.")
+        print("An iron-plated gunboat rounds the bend, the 'Coffee Grinder' repeating gun blazing!")
+        print("The Marshal yells, 'It's a trap! He's going to shred us! Get to that boat and take control of that gun!'")
+        print("'We will cover for you.'")
+        time.sleep(3)
+
+        # --- Part 2: Seize the Gun (Skill Challenge) ---
+        print("\nYou spot it on the deck: a 'Coffee Mill' rapid-fire gun. You have to take it!")
+        print("How will you board the ship?")
+        print("Swim across under fire (Strength Check)")
+        print("Use your rope to swing from the cliff (Trail Skill Check)")
+        print("Sneak along the riverbank to get closer (Shadow Skill Check)")
+        
+        boarded = False
+        choice = input("Choice (1-3): ").strip()
+        choice =  AI_File.parse_choice((["swim", "rope", "sneak"]), choice, USE_OLLAMA)
+        if choice == "1":
+            if self.perform_stat_check(self.strength_skill, base_target=15):
+                print("You dive into the churning water and power through the current, climbing aboard!")
+                boarded = True
+            else:
+                print("The current is too strong! You're washed downstream but manage to grab the anchor line.")
+                print("You climb aboard, exhausted. -15 health.")
+                self.Health -= 15
+                boarded = True
+
+        elif choice == "2":
+            if "rope" in self.itemsinventory and self.perform_stat_check(self.trail_skill, base_target=12):
+                print("You swing across like a hawk, landing hard on the deck!")
+                self.itemsinventory["rope"] -= 1 # Use the rope
+                boarded = True
+            else:
+                print("You misjudge the swing! You slam into the iron hull and fall to the deck.")
+                print("-20 health.")
+                self.Health -= 20
+                boarded = True
+
+        elif choice == "3":
+            if self.perform_stat_check(self.shadow_skill, base_target=14):
+                print("You slip through the shadows and climb onto the back of the boat unnoticed!")
+                boarded = True
+            else:
+                print("You're spotted! A sniper pegs you as you climb! -25 health.")
+                self.Health -= 25
+                boarded = True
+
+        if self.Health <= 0:
+            print("Your wounds are too great. You collapse on the deck...")
+            self.Death("You have died while trying to get to the Coffee Mill gun.")
+            
+        if boarded:
+            print("\nYou're on the deck! The gunner and his crew turn to face you!")
+            
+            # Add "gunboat_crew" to your Enemies dict
+            # "gunboat_crew": {"health": 90, "damage": 15, "speed": 3, "loot": "common", "type": "human", "behavior": "desperate", "bound": True}
+            if self.Health < 50:
+                print("You steel yourself for the fight ahead. +30 health.")
+                self.Health += 30
+            combat = Combat(self)
+            combat.FindAttacker("gunboat_crew")
+            combat.Attack()
+
+            if self.Health <= 0:
+                print("The crew cuts you down before you can reach the gun...")
+                self.Death("You have died trying to seize the Coffee Mill gun.")
+
+            print("\nYou take down the crew and seize the Coffee Mill gun!")
+            print("The Warlord himself kicks open the cabin door, leveling a rifle at you.")
+            print("'You've been a thorn in my side for too long!'")
+            
+            # --- Part 3: The Final Minigame ---
+            self.coffee_mill_showdown() # Call the final minigame function
+    
+# In Western_Sim.py, as another new method in the Player class
+
+    def coffee_mill_showdown(self):
+        boss_health = 150
+        ship_integrity = 100
+        gun_overheated = False
+        gun_overheat_ever = True
+        boss_behind_cover = True
+        extra_damage = 0
+        ammo = 50
+        print("You finally grab the Coffee Mill gun and prepare for the final showdown!")
+        print("The cold steel feels good in your hands as you figure out how the gun works.")
+        if self.perform_stat_check(self.trail_skill, base_target=15):
+            print("You quickly get the hang of the Coffee Mill's firing mechanism.")
+            extra_damage = 5
+        if self.perform_stat_check(self.shadow_skill, base_target=15):
+            print("You search the deck and find some extra ammo for the Coffee Mill!")
+            ammo += 20
+        if self.perform_stat_check(self.strength_skill, base_target=15):
+            print("You manage to jury-rig a cooling system to prevent overheating!")
+            gun_overheat_ever = False
+
+        print("\n--- FINAL SHOWDOWN ---")
+        
+
+        while boss_health > 0 and self.Health > 0 and ship_integrity > 0:
+            
+            print("\n--- YOUR TURN ---")
+            print(f"Your Health: {self.Health} | Warlord: {boss_health} | Ship Integrity: {ship_integrity}")
+            print(f"Coffee Mill Ammo: {ammo}")
+            if ammo < 1:
+                print("You're out of ammo! You must reload.")
+                ammo += 50
+                print(f"Coffee Mill Ammo: {ammo}")
+            if gun_overheated:
+                print("The gun is overheated! You must let it cool or take cover!")
+                print("1) Take cover and tend wounds (Use Bandage)")
+                print("2) Let it cool (Skip turn)")
+                gun_overheated = False # It cools after one turn
+            else:
+                print("1) Fire a long burst at the Warlord (High Damage, risks overheat)")
+                print("2) Fire a short, accurate burst (Low Damage, safe)")
+                print("3) Spray the deck to clear out his guards (Damages ship)")
+            
+            choice = input("Action: ").strip()
+
+            # --- Player Action ---
+            if gun_overheated:
+                if choice == "1" and "bandage" in self.itemsinventory:
+                    self.Health = min(self.MaxHealth, self.Health + 25)
+                    self.itemsinventory["bandage"] -= 1
+                    print("You duck and apply a bandage. +25 Health.")
+                else:
+                    print("You wait for the gun to cool...")
+            
+            elif choice == "1":
+                dmg = random.randint(30, 45)
+                boss_health -= dmg
+                print(f"You spray the cabin! The Warlord is hit for {dmg} damage!")
+                if gun_overheat_ever:
+                    if random.randint(1, 3) == 1: # 33% chance to overheat
+                        print("The gun barrel is glowing red! It's overheated!")
+                        gun_overheated = True
+                else: 
+                    print("Your cooling system keeps the gun from overheating.")
+            
+            elif choice == "2":
+                dmg = random.randint(15, 20)
+                boss_health -= dmg
+                print(f"You land an accurate burst! The Warlord is hit for {dmg} damage.")
+            
+            elif choice == "3":
+                ship_dmg = random.randint(10, 15)
+                ship_integrity -= ship_dmg
+                print(f"You clear the deck, but damage the ship! -{ship_dmg} Integrity.")
+                print("The Warlord has fewer men to command next turn.")
+                
+            time.sleep(2)
+            
+            # --- Boss Turn ---
+            if boss_health <= 0:
+                break # Player wins
+
+            print("\n--- WARLORD'S TURN ---")
+            boss_action = random.randint(1, 3)
+            
+            if boss_action == 1:
+                dmg = random.randint(15, 20)
+                self.Health -= dmg
+                print(f"The Warlord snipes you from the cabin! -{dmg} Health.")
+            
+            elif boss_action == 2:
+                print("The Warlord orders his men to fire a cannon at the cliff!")
+                print("The Marshal and his men are forced to take cover!")
+                
+            elif boss_action == 3:
+                print("The Warlord yells, 'Scuttle the ship! Blow it all to hell!'")
+                ship_integrity -= 20
+                print("Explosions rock the boat! -20 Ship Integrity.")
+
+            time.sleep(2)
+
+            # --- Check Lose Conditions ---
+            if self.Health <= 0:
+                print("The Warlord's shot finds its mark. You fall over the gun...")
+                self.Death("Killed by the Warlord in the final showdown.")
+                return
+                
+            if ship_integrity <= 0:
+                print("The ship is breaking apart! The explosions consume you!")
+                self.Death("Lost at sea after the gunboat was scuttled.")
+                return
+
+        # --- Victory ---
+        print("\nWith a final scream, the Warlord collapses. The battle is won.")
+        print("You steer the burning gunboat to the shore, where the Marshal greets you as a hero.")
+        print("The territory is finally safe, thanks to you.")
+        
+        self.score += 500 # A massive score bonus
+        
+        # Call the end game/credits (by borrowing from your Death() function)
+        print("\nYour final score:")
+        print(f"Days survived: {self.Day}")
+        print(f"Score: {self.score}")
+        self.Statcheck()
+        
+        print("\nCredits: Bayne Cheke, Designer and Programmer.")
+        print("Music/audio effects: Freesound.com")
+        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
+        print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
+        print("\n--- THANKS FOR PLAYING! ---")
+        
+        pygame.mixer.music.stop()
+        exit()
+
     #Generic Game Stuff
 
     def change_music(self, filename, loop):
@@ -4322,16 +4548,18 @@ class Combat:
             "brawler": {"health": 60, "damage": 5, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["reckless", "none"]),},
             "sheriff": {"health": 65, "damage": 10, "speed": 2, "loot": "townsperson",  "type": "human","behavior": random.choice(["cautious", "desperate", "none"]),},
             "looter": {"health": 60, "damage": 10, "speed": 5, "loot": "rare",  "type": "human","behavior": random.choice(["fearful", "cautious"]),},
-            "bandit leader": {"health": 100, "damage": 20, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": "boss"},
+            "bandit leader": {"health": 120, "damage": 25, "speed": 3, "loot": "ultra_rare",  "type": "human", "special": "alert", "bound": True,"behavior": "boss"},
             "tester": {"health": 100, "damage": 5, "speed": 3, "loot": "ultra_rare",  "type": "human", "armored": True, "bound": True,"behavior": "boss"},
             "phantom gunslinger": {"health": 75, "damage": 15, "speed": 3, "loot": "ultra_rare", "type": "ghost", "special": "ghostly_form","behavior": "boss"},
             "outlaw gunman": {"health": 70, "damage": 12, "speed": 4, "loot": "bandit", "type": "human", "behavior": "aggressive"},
             "cowboy scout": {"health": 60, "damage": 10, "speed": 5, "loot": "common", "type": "human", "behavior": random.choice(["cautious", "desperate"])},
             "clanton gunfighter": {"health": 85, "damage": 15, "speed": 3, "loot": "rare", "type": "human", "behavior": "reckless"},
-            "curly bill": {"health": 110, "damage": 18, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
+            "curly bill": {"health": 120, "damage": 20, "speed": 4, "loot": "ultra_rare", "type": "human", "behavior": "boss", "special": "alert", "bound": True},
             "saboteur": {"health": 65, "damage": 10, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
             "saboteur chief": {"health": 80, "damage": 15, "speed": 4, "loot": "bandit",  "type": "human","behavior": random.choice(["intelligent", "cautious", "fearful"]),},
             "dynamite dave": {"health": 110, "damage": 20, "speed": 3, "loot": "bandit",  "type": "human","behavior": "dynamite dave","bound": True,},
+            "warlord_lieutenant": {"health": 120, "damage": 20, "speed": 2, "loot": "ultra_rare", "type": "human", "behavior": "boss", "bound": True},
+            "gunboat_crew": {"health": 75, "damage": 15, "speed": 3, "loot": "common", "type": "human", "behavior": "desperate", "bound": True},
             }
         self.loots = {
             "small": ["small hide", "small meat"],
