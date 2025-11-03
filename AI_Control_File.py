@@ -9,7 +9,7 @@ class AI_Control:
         self.action = None
 
     def parse_choice(self, available_choices, player_prompt ,use_ollama):
-        player_text = input(player_prompt)
+        player_text = input(player_prompt).strip().lower()
         safe_fallback = "none"
         if "leave" in available_choices:
             safe_fallback = "leave"
@@ -62,7 +62,7 @@ class AI_Control:
                 print(f"{i}. {choice_text.capitalize()}")
 
             # The 'player_text' variable holds the user's raw input (which should be a number here)
-            player_text = input(player_prompt)
+            player_text = input(player_prompt).strip().lower()
             choice_input = player_text # Use the input directly
 
             try:
@@ -81,7 +81,7 @@ class AI_Control:
                 return safe_fallback
 
     def parse_YN(self, player_prompt) -> str:
-        player_text = input(player_prompt)
+        player_text = input(player_prompt).strip().lower()
         """
         Parse yes/no answers robustly without using LLMs.
         Always returns 'yes' or 'no'.
@@ -112,7 +112,7 @@ class AI_Control:
         return "no"
 
     def parse_purchase(self, items: list, player_prompt, use_ollama):
-        player_text = input(player_prompt)
+        player_text = input(player_prompt).strip().lower()
         if use_ollama:
             # --- START FIX ---
             # The 'items' list passed from store.py NOW CONTAINS 'inventory' and 'leave'
@@ -269,7 +269,7 @@ class AI_Control:
             # --- End Numerical Fallback Logic ---
 
     def parse_action(self, player_prompt, available_actions: list, use_ollama):
-        player_text = input(player_prompt)
+        player_text = input(player_prompt).strip().lower()
         if use_ollama:
             # --- START FIX ---
             # Give the AI a "help" option and better instructions
