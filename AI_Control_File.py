@@ -15,7 +15,6 @@ class AI_Control:
         try:
             self.groq_api_key = os.environ.get("GROQ_API_KEY")
             if not self.groq_api_key:
-                # This will now print to the web console
                 print("[WARNING] GROQ_API_KEY not found in .env file. AI features will be disabled.")
             else:
                 self.groq_client = Groq(api_key=self.groq_api_key)
@@ -46,6 +45,28 @@ class AI_Control:
             'loop': True if loop == -1 else False
         })
         
+    def weapon_sound(self, weapon):
+        """ Tells the client to play a weapon sound. """
+        if "rifle" in weapon:
+            self.play_sound("rifle_shot.mp3")
+        elif "revolver" in weapon or "pistol" in weapon:
+            self.play_sound("revolver_shot.mp3")
+        elif "shotgun" in weapon:
+            self.play_sound("shotgun.mp3")
+        elif "knife" in weapon or "saber" in weapon:
+            self.play_sound("knife.mp3")
+        elif "tomahawk" in weapon:
+            self.play_sound("tomahawk.mp3")
+        else:
+            self.play_sound("punch.mp3") # Default
+
+    def enemy_sound(self, name):
+        """ Tells the client to play an enemy sound. """
+        if "wolf" in name:
+            self.play_sound("wolf_howl.mp3")
+        elif "snake" in name or "viper" in name or "cobra" in name:
+            self.play_sound("rattle.mp3")
+        
     def update_stats_display(self, player_obj):
         """ Sends a complete player stat block to the UI. """
         try:
@@ -60,7 +81,7 @@ class AI_Control:
                 'difficulty': player_obj.difficulty.capitalize()
             })
         except Exception as e:
-            print(f"[Stat Update Error]: {e}")
+            print(f"[Stat Update Error]: {e}") # Log to server console
 
     # --- CORE I/O (Input) FUNCTIONS ---
 
@@ -85,19 +106,16 @@ class AI_Control:
         """ Helper function to call the Groq API. """
         if not self.use_ai:
             return None 
-        
-        format_props = {}
-        if is_json:
-            format_props = {"type": "json_object"}
             
         try:
+            # FIX: Pass response_format directly to fix Pylance type error
             response = self.groq_client.chat.completions.create(
                 model="llama3-8b-8192", 
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format=format_props,
+                response_format={"type": "json_object"} if is_json else None,
                 temperature=0.2
             )
             return response.choices[0].message.content
@@ -105,44 +123,27 @@ class AI_Control:
             self.print_to_client(f"[Groq API Error: {e}]")
             return None
 
-    # --- NEW PARSER FUNCTIONS (Replaces your old file) ---
-    # These functions now get input from the web UI
-    # instead of the console `input()`.
+    # --- NEW PARSER FUNCTIONS (Replaces your old file's logic) ---
+    # These functions match your game's calls but use the web UI
 
     def parse_choice(self, available_choices, player_prompt, use_ollama):
-        # We always use the web buttons, which is the 'numerical' (safe) path.
-        # The 'use_ollama' flag (now 'use_ai') is only for AI *narration*.
-        
-        # 1. Get input from the web UI by showing buttons
-        # 'player_prompt' is used as the title for the button list
+        """ Gets a choice from the user by showing buttons. """
         raw_text = self._get_web_input(player_prompt, choices=available_choices, input_type='choice')
 
-        # 2. Since the UI sends the *exact* choice (e.g., "leave town"),
-        # we can just validate and return it.
         if raw_text in available_choices:
             return raw_text.lower()
         else:
-            # Safe fallback
-            if "leave" in available_choices:
-                return "leave"
-            else:
-                return "none"
+            return "leave" if "leave" in available_choices else "none"
 
     def parse_YN(self, player_prompt) -> str:
-        # 1. Get input from the web UI. We show two buttons: "Yes" and "No".
+        """ Gets a Yes/No answer from the user. """
         raw_text = self._get_web_input(player_prompt, choices=["Yes", "No"], input_type='choice')
-        
-        # 2. The UI sends back "Yes" or "No". We convert it to your game's format.
-        if raw_text.lower() == "yes":
-            return "yes"
-        else:
-            return "no"
+        return "yes" if raw_text.lower() == "yes" else "no"
 
     def parse_purchase(self, items: list, player_prompt, use_ollama):
-        # This is now a multi-step process
+        """ Asks for item, then quantity. """
         
         # 1. Ask *what* item to buy
-        # 'items' list already contains 'inventory' and 'leave'
         item_choice = self._get_web_input(player_prompt, choices=items, input_type='choice')
         
         # 2. Handle non-item choices
@@ -158,38 +159,33 @@ class AI_Control:
         if quantity_str.isdigit() and int(quantity_str) > 0:
             final_quantity = quantity_str
         else:
-            # If they type "one" or "a bunch" or "0", default to 1
-            print(f"Invalid quantity '{quantity_str}'. Defaulting to 1.")
+            self.print_to_client(f"Invalid quantity '{quantity_str}'. Defaulting to 1.")
             final_quantity = "1"
             
         # 5. Return the full dictionary your store.py expects
         return {"choice": item_choice, "quantity": final_quantity}
 
-
     def parse_action(self, player_prompt, available_actions: list, use_ollama):
-        # 1. Get input from the web UI
+        """ Gets a main action choice from the user. """
         raw_text = self._get_web_input(player_prompt, choices=available_actions, input_type='choice')
 
-        # 2. The UI sends the exact action.
         if raw_text in available_actions:
             return {"action": raw_text}
         else:
-            # Safe fallback
-            return {"action": "help"}
+            return {"action": "help"} # Safe fallback
 
     def parse_dialogue_player(self, player_dialogue_prompt, choices: list, use_ollama):
-        # This is now identical to parse_choice
+        """ Gets a dialogue choice. """
         raw_text = self._get_web_input(player_dialogue_prompt, choices=choices, input_type='choice')
         
         if raw_text in choices:
             return {"action": raw_text}
         else:
-            return {"action": "talk"} # Default fallback for dialogue
+            return {"action": "talk"} # Default fallback
 
     # --- AI NARRATION FUNCTIONS (Using Groq) ---
 
     def narrate_shop(self, game_state, event, NPC, use_ollama):
-        # We use the 'use_ollama' flag (which is now self.use_ai)
         if self.use_ai:
             prompt = dedent(f"""
             You are an NPC for a western text RPG.
@@ -200,15 +196,13 @@ class AI_Control:
             
             narration = self._call_groq(prompt, "The player enters your shop.", is_json=False)
             if narration:
-                print(f"{NPC}: {narration}")
+                self.print_to_client(f"{NPC}: {narration}")
             else:
-                print(f"\n{NPC}: Welcome to the shop. Take a look.") # Groq fallback
+                self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
             
-            # This function no longer needs to handle input.
-            # Your store.py loop will continue and call 'parse_purchase' next.
-            return 'buy' # Always proceed
+            return 'buy'
         else:
-            print(f"\n{NPC}: Welcome to the shop. Take a look.")
+            self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
             return 'buy'
 
     def narrate_dialogue_once(self, game_state, event, NPC, use_ollama):
@@ -221,23 +215,20 @@ class AI_Control:
             """)
             question = self._call_groq(prompt, "Ask the player the question.", is_json=False)
             if question:
-                print(f"{NPC}: {question}")
+                self.print_to_client(f"{NPC}: {question}")
             else:
-                print(f"{NPC}: {event} (yes/no?)") # Groq fallback
+                self.print_to_client(f"{NPC}: {event} (yes/no?)")
         else:
-            print(f"\n{NPC}: {event} (yes/no?)")
+            self.print_to_client(f"\n{NPC}: {event} (yes/no?)")
             
-        # Your Western_Sim.py code MUST call 'AI_File.parse_YN()' *after*
-        # this function. This function's only job is to print the dialogue.
-        # We return 'yes' or 'no' based on the player's *next* input.
-        return self.parse_YN("") # Ask the Y/N question
+        # Your code expects a 'yes'/'no' string back
+        return self.parse_YN("") # Ask the Y/N question immediately
             
     def generate_diary_entry(self, game_state, player_health, max_health, day_memory, tone):
         """ Uses Groq to generate a creative diary entry. """
         fallback_entry = "Another day done. The trail is long." 
         
         if not self.use_ai:
-            print(fallback_entry)
             return fallback_entry
 
         encounter_desc = day_memory.get('encounter') or "nothing special"
@@ -257,8 +248,5 @@ class AI_Control:
 
         if not full_entry:
             full_entry = fallback_entry
-            
-        print("\n— Your diary entry —")
-        print(full_entry)
         
         return full_entry.strip()

@@ -1,5 +1,5 @@
 import random
-import ollama
+
 import time
 import json
 import os
@@ -9,7 +9,7 @@ from store import ShopItem, ShopSession
 import yaml
 import builtins
 import sys
-from AI_Control_File import AI_Control
+USE_OLLAMA = False
 from requests.exceptions import ConnectionError
 
     
@@ -204,7 +204,7 @@ class Player:
         save_files = [f for f in os.listdir(save_folder) if f.endswith('.json')]
         if not save_files:
             print("No save files found. Starting a new game.")
-            return cls()
+            return 
 
         # Display saves by number
         for idx, filename in enumerate(save_files, start=1):
@@ -214,14 +214,13 @@ class Player:
 
         if not slot_choice.isdigit() or not (1 <= int(slot_choice) <= len(save_files)):
             print("Invalid choice. Starting a new game.")
-            return cls()
+            return 
 
         save_file = save_files[int(slot_choice) - 1]
         filepath = os.path.join(save_folder, save_file)
         with open(filepath, 'r') as f:
             save_data = json.load(f)
 
-        player = cls()
 
         # Restore saved data
         player.rebirth = save_data.get("rebirth", False)
@@ -334,7 +333,7 @@ class Player:
             player = Player.load_game()
         else:
             print("Would you like the instructions (Yes/No)?")
-            Choice = AI_File.parse_YN(": ")
+            Choice = self.AI_File.parse_YN(": ")
             if Choice == "yes":
                 print("Welcome to Western Simulator!")
                 time.sleep(2,)
@@ -345,11 +344,11 @@ class Player:
                 print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
                 choice = input(": ").strip()
                 if choice == "1":
-                    player.difficulty = 'adventure'
+                    self.difficulty = 'adventure'
                 elif choice == "3":
-                    player.difficulty = 'savage'
+                    self.difficulty = 'savage'
                 else:
-                    player.difficulty = 'frontier'
+                    self.difficulty = 'frontier'
                 time.sleep(2,)
                 print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
                 time.sleep(2,)
@@ -364,20 +363,20 @@ class Player:
                 print("You wake up in the town of " + Location[random.randint(0,2)])
                 print("The people greet you with nods as you walk down the mainstreet.")
                 time.sleep(4,)
-                player.change_music("Town.mp3", -1)
-                player.add_item("diary")
+                self.change_music("Town.mp3", -1)
+                self.add_item("diary")
                 
             else:
-                player.change_music("Town.mp3", -1)
-                player.add_item("diary")
+                self.change_music("Town.mp3", -1)
+                self.add_item("diary")
                 print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
                 choice = input(": ").strip()
                 if choice == "1":
-                    player.difficulty = 'adventure'
+                    self.difficulty = 'adventure'
                 elif choice == "3":
-                    player.difficulty = 'savage'
+                    self.difficulty = 'savage'
                 else:
-                    player.difficulty = 'frontier'
+                    self.difficulty = 'frontier'
 
 
         while not player.Health <= 0:
@@ -418,7 +417,6 @@ class Player:
             choice = input("Would you like to quit? (yes/no): ").strip().lower()
             if choice == 'yes':
                 print("Thanks for playing! See you next time.")
-                pygame.mixer.music.stop()
                 exit()
             else:
                 print("Continuing your adventure...")
@@ -535,24 +533,13 @@ class Player:
             while True:
                 # 1. Get input
                 if USE_OLLAMA:
-                    parsed = AI_File.parse_action(": ", self.possibleactions, use_ollama=USE_OLLAMA)
+                    parsed = self.AI_File.parse_action(": ", self.possibleactions, use_ollama=USE_OLLAMA)
                     action_result = parsed.get('action', 'none')
-                    if choice == "67":
-                        self.coffee_mill_showdown()
-                        self.gold += 100
-                        self.encounter_earp_intro()
-                        self.loot_drop("sharps rifle")
-                        self.loot_drop("tomahawk")
-                        self.run_final_mission()
-                        print("executed")
                 else:
-                    parsed = AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions, use_ollama=USE_OLLAMA)
+                    parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions, use_ollama=USE_OLLAMA)
                     action_result = parsed.get('action', 'none')
 
                 # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
-                if choice.lower() == "help":
-                    print_action_list()
-                    continue # Ask for input again
 
                 # 3. Parse the action
                 # AI_File.parse_action will now handle the number-to-action conversion
@@ -924,7 +911,7 @@ class Player:
         print("Ask the sheriff to teach you some skills.")
         print("Leave the jail.")
         available_choices = ["pay fine", "return criminal", "ask rumors", "teach skills", "leave"]
-        choice = AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=USE_OLLAMA)
+        choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=USE_OLLAMA)
         if choice == "pay fine":
             if self.Hostility > 0:
                 fine = self.Hostility * 5
@@ -988,14 +975,14 @@ class Player:
             print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
             available_choices = ['durability', 'trail', 'strength', 'shadow']
-            skill_choice = AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=USE_OLLAMA)
+            skill_choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=USE_OLLAMA)
             if skill_choice == "shadow":
                 gold = (self.shadow_skill - 2) * 5
                 if gold > self.gold:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.shadow_skill += 1
                     print("Your shadow skill has improved! +1 shadow skill.")
@@ -1008,7 +995,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.trail_skill += 1
                     print("Your trail skill has improved! +1 trail skill.")
@@ -1021,7 +1008,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.strength_skill += 1
                     print("Your strength skill has improved! +1 strength skill.")
@@ -1034,7 +1021,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.MaxHealth += 5
                     print("Your durability skill has improved! +5 max Health.")
@@ -1094,7 +1081,7 @@ class Player:
         if "winchester barrel" in self.itemsinventory and "winchester stock" in self.itemsinventory:
             print("You have the parts to assemble a Winchester rifle.")
             print("Would you like to assemble it now? (yes/no)")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 self.itemsinventory.pop("winchester barrel")
                 self.itemsinventory.pop("winchester stock")
@@ -1106,7 +1093,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
 
         item_prices = {
             'boots': 15,
@@ -1161,7 +1148,7 @@ class Player:
         cost = round(cost)
         print("'Would you like me to heal you?' Yes/No")
         print(f"It will cost you {cost}.")
-        Choice = AI_File.parse_YN(": ")
+        Choice = self.AI_File.parse_YN(": ")
         if Choice == "yes":
             if self.gold >= cost:
                 self.gold -= cost
@@ -1181,7 +1168,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
         doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, USE_OLLAMA)
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
@@ -1195,7 +1182,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
             NpC = "gunsmith"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
         time.sleep(2,)
 
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
@@ -1381,7 +1368,7 @@ class Player:
                 print("The saloon is lively, but nothing new catches your attention.")
                 return
             print("A drunk cowboy staggers over and offers you a swig of whiskey. (yes/no)")
-            ans = AI_File.parse_YN(": ")
+            ans = self.AI_File.parse_YN(": ")
             if ans == "yes":
                 if random.randint(1,10) >= 9:
                     print("The whiskey was spoiled! You feel ill.")
@@ -1468,7 +1455,7 @@ class Player:
     
     def saloon_steal_attempt(self):
         print("\nYou notice the crowd is enthralled by the music... could be your chance to steal something.")
-        choice = AI_File.parse_YN("Would you like to attempt to steal? (yes/no): ")
+        choice = self.AI_File.parse_YN("Would you like to attempt to steal? (yes/no): ")
         if choice == "yes":
             # Determine success based on shadow skill
 
@@ -1488,7 +1475,7 @@ class Player:
                 print("'We can do this the easy way, or the hard way.'")
                 print("'Surrender, or I make you.'")
                 print("Will you surrender? (yes/no)")
-                Choice = AI_File.parse_YN(": ")
+                Choice = self.AI_File.parse_YN(": ")
                 if Choice == "yes":
                     print("You surrender to the sheriff, and he takes you to the Town Jail.")
                     self.jail_penalty()
@@ -1579,7 +1566,7 @@ class Player:
             print("A merchant walks up to you.")
             NpC = "merchant"
             event = "A merchant asks if the player will help load wagons at the stable."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice.strip().lower() == "yes":
                 earned = random.randint(20, 40)
                 self.gold += earned
@@ -1593,7 +1580,7 @@ class Player:
             NpC = "farmer"
             print("A farmer waves you over.")
             event = "A farmer waves the player over. 'My plow's busted—can you help fix it?'"
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice == "yes":
                 if "rope" in self.itemsinventory:
                     print("You tie it back together with your rope.")
@@ -1619,7 +1606,7 @@ class Player:
             print("A schoolteacher walks over.")
             NpC = "schoolteacher"
             event = "A schoolteacher asks if the player will speak to the children about survival."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
             if choice == "yes":
                 self.Time += 2
                 self.shadow_skill += 1
@@ -1644,7 +1631,7 @@ class Player:
             # Rare: town alert
             print("A kid runs by shouting, 'Bandits near the ridge!'")
             print("The sheriff is calling for help. Do you join him? (yes/no)")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 print("You ride with the sheriff to confront the bandits!")
                 self.Speed += 1
@@ -1697,7 +1684,7 @@ class Player:
         if self.event == "final_earp_confrontation":
             print("Earp yells at you to stop, 'We need to finish Curly Bill.'")
             print("Will you stay and help him? (yes/no)")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 print("'Meet me at the saloon,' Earp says.")
                 return
@@ -1866,7 +1853,6 @@ class Player:
             self.jail_penalty()
 
     def Death(self, death_cause):
-        pygame.mixer.music.stop()
         self.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
         time.sleep(2,)
@@ -1882,7 +1868,7 @@ class Player:
             self.Statcheck()
             print("You have come so far, would you like to respawn at your current position? (yes/no)")
             print("You will no longer track score.")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 self.lose_random_item(2)
                 self.gold -= self.gold/2
@@ -1900,17 +1886,11 @@ class Player:
         time.sleep(1,)
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         time.sleep(1,)
-        if choice == "yes":
-            print("Restarting game...")
-            
-            player = Player()
-            player.main_game_loop()
-            exit()
-        else:
-            print("Thank you for playing!")
-            print("Until next time...")
-            time.sleep(2,)
-            exit()
+
+        print("Thank you for playing!")
+        print("Until next time...")
+        time.sleep(2,)
+        exit()
 
         
 
@@ -2055,7 +2035,7 @@ class Player:
         if "outlaw" not in self.caravan and rand == 2:
             print("A outlaw appears on the road.")
             print("Will you try and capture him? (yes/no)")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             time.sleep(2,)
             if choice == "Yes":
                 print("You attempt to capture the outlaw.")
@@ -2078,7 +2058,7 @@ class Player:
         elif "family" not in self.caravan and rand == 1:
             print("A family is travelling in their wagon, but it appears that they have a broken wheel.")
             print("Would you like to help, or pass them by? (yes/no)")
-            choice = AI_File.parse_YN(": ")
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 print("You tow the other wagon behind yours.")
                 print("The family thanks you for allowing them to travel with them")
@@ -2726,7 +2706,7 @@ class Player:
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
         print("You have learned from this adventure, you become more agile. +1 speed.")
         print("You may choose either a strength, shadow, or trail skill increase.")
-        skill_choice = AI_File.parse_choice(["strength", "shadow", "trail"], "Which skill do you choose to improve? (strength/shadow/trail): ", use_ollama=USE_OLLAMA).strip().lower()
+        skill_choice = self.AI_File.parse_choice(["strength", "shadow", "trail"], "Which skill do you choose to improve? (strength/shadow/trail): ", use_ollama=USE_OLLAMA).strip().lower()
         if choice == "strength":
             self.strength_skill += 2
             print("Your strength skill increases by 2.")
@@ -3073,7 +3053,7 @@ class Player:
                 print("Running quickly, you find the manage to catch the looter outside the mine.")
                 print("He surrenders, begging for mercy.")
                 print("Do you take him with you? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.caravan.append("outlaw")
                     print("You take the outlaw with you, hoping to turn him in for a reward.")
@@ -3284,7 +3264,7 @@ class Player:
             return
         print("At the saloon, you overhear a group of railroad men talking.")
         print("'Tracks are coming through this territory... but bandits don't like progress.'")
-        choice = AI_File.parse_YN("Do you agree to help the railroad? (yes/no): ")
+        choice = self.AI_File.parse_YN("Do you agree to help the railroad? (yes/no): ")
         if choice == "yes":
             print("You agree to aid the foreman in keeping the line safe.")
             self.Tquest = "iron_tracks"
@@ -3707,7 +3687,7 @@ class Player:
         print("Sneak along the riverbank to get closer (Shadow Skill Check)")
         
         boarded = False
-        choice =  AI_File.parse_choice((["swim", "rope", "sneak"]), "Choice (swim, rope, or sneak: ", USE_OLLAMA)
+        choice =  self.AI_File.parse_choice((["swim", "rope", "sneak"]), "Choice (swim, rope, or sneak: ", USE_OLLAMA)
         if choice == "swim":
             if self.perform_stat_check(self.strength_skill, base_target=15):
                 print("You dive into the churning water and power through the current, climbing aboard!")
@@ -3924,8 +3904,6 @@ class Player:
         print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         print("\n--- THANKS FOR PLAYING! ---")
-        
-        pygame.mixer.music.stop()
         exit()
 
     #Generic Game Stuff
@@ -3977,7 +3955,7 @@ class Player:
             case "multi-shot":
                 # Logic for remington pistol, derringer pistol
                 print("Would you like to fire multiple shots? yes/no")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     print("You fire multiple shots")
                     # Note: The main combat loop already consumed 1 ammo. This consumes 2 *additional* ammo.
@@ -3995,7 +3973,7 @@ class Player:
             case "double barrel":
                 # Logic for double barrel shotgun
                 print("Double Barrel! Fire both barrels? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 # Note: The main combat loop already consumed 1 ammo. This consumes 1 *additional* ammo.
                 if choice == "yes" and self.itemsinventory.get("shotgun_ammo", 0) >= 1:
                     self.itemsinventory["shotgun_ammo"] -= 1 # Consume the second barrel's shell
@@ -4014,7 +3992,7 @@ class Player:
             case "throw":
                 # Logic for tomahawk
                 print("Throw your tomahawk for extra damage? (yes/no)")
-                choice = AI_File.parse_YN(": ")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     if self.itemsinventory.get("tomahawk", 0) > 0:
                         self.itemsinventory["tomahawk"] -= 1

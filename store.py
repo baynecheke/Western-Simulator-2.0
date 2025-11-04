@@ -1,7 +1,7 @@
 # In store.py
 import time
 import random
-
+from Western_Sim import USE_OLLAMA
 class ShopItem:
     """A simple data class to hold item info."""
     def __init__(self, name, base_price, quantity):
