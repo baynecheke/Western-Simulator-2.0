@@ -198,8 +198,7 @@ class Player:
         self.current_town_name = "Dustbowl"
         self.update_actions()
 
-    @classmethod
-    def load_game(cls):
+    def load_game(self):
         print("\n--- Load Game ---")
         save_folder = 'saves'
         if not os.path.exists(save_folder):
@@ -227,53 +226,53 @@ class Player:
 
 
         # Restore saved data
-        player.rebirth = save_data.get("rebirth", False)
-        player.gold = save_data.get("gold", 0)
-        player.itemsinventory = save_data.get("itemsinventory", {})
-        player.distancenext = save_data.get("distancenext", 0)
-        player.Day = save_data.get("Day", 1)
-        player.Time = save_data.get("Time", 9)
-        player.Health = save_data.get("Health", 100)
-        player.Hunger = save_data.get("Hunger", 0)
-        player.Hostility = save_data.get("Hostility", 0)
-        player.score = save_data.get("score", 0)
-        player.invillage = save_data.get("invillage", True)
-        player.travel_bonus = save_data.get("travel_bonus", 0)
-        player.trade_bonus = save_data.get("trade_bonus", 0)
-        player.caravan = save_data.get("caravan", [])
-        player.town_defense_outcome = save_data.get("defense_outcome", False)
-        player.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
-        player.town_final_outcome = save_data.get("final_outcome", False)
-        player.boots_used = save_data.get("boots", False)
-        player.diary_entries = save_data.get("diary_entries", [])
-        player.difficulty = save_data.get("difficulty", [])
-        player.MaxHealth = save_data.get("MaxHealth", 0)
-        player.TownUpgrades = save_data.get("TownUpgrades", [])
-        player.Tquest = save_data.get("Tquest", "None")
-        player.quest = save_data.get("quest", [])
-        player.rumors = save_data.get("rumors", {})
-        player.diary_bonuses = save_data.get("diary_bonuses", [])
-        player.rumors_heard = save_data.get("rumors_heard", [])
-        player.enemy_effects = save_data.get("enemy_effects", [])
-        player.player_effects = save_data.get("player_effects", [])
-        player.iron_bonus = save_data.get("iron_bonus", 0)
-        player.iron_stage = save_data.get("iron_stage", 0)
-        player.shadow_skill = save_data.get("shadow_skill", 3)
-        player.trail_skill = save_data.get("trail_skill", 3)
-        player.strength_skill = save_data.get("strength_skill", 3)
-        player.earp_bonus = save_data.get("earp_bonus", 0)
-        player.earp_stage = save_data.get("earp_stage", 0)
-        player.quests_done = save_data.get("quests_done", [])
-        player.event = save_data.get("event", [])
-        player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
-        player.player_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
-        player.current_town_name = save_data.get("current_town_name", "Dustbowl")
+        self.rebirth = save_data.get("rebirth", False)
+        self.gold = save_data.get("gold", 0)
+        self.itemsinventory = save_data.get("itemsinventory", {})
+        self.distancenext = save_data.get("distancenext", 0)
+        self.Day = save_data.get("Day", 1)
+        self.Time = save_data.get("Time", 9)
+        self.Health = save_data.get("Health", 100)
+        self.Hunger = save_data.get("Hunger", 0)
+        self.Hostility = save_data.get("Hostility", 0)
+        self.score = save_data.get("score", 0)
+        self.invillage = save_data.get("invillage", True)
+        self.travel_bonus = save_data.get("travel_bonus", 0)
+        self.trade_bonus = save_data.get("trade_bonus", 0)
+        self.caravan = save_data.get("caravan", [])
+        self.town_defense_outcome = save_data.get("defense_outcome", False)
+        self.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
+        self.town_final_outcome = save_data.get("final_outcome", False)
+        self.boots_used = save_data.get("boots", False)
+        self.diary_entries = save_data.get("diary_entries", [])
+        self.difficulty = save_data.get("difficulty", [])
+        self.MaxHealth = save_data.get("MaxHealth", 0)
+        self.TownUpgrades = save_data.get("TownUpgrades", [])
+        self.Tquest = save_data.get("Tquest", "None")
+        self.quest = save_data.get("quest", [])
+        self.rumors = save_data.get("rumors", {})
+        self.diary_bonuses = save_data.get("diary_bonuses", [])
+        self.rumors_heard = save_data.get("rumors_heard", [])
+        self.enemy_effects = save_data.get("enemy_effects", [])
+        self.player_effects = save_data.get("player_effects", [])
+        self.iron_bonus = save_data.get("iron_bonus", 0)
+        self.iron_stage = save_data.get("iron_stage", 0)
+        self.shadow_skill = save_data.get("shadow_skill", 3)
+        self.trail_skill = save_data.get("trail_skill", 3)
+        self.strength_skill = save_data.get("strength_skill", 3)
+        self.earp_bonus = save_data.get("earp_bonus", 0)
+        self.earp_stage = save_data.get("earp_stage", 0)
+        self.quests_done = save_data.get("quests_done", [])
+        self.event = save_data.get("event", [])
+        self.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
+        self.player_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
+        self.current_town_name = save_data.get("current_town_name", "Dustbowl")
 
         print(f"Game loaded from {save_file} successfully!")
         # Update possible actions based on whether the player is in a village
-        player.save_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
-        player.update_actions()
-        return player
+        self.save_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
+        self.update_actions()
+        return self
 
     def save_game(self):
         if not self.save_name:
@@ -340,9 +339,14 @@ class Player:
         choice_str = self.AI_File.parse_choice(choices, prompt, USE_OLLAMA)
         # --- END NEW ---
 
-        if choice_str == "load a save": # Note: parse_choice returns lowercase
-            player = Player.load_game() # This will still use text boxes (for now)
-        else:
+        load_success = False # Default to false
+        if choice_str == "load a save":
+            load_success = self.load_game() # This now calls the method on 'self'
+            if not load_success:
+                print("...Proceeding with a new game anyway.")
+
+        if not load_success: # This block runs if player clicks "Start New Game" OR if loading failed
+            # "Start New Game" path
             # "Start New Game" path
             print("Would you like the instructions (Yes/No)?")
             Choice = self.AI_File.parse_YN(": ")
@@ -391,41 +395,41 @@ class Player:
                     self.difficulty = 'frontier'
 
 
-        while not player.Health <= 0:
-            if player.invillage == True:
-                player.HostilityFunc()
-                player.change_music("Town.mp3", -1)
+        while not self.Health <= 0:
+            if self.invillage == True:
+                self.HostilityFunc()
+                self.change_music("Town.mp3", -1)
             else:
-                player.change_music("game_theme.mp3", -1)
-            player.RunDay()
-            player.counter = 0
-            player.Day += 1
-            if player.Temporaryspdboost > 0:
-                player.Speed -= player.Temporaryspdboost
-                player.Temporaryspdboost = 0
-            if player.Health <= 0:
+                self.change_music("game_theme.mp3", -1)
+            self.RunDay()
+            self.counter = 0
+            self.Day += 1
+            if self.Temporaryspdboost > 0:
+                self.Speed -= self.Temporaryspdboost
+                self.Temporaryspdboost = 0
+            if self.Health <= 0:
                 time.sleep(2,)
-                player.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
-            player.Hunger = player.Hunger + 1
+                self.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
+            self.Hunger = self.Hunger + 1
             print("You feel hungrier...")
             time.sleep(2,)
-            if player.Hunger >= 3:
+            if self.Hunger >= 3:
                 print("You stagger, feeling the effects of your ravenous hunger.")
-                hunger_damage = player.Hunger*5
+                hunger_damage = self.Hunger*5
                 lost_health = hunger_damage
-                player.Health -= lost_health
+                self.Health -= lost_health
                 print(f"You lost {lost_health} health of hunger.")
-                if player.Health <= 0:
-                    player.Death("You have succumbed to starvation in the unforgiving wild west.")
+                if self.Health <= 0:
+                    self.Death("You have succumbed to starvation in the unforgiving wild west.")
                 
-            if player.poisoned > 0:
+            if self.poisoned > 0:
                 print("You remain poisoned, feeling weak and faint.")
                 time.sleep(2,)
 
-            print(f"Your health is: {player.Health}.")
-            if player.Health <= 0:
+            print(f"Your health is: {self.Health}.")
+            if self.Health <= 0:
                 break
-            player.save_game()
+            self.save_game()
             choice = input("Would you like to quit? (yes/no): ").strip().lower()
             if choice == 'yes':
                 print("Thanks for playing! See you next time.")
@@ -1102,7 +1106,7 @@ class Player:
         time.sleep(2,)
         if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
+            game_state = self.generate_game_state()
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
             self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
@@ -1177,7 +1181,7 @@ class Player:
         }
         if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
+            game_state = self.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
             self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
@@ -1191,7 +1195,7 @@ class Player:
         print("The gunsmith greets you with a nod. Guns line the walls.")
         if random.randint(1,3) == 3:
             print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
+            game_state = self.generate_game_state()
             event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
             NpC = "gunsmith"
             self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
