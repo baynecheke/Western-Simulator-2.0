@@ -114,4 +114,4 @@ def run_game_loop():
 # --- Start The Server ---
 if __name__ == '__main__':
     original_print("Starting Flask server on http://localhost:5001")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host="0.0.0.0", port=5001, debug=False, allow_unsafe_werkzeug=True)
