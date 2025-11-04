@@ -1,49 +1,84 @@
-import eventlet
-eventlet.monkey_patch()
 import os
 import threading
-import builtins
-original_print = builtins.print # Save the original print
-from flask import Flask, render_template_string
-from flask_socketio import SocketIO
+import queue
+import builtins # Need this for patching
+import time     # Need this for patching
+from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv
 
 # --- Load Environment Variables ---
-# This loads your GROQ_API_KEY from the .env file
 load_dotenv() 
 
 # --- Import Your Game Logic ---
 from AI_Control_File import AI_Control
 from Western_Sim import Player 
-from store import ShopItem, ShopSession
-import game_html # This is our new HTML file
+import game_html 
 
 # --- Global Game Objects ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-12345')
-socketio = SocketIO(app)
 
-# --- Thread-Safe Communication ---
-input_event = threading.Event()
-player_response = None
+server_outbox = queue.Queue()
+player_inbox = queue.Queue()
 
-def get_player_response_from_global():
-    """A function to safely get the response."""
-    global player_response
-    return player_response
+ai_file = AI_Control(server_outbox, player_inbox) 
+player_thread = None
+player_object = None 
 
-# --- Instantiate Game Objects ---
-# 1. Create the AI Controller Bridge
-ai_file = AI_Control(socketio, input_event, get_player_response_from_global) 
+# --- The Main Game Loop Function ---
+def run_game_loop():
+    """ 
+    This function runs the actual game logic in a separate thread.
+    It will start, run until it needs input, and then pause, waiting 
+    for the player_inbox to have an item.
+    """
+    global player_object
+    
+    # --- Store original built-in functions ---
+    original_print = builtins.print
+    original_input = builtins.input
+    original_sleep = time.sleep
 
-# 2. Create the Player and "inject" the ai_file
-# --- THIS IS THE FIX ---
-player = None
-# --- END OF FIX ---
+    try:
+        # --- PATCH BUILT-IN FUNCTIONS ---
+        # All calls to 'print()' in the game thread will now go to the web.
+        builtins.print = ai_file.print_to_client
+        # All calls to 'input()' in the game thread will now ask the web.
+        builtins.input = ai_file.patched_input
+        # Speed up the game by patching 'time.sleep'
+        time.sleep = lambda seconds: None # Does nothing
+        
+        # 1. Create the Player *inside the thread*
+        player_object = Player(ai_file_arg=ai_file) 
 
-# --- MONKEY-PATCH 'print()' ---
+        # 2. Set the AI flag
+        import Western_Sim
+        Western_Sim.USE_OLLAMA = ai_file.use_ai
 
-# ---
+        # 3. Run the game
+        player_object.main_game_loop()
+        
+    except Exception as e:
+        # Use the *original* print to log to the terminal
+        original_print(f"--- A CRITICAL ERROR OCCURRED ---")
+        import traceback
+        original_print(traceback.format_exc())
+        
+        # Send a fatal error to the client
+        server_outbox.put({
+            "type": "game_message",
+            "text": f"--- A CRITICAL ERROR OCCURRED: {e} ---<br>The game must restart. Please refresh the page."
+        })
+    
+    finally:
+        # --- CRITICAL: Restore original functions ---
+        # This ensures that if the thread dies, the server
+        # itself can still print to the terminal.
+        builtins.print = original_print
+        builtins.input = original_input
+        time.sleep = original_sleep
+    
+    server_outbox.put({"type": "game_over", "text": "--- GAME OVER ---<br>Refresh the page to play again."})
 
 # --- Web Server Routes ---
 @app.route('/')
@@ -51,67 +86,53 @@ def index():
     """Serves the main HTML game page."""
     return render_template_string(game_html.HTML_CONTENT)
 
-# --- Socket.IO Event Handlers (The "Waiter") ---
-@socketio.on('connect')
-def handle_connect():
-    """A new player connected. Start the game loop in a new thread."""
-    socketio.emit('game_message', {'text': 'Client connected!'})
-    
-    # This check prevents the game from restarting on a simple refresh
-    if player is None:
-         threading.Thread(target=run_game_loop).start()
+@app.route('/start_game', methods=['POST'])
+def start_game():
+    """
+    Browser calls this *once* on page load to start the game thread.
+    """
+    global player_thread
+    if player_thread is None or not player_thread.is_alive():
+        # Clear any old messages
+        while not server_outbox.empty():
+            server_outbox.get()
+        while not player_inbox.empty():
+            player_inbox.get()
+            
+        player_thread = threading.Thread(target=run_game_loop)
+        player_thread.start()
+        return jsonify({"status": "Game started"})
+    return jsonify({"status": "Game already running"})
 
-@socketio.on('player_response')
-def handle_player_response(data):
-    """ We received an answer from the web client. """
-    global player_response, input_event
-    player_response = data['choice']
-    input_event.set() # Wake up the game thread
+@app.route('/get_update')
+def get_update():
+    """
+    This is the "polling" endpoint. The browser calls this every second.
+    It drains all pending messages from the outbox and sends them as a list.
+    """
+    messages = []
+    while not server_outbox.empty():
+        msg = server_outbox.get()
+        messages.append(msg)
+        # If the message is a question, stop sending more messages.
+        # This ensures the browser only gets one question at a time.
+        if msg.get("type") in ["ask_for_choice", "ask_for_text"]:
+            break
+            
+    return jsonify({"messages": messages})
 
-@socketio.on('request_save')
-def handle_request_save():
-    """ Browser is asking to save. (Not fully implemented) """
-    print("Save request received... (logic not fully implemented)")
-
-@socketio.on('load_game')
-def handle_load_game(data):
-    """ Browser is sending us a save file to load. (Not fully implemented) """
-    print("Load request received... (logic not fully implemented)")
-    # Here you would parse data['save_data']
-    # and use it to set up the player object
-    # player.load_from_json_string(data['save_data'])
-
-
-# --- The Main Game Loop Function ---
-def run_game_loop():
-    """ This function runs the actual game logic in a separate thread. """
-    global player # We need to assign to the global 'player'
-    try:
-        # 1. Create the Player *inside the thread*
-        # This calls __init__ *after* eventlet is running.
-        player = Player(ai_file_arg=ai_file) 
-
-        # 2. Set the AI flag
-        import Western_Sim
-        Western_Sim.USE_OLLAMA = ai_file.use_ai
-        builtins.print = ai_file.print_to_client
-        # 3. Run the game
-        player.main_game_loop()
-        
-    except Exception as e:
-        # Send a fatal error to the client
-        print(f"--- A CRITICAL ERROR OCCURRED ---")
-        print(f"ERROR: {e}")
-        print("The game must restart. Please refresh the page.")
-        # Also print to the server console for debugging
-        import traceback
-        original_print("--- A CRITICAL ERROR OCCURRED (SERVER LOG) ---")
-        original_print(traceback.format_exc())
-    
-    print("--- GAME OVER ---")
-    print("Refresh the page to play again.")
+@app.route('/send_response', methods=['POST'])
+def send_response():
+    """
+    This is where the browser sends the player's answer (from a button click
+    or text input) back to the server.
+    """
+    data = request.json
+    player_inbox.put(data['choice']) # Put the answer in the inbox
+    return jsonify({"status": "Response received"})
 
 # --- Start The Server ---
 if __name__ == '__main__':
-    original_print("Starting Flask server on http://localhost:5001")
-    socketio.run(app, host="0.0.0.0", port=5001, debug=False, allow_unsafe_werkzeug=True)
+    print("Starting Flask server on http://localhost:5001")
+    # We use a standard Flask server. No eventlet, no socketio.
+    app.run(host="0.0.0.0", port=5001, debug=False)
