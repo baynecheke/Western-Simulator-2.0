@@ -2,7 +2,7 @@ import json
 import os
 import time
 from textwrap import dedent
-from groq import Groq
+
 
 class AI_Control:
     def __init__(self, socketio, input_event, get_player_response_func):
@@ -107,10 +107,11 @@ class AI_Control:
         """ Helper function to call the Groq API. """
         if not self.use_ai:
             return None 
-
+        
         # --- NEW: Initialize the client *inside the thread* the first time ---
         if self.groq_client is None:
             try:
+                from groq import Groq  # <--- ADD THIS LINE HERE
                 self.groq_client = Groq(api_key=self.groq_api_key)
                 print("[Groq client initialized *inside thread*.]")
             except Exception as e:
