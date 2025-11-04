@@ -37,7 +37,7 @@ ai_file = AI_Control(socketio, input_event, get_player_response_from_global)
 
 # 2. Create the Player and "inject" the ai_file
 # --- THIS IS THE FIX ---
-player = Player(ai_file_arg=ai_file) 
+player = None
 # --- END OF FIX ---
 
 # --- MONKEY-PATCH 'print()' ---
@@ -84,14 +84,18 @@ def handle_load_game(data):
 # --- The Main Game Loop Function ---
 def run_game_loop():
     """ This function runs the actual game logic in a separate thread. """
+    global player # We need to assign to the global 'player'
     try:
-        # This global variable is set at the top of Western_Sim.py
-        # We must update it here so the game knows to use AI
+        # 1. Create the Player *inside the thread*
+        # This calls __init__ *after* eventlet is running.
+        player = Player(ai_file_arg=ai_file) 
+
+        # 2. Set the AI flag
         import Western_Sim
-        Western_Sim.USE_OLLAMA = ai_file.use_ai # Use Groq status
-        
-        # Now, call the main loop on our *global* player object
-        player.main_game_loop() 
+        Western_Sim.USE_OLLAMA = ai_file.use_ai
+
+        # 3. Run the game
+        player.main_game_loop()
         
     except Exception as e:
         # Send a fatal error to the client
