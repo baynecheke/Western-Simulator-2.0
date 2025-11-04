@@ -331,11 +331,19 @@ class Player:
 
     def main_game_loop(self):
         global player
-        print("Would you like to (1) Start New Game or (2) Load a Save?")
-        choice = input("Enter 1 or 2: ").strip()
-        if choice == "2":
-            player = Player.load_game()
+        
+        # --- NEW CODE ---
+        prompt = "Would you like to Start a New Game or Load a Save?"
+        choices = ["Start New Game", "Load a Save"]
+        
+        # This will show two buttons
+        choice_str = self.AI_File.parse_choice(choices, prompt, USE_OLLAMA)
+        # --- END NEW ---
+
+        if choice_str == "load a save": # Note: parse_choice returns lowercase
+            player = Player.load_game() # This will still use text boxes (for now)
         else:
+            # "Start New Game" path
             print("Would you like the instructions (Yes/No)?")
             Choice = self.AI_File.parse_YN(": ")
             if Choice == "yes":
