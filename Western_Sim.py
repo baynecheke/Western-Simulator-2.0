@@ -36,12 +36,14 @@ with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
 
 
 class Player:
-    def __init__(self):
+    def __init__(self, ai_file_arg):
         #Basic player stuff
+        self.AI_File = ai_file_arg
+
         self.player_name = "default"
         self.rumors = {}
         self.Day = 1
-        self.AI_File = AI_File
+
         self.Time = 9
         self.Speed = 3
         self.counter = 0
@@ -3929,40 +3931,16 @@ class Player:
     #Generic Game Stuff
 
     def change_music(self, filename, loop):
-        music_path = os.path.join(os.path.dirname(__file__), filename)
-        if self.music == False:
-            return
-        else:
-            try:
-                pygame.mixer.music.load(music_path)
-                pygame.mixer.music.play(loop)
-            except pygame.error as e:
-                print(f"Could not play {filename}: {e}")
+        print()
 
     def play_sound(self, filename):
-        try:
-            full_path = os.path.join(os.path.dirname(__file__), filename)
-            sound = pygame.mixer.Sound(full_path)
-            sound.play()
-        except pygame.error as e:
-            print(f"Error playing sound: {e}")
+        print()
 
     def weapon_sound(self, weapon):
-        if weapon in [
-            "rifle", "winchester rifle", "henry rifle",
-            "carbine rifle", "sharps rifle", "lever-action rifle"]:
-            self.play_sound("rifle_shot.mp3")
-            self.play_sound("rifle_prime.mp3")
-        elif weapon in ["shotgun", "double barrel shotgun", "sawed-off shotgun"]:
-            self.play_sound("shotgun.mp3")
-        elif weapon in [
-            "revolver", "colt pistol", "remington pistol",
-            "derringer pistol", "colt navy revolver"]:
-            self.play_sound("revolver_shot.mp3")
+        print()
 
     def enemy_sound(self, name):
-        if name == "rattlesnake":
-            self.play_sound("rattle_snake.mp3")
+        print()
 
     def weapon_ability(self, weapon):
         # Get the weapon's data from the loaded weapons_data
@@ -4824,27 +4802,3 @@ class Combat:
                     player.change_music("game_theme.mp3", -1)
                 return escape
 
-player = Player()
-
-choice = input("Enter cheat code, or press enter to continue:").strip().upper()
-if choice == "DAX":
-    print("Correct")
-    player.gold += 15
-
-music_path = os.path.join(os.path.dirname(__file__), "game_theme.mp3")
-if not os.path.exists(music_path):
-    print("Music file not found!")
-else:
-    pygame.mixer.music.load(music_path)
-    pygame.mixer.music.set_volume(0.5)
-
-    print("Would you like music to play during the game? (yes/no)")
-    choice = AI_File.parse_YN(": ")
-    if choice == "yes":
-        pygame.mixer.music.play(-1)
-    else:
-        player.music = False
-
-
-player.main_game_loop()
-pygame.mixer.music.stop()

@@ -1,0 +1,6 @@
+dist/
+build/
+__pycache__/
+WesternSim.spec
+saves/
+.env
