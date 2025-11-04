@@ -106,11 +106,10 @@ class ShopSession:
                 print("\nWhat would you like to buy?")
                 print("You can 'leave' or look at your 'inventory' at any time.")
             
-            choice1 = input(": ").strip()
 
             # The complete_list must match the printed number order
             complete_list = item_list + actions
-            parsed = self.ai_file.parse_purchase(complete_list, choice1, use_ollama=self.use_ollama)
+            parsed = self.ai_file.parse_purchase(complete_list, ": ", use_ollama=self.use_ollama)
             choice = parsed.get('choice')
             # --- END FIX ---
             
@@ -143,8 +142,7 @@ class ShopSession:
             total_cost = adjusted_price * amount
             
             print(f"I understood you want to buy {amount} x {choice.capitalize()} for ${total_cost}.")
-            confirm = input("Confirm purchase? (yes/no): ").lower()
-            yn_choice = self.ai_file.parse_YN(confirm)
+            yn_choice = self.ai_file.parse_YN("Confirm purchase? (yes/no): ")
             
             if yn_choice != "yes":
                 print("Purchase cancelled.")
@@ -182,10 +180,8 @@ class ShopSession:
                 # Text prompt
                 print("You can 'sell' items, 'swap' items, or 'leave'.")
 
-            raw_input = input("What would you like to do? ").strip()
-            
             # Use the AI_Control parser
-            choice = self.ai_file.parse_choice(available_choices, raw_input, self.use_ollama)
+            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ", self.use_ollama)
             # --- END FIX ---
 
             if choice == "sell": # Replaced "1"

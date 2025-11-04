@@ -1,0 +1,6 @@
+Flask
+Flask-SocketIO
+groq
+PyYAML
+gunicorn
+python-dotenv
