@@ -17,9 +17,9 @@ class AI_Control:
             if not self.groq_api_key:
                 print("[WARNING] GROQ_API_KEY not found in .env file. AI features will be disabled.")
             else:
-                self.groq_client = Groq(api_key=self.groq_api_key)
+                # self.groq_client = Groq(api_key=self.groq_api_key) # <-- DO NOT INIT YET
                 self.use_ai = True
-                print("[Groq client initialized. AI features enabled.]")
+                print("[Groq API key found. AI features enabled.]") # <-- CHANGED PRINT
         except Exception as e:
             print(f"Failed to initialize Groq client: {e}")
             print("Falling back to numerical-only mode.")
@@ -106,9 +106,20 @@ class AI_Control:
         """ Helper function to call the Groq API. """
         if not self.use_ai:
             return None 
-            
+
+        # --- NEW: Initialize the client *inside the thread* the first time ---
+        if self.groq_client is None:
+            try:
+                self.groq_client = Groq(api_key=self.groq_api_key)
+                print("[Groq client initialized *inside thread*.]")
+            except Exception as e:
+                self.print_to_client(f"Failed to initialize Groq client: {e}")
+                self.use_ai = False
+                return None
+        # --- END NEW ---
+
         try:
-            # FIX: Pass response_format directly to fix Pylance type error
+        # FIX: Pass response_format directly to fix Pylance type error
             response = self.groq_client.chat.completions.create(
                 model="llama3-8b-8192", 
                 messages=[
