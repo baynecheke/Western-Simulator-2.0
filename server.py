@@ -3,6 +3,7 @@ eventlet.monkey_patch()
 import os
 import threading
 import builtins
+original_print = builtins.print # Save the original print
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
@@ -57,7 +58,7 @@ def handle_connect():
     socketio.emit('game_message', {'text': 'Client connected!'})
     
     # This check prevents the game from restarting on a simple refresh
-    if player.Health > 0 and player.Day == 1 and player.Time == 9:
+    if player is None:
          threading.Thread(target=run_game_loop).start()
 
 @socketio.on('player_response')
@@ -104,12 +105,13 @@ def run_game_loop():
         print("The game must restart. Please refresh the page.")
         # Also print to the server console for debugging
         import traceback
-        traceback.print_exc()
+        original_print("--- A CRITICAL ERROR OCCURRED (SERVER LOG) ---")
+        original_print(traceback.format_exc())
     
     print("--- GAME OVER ---")
     print("Refresh the page to play again.")
 
 # --- Start The Server ---
 if __name__ == '__main__':
-    print("Starting Flask server on http://localhost:5000")
+    original_print("Starting Flask server on http://localhost:5001")
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)
