@@ -6,7 +6,7 @@ import os
 
 from store import ShopItem, ShopSession
 
-import yaml
+
 import builtins
 import sys
 USE_OLLAMA = False
@@ -15,23 +15,6 @@ USE_OLLAMA = False
 
 
 
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS # type: ignore
-    except AttributeError: # <-- This is more specific
-        # AttributeError is raised when _MEIPASS doesn't exist
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-base_dir = resource_path(".")
-with open(os.path.join(base_dir, "weapons"), "r") as file:
-    weapons_data = yaml.safe_load(file)
-
-
-with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
-    loot_data = yaml.safe_load(file)
 
 
 class Player:
@@ -42,6 +25,28 @@ class Player:
         self.player_name = "default"
         self.rumors = {}
         self.Day = 1
+        import yaml
+        global weapons_data
+        global loot_data
+        def resource_path(relative_path):
+            """ Get absolute path to resource, works for dev and for PyInstaller """
+            try:
+                # PyInstaller creates a temp folder and stores path in _MEIPASS
+                base_path = sys._MEIPASS # type: ignore
+            except AttributeError: # <-- This is more specific
+                # AttributeError is raised when _MEIPASS doesn't exist
+                base_path = os.path.abspath(".")
+
+            return os.path.join(base_path, relative_path)
+        base_dir = resource_path(".")
+        with open(os.path.join(base_dir, "weapons"), "r") as file:
+            weapons_data = yaml.safe_load(file)
+
+
+        with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
+            loot_data = yaml.safe_load(file)
+        
+
 
         self.Time = 9
         self.Speed = 3
