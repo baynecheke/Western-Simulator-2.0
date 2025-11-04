@@ -65,7 +65,7 @@ class AI_Control:
         if "wolf" in name:
             self.play_sound("wolf_howl.mp3")
         elif "snake" in name or "viper" in name or "cobra" in name:
-            self.play_sound("rattle.mp3")
+            self.play_sound("rattle_snake.mp3")
         
     def update_stats_display(self, player_obj):
         """ Sends a complete player stat block to the UI. """

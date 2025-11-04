@@ -3909,16 +3909,17 @@ class Player:
     #Generic Game Stuff
 
     def change_music(self, filename, loop):
-        print()
+        self.AI_File.change_music(filename, loop)
 
     def play_sound(self, filename):
-        print()
+        self.AI_File.play_sound(filename)
 
     def weapon_sound(self, weapon):
-        print()
+        self.AI_File.play_sound(weapon)
 
     def enemy_sound(self, name):
-        print()
+        if name == "rattlesnake":
+            self.AI_File.play_sound("rattle_snake.mp3")
 
     def weapon_ability(self, weapon):
         # Get the weapon's data from the loaded weapons_data
@@ -4040,36 +4041,52 @@ class Player:
                 pass
 
     def donate_supplies(self):
+        
         if not self.itemsinventory:
             print("You have nothing to donate.")
             return
 
         while True:
-            print("\nChoose an item to donate (or 0 to finish):")
-            for i,(item,qty) in enumerate(self.itemsinventory.items(),1):
+            print("\nChoose an item to donate (or 'Done donating'):")
+            
+            # Create the list of choices for the UI
+            item_list = list(self.itemsinventory.keys())
+            display_choices = []
+            
+            # Print the list to the console (like you did before)
+            for i, (item, qty) in enumerate(self.itemsinventory.items(), 1):
                 print(f"{i}) {item} x{qty}")
+                display_choices.append(item) # Add the item name
+            
             print("0) Done donating")
-            choice = input("Choice: ").strip()
-            if choice == "0":
-                break
-            if not choice.isdigit() or not (1 <= int(choice) <= len(self.itemsinventory)):
-                print("Invalid.")
-                continue
+            display_choices.append("Done donating") # Add the exit option
 
-            item = list(self.itemsinventory.keys())[int(choice)-1]
+            # --- FIX 1: Replaced input() with parse_choice ---
+            # This will show buttons for each item and "Done donating"
+            choice = self.AI_File.parse_choice(display_choices, "Choose item:", USE_OLLAMA)
+            
+            if choice == "Done donating":
+                break
+
+            # 'choice' is now the item *name* (e.g., "bread")
+            item = choice
             max_q = self.itemsinventory[item]
-            num = input(f"How many {item}? (1–{max_q}): ").strip()
-            if not num.isdigit() or not (1 <= int(num) <= max_q):
+            
+            # --- FIX 2: Replaced input() with ask_free_text ---
+            num_str = self.AI_File.ask_free_text(f"How many {item}? (1–{max_q}): ")
+            
+            if not num_str.isdigit() or not (1 <= int(num_str) <= max_q):
                 print("Invalid quantity.")
                 continue
-            num = int(num)
+            
+            num = int(num_str)
 
             # determine bonus per unit
             if item in self.common_loot:      bonus = 0.5
             elif item in self.uncommon_loot:  bonus = 1
             elif item in self.rare_loot:      bonus = 3
             elif item in self.ultra_rare_loot: bonus = 6
-            else:                   bonus = 0.5
+            else:                           bonus = 0.5
 
             self.town_defense_bonus += bonus * num
             self.itemsinventory[item] -= num
@@ -4077,7 +4094,7 @@ class Player:
                 del self.itemsinventory[item]
             print(f"Donated {num}×{item}: +{bonus*num} defense bonus.")
 
-        print(f"Total town defense bonus: {self.town_defense_bonus}")          
+        print(f"Total town defense bonus: {self.town_defense_bonus}")     
 
     def write_diary_entry(self):
             # 1) Ask for tone once
@@ -4139,16 +4156,9 @@ class Player:
                         f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
                     )
 
-                add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
-                if add == 'yes':
-                    custom = input("Enter your custom diary line: ").strip()
-                    if custom:
-                        lines.append(custom)
-                        custom_line_added = True # Set flag
+                
                         
                 # --- START FIX: Add score for custom line ---
-                if custom_line_added:
-                    activity_score += 1
                 # --- END FIX ---
 
                 # Cap lines at 4 (was 3, but health+encounter+loot+custom = 4)
@@ -4211,15 +4221,14 @@ class Player:
 
     def select_tone(self):
         tones = ["witty", "serious", "nervous", "hopeful"]
-        print("Choose a tone for tonight's diary:")
-        for i, t in enumerate(tones, 1):
-            print(f"{i}) {t.capitalize()}")
-        while True:
-            choice = input(": ").strip()
-            if choice.isdigit() and 1 <= int(choice) <= len(tones):
-                return tones[int(choice) - 1]
-            print("Invalid choice. Try again.")
+        prompt = "Choose a tone for tonight's diary:"
+        selected_tone = self.AI_File.parse_choice(
+            available_choices=tones,
+            player_prompt=prompt,
+            use_ollama=USE_OLLAMA  # Pass the global flag
+        )
 
+        return selected_tone
     def health_tone_phrase(self, tone):
         options = {
             "witty": [
