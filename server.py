@@ -42,7 +42,7 @@ player = None
 # --- END OF FIX ---
 
 # --- MONKEY-PATCH 'print()' ---
-builtins.print = ai_file.print_to_client
+
 # ---
 
 # --- Web Server Routes ---
@@ -94,7 +94,7 @@ def run_game_loop():
         # 2. Set the AI flag
         import Western_Sim
         Western_Sim.USE_OLLAMA = ai_file.use_ai
-
+        builtins.print = ai_file.print_to_client
         # 3. Run the game
         player.main_game_loop()
         
