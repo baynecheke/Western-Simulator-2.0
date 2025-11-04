@@ -10,7 +10,6 @@ import yaml
 import builtins
 import sys
 USE_OLLAMA = False
-from requests.exceptions import ConnectionError
 
     
 
