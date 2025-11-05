@@ -9,12 +9,12 @@ class ShopItem:
         self.quantity = quantity
 
 class ShopSession:
-    def __init__(self, player, ai_file, store_name, inventory, use_ollama): # Added use_ollama
+    def __init__(self, player, ai_file, store_name, inventory): # Added use_ollama
             self.player = player
             self.ai_file = ai_file
             self.store_name = store_name
             self.inventory = inventory # Dict of {'item_name': ShopItem}
-            self.use_ollama = use_ollama # Store the flag
+
 
     def _show_player_inventory(self):
         """Internal helper to show the player's inventory."""
@@ -77,7 +77,7 @@ class ShopSession:
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
             NpC = "store owner"
-            leave = self.ai_file.narrate_shop(game_state, event, NpC, self.use_ollama)
+            leave = self.ai_file.narrate_shop(game_state, event, NpC)
             if leave == 'leave':
                 return
         
@@ -98,7 +98,7 @@ class ShopSession:
             
             # *** FIX is here ***
             # 1. Store the dictionary from the parser
-            parsed_dict = self.ai_file.parse_purchase(complete_list, ": ", use_ollama=False)
+            parsed_dict = self.ai_file.parse_purchase(complete_list, ": ")
             
             # 2. Get the string 'choice' and 'quantity' from the dictionary
             choice = parsed_dict.get('choice')

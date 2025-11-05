@@ -348,7 +348,7 @@ class Player:
         choices = ["Start New Game", "Load a Save"]
         
         # This will show two buttons
-        choice_str = self.AI_File.parse_choice(choices, prompt, False)
+        choice_str = self.AI_File.parse_choice(choices, prompt)
         # --- END NEW ---
 
         if choice_str == "load a save": # Note: parse_choice returns lowercase
@@ -372,7 +372,7 @@ class Player:
                 prompt = "Choose a difficulty:"
                 
                 # This one call replaces the print and input
-                choice = self.AI_File.parse_choice(available_choices, prompt, False)
+                choice = self.AI_File.parse_choice(available_choices, prompt)
                 # 'choice' will be "adventure", "frontier", or "savage"
                 
                 if choice == "adventure": # <-- Changed from "1"
@@ -405,7 +405,7 @@ class Player:
                 prompt = "Choose a difficulty:"
                 
                 # This one call replaces the print and input
-                choice = self.AI_File.parse_choice(available_choices, prompt, False)
+                choice = self.AI_File.parse_choice(available_choices, prompt)
                 # 'choice' will be "adventure", "frontier", or "savage"
                 
                 if choice == "adventure": # <-- Changed from "1"
@@ -686,8 +686,7 @@ class Player:
             # Replace the input() with parse_choice
             choice = self.AI_File.parse_choice(
                 choices_for_parser, 
-                "Choose an item to use:", 
-                False
+                "Choose an item to use:"
             )
             # 'choice' is now the item *name* (e.g., "bread") or "leave"
 
@@ -738,7 +737,7 @@ class Player:
                     prompt = "Which ammo type would you like?"
                     available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
                     
-                    choice = self.AI_File.parse_choice(available_choices, prompt, False)
+                    choice = self.AI_File.parse_choice(available_choices, prompt)
                     # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
                     
                     if choice == "pistol ammo":
@@ -860,7 +859,7 @@ class Player:
                     prompt = "Which ammo type would you like?"
                     available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
                     
-                    choice = self.AI_File.parse_choice(available_choices, prompt, False)
+                    choice = self.AI_File.parse_choice(available_choices, prompt)
                     # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
                     
                     if choice == "pistol ammo":
@@ -933,7 +932,7 @@ class Player:
         #print(f"Your role is {self.active_role.name.capitalize()} (XP: {self.active_role.xp}).")
         print(self.hunger_check())
         print(f"Your health is {self.Health}.")
-        self.AI_File.parse_choice(["Continue"], "Press Enter to continue:", False)
+        self.AI_File.parse_choice(["Continue"], "Press Enter to continue:")
 
     def TownJail(self):
         print("You walk into the town jail.")
@@ -966,7 +965,7 @@ class Player:
                 prompt = "How can we reward you for bringing in this outlaw?"
                 available_choices = ["Gold", "Supplies"]
                 
-                choice = self.AI_File.parse_choice(available_choices, prompt, False)
+                choice = self.AI_File.parse_choice(available_choices, prompt)
                 if choice == "gold": # <-- Changed from "1"
                     reward = random.randint(20, 40)
                     self.gold += reward
@@ -1098,7 +1097,7 @@ class Player:
         ]
 
         # We don't need a buy inventory, so we pass an empty dict {}
-        trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, False)
+        trader_session = ShopSession(self, self.AI_File, "Trading Post", {})
 
         # Call our new, specialized method!
         trader_session.run_trade_session(sell_prices, trade_offers)
@@ -1153,7 +1152,7 @@ class Player:
         for name in available_items:
             # Use a default quantity of 5 for this example
             shop_inventory[name] = ShopItem(name, item_prices[name], 5)
-        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory, False)
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory)
         BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
@@ -1204,7 +1203,7 @@ class Player:
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
             self.AI_File.narrate_shop(game_state, event, NpC)
-        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, False)
+        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory)
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
 
@@ -1245,7 +1244,7 @@ class Player:
             'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10),
         })
 
-        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory, False)
+        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory)
         GunsmithStore.run_buy_session()
 
     def Bank(self):
@@ -1333,7 +1332,7 @@ class Player:
                     'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, False)
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory)
                 ammo_shop.run_buy_session()
             elif choice == "3":
                 print("The armory clerk hands you a crate of supplies...")
@@ -1865,7 +1864,7 @@ class Player:
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
         }
-        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, False)
+        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory)
         gen_shop.run_buy_session()
 
     def HostilityFunc(self):
@@ -2588,7 +2587,7 @@ class Player:
             wandering_trader_inventory[name] = ShopItem(name, price, quantity)
 
         # --- Open shop session ---
-        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory, False)
+        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory)
         trader_shop.run_buy_session()
 
         print("You thank the trader and continue down the dusty trail.")
@@ -3723,7 +3722,7 @@ class Player:
         print("Sneak along the riverbank to get closer (Shadow Skill Check)")
         
         boarded = False
-        choice =  self.AI_File.parse_choice((["swim", "rope", "sneak"]), "Choice (swim, rope, or sneak: ", False)
+        choice =  self.AI_File.parse_choice((["swim", "rope", "sneak"]), "Choice (swim, rope, or sneak: ")
         if choice == "swim":
             if self.perform_stat_check(self.strength_skill, base_target=15):
                 print("You dive into the churning water and power through the current, climbing aboard!")
@@ -4099,7 +4098,7 @@ class Player:
 
             # --- FIX 1: Replaced input() with parse_choice ---
             # This will show buttons for each item and "Done donating"
-            choice = self.AI_File.parse_choice(display_choices, "Choose item:", False)
+            choice = self.AI_File.parse_choice(display_choices, "Choose item:")
             
             if choice == "Done donating":
                 break
@@ -4544,7 +4543,7 @@ class Combat:
                         available_choices = ["Attack", "Use Item", "Retreat"]
                         prompt = "What will you do?"
 
-                        choice = self.player.AI_File.parse_choice(available_choices, prompt, False)
+                        choice = self.player.AI_File.parse_choice(available_choices, prompt)
 
 
                         if choice == "attack":
