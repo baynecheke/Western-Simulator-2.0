@@ -145,7 +145,7 @@ class AI_Control:
 
     # --- PARSER FUNCTIONS (These are identical to your file) ---
 
-    def parse_choice(self, available_choices, player_prompt, use_ollama):
+    def parse_choice(self, available_choices, player_prompt):
         raw_text = self._get_web_input(player_prompt, choices=available_choices, input_type='choice')
         if raw_text in available_choices: return raw_text.lower()
         else: return "leave" if "leave" in available_choices else "none"
@@ -154,7 +154,7 @@ class AI_Control:
         raw_text = self._get_web_input(player_prompt, choices=["Yes", "No"], input_type='choice')
         return "yes" if raw_text.lower() == "yes" else "no"
 
-    def parse_purchase(self, items: list, player_prompt, use_ollama):
+    def parse_purchase(self, items: list, player_prompt):
         item_choice = self._get_web_input(player_prompt, choices=items, input_type='choice')
         if item_choice == "leave": return {"choice": "leave", "quantity": "0"}
         if item_choice == "inventory": return {"choice": "inventory", "quantity": "0"}
@@ -165,19 +165,12 @@ class AI_Control:
             final_quantity = "1"
         return {"choice": item_choice, "quantity": final_quantity}
 
-    def parse_action(self, player_prompt, available_actions: list, use_ollama):
+    def parse_action(self, player_prompt, available_actions: list):
         raw_text = self._get_web_input(player_prompt, choices=available_actions, input_type='choice')
         if raw_text in available_actions: return {"action": raw_text}
         else: return {"action": "help"}
 
-    def parse_dialogue_player(self, player_dialogue_prompt, choices: list, use_ollama):
-        raw_text = self._get_web_input(player_dialogue_prompt, choices=choices, input_type='choice')
-        if raw_text in choices: return {"action": raw_text}
-        else: return {"action": "talk"}
-
-    # --- AI NARRATION FUNCTIONS (Identical to your file) ---
-
-    def narrate_shop(self, game_state, event, NPC, use_ollama):
+    def narrate_shop(self, game_state, event, NPC):
         if self.use_ai:
             prompt = dedent(f"""
             You are an NPC for a western text RPG.
@@ -193,7 +186,7 @@ class AI_Control:
             self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
             return 'buy'
 
-    def narrate_dialogue_once(self, game_state, event, NPC, use_ollama):
+    def narrate_dialogue_once(self, game_state, event, NPC):
         if self.use_ai:
             prompt = dedent(f"""
             You are an NPC for a western text RPG.

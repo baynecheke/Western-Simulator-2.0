@@ -9,7 +9,7 @@ from store import ShopItem, ShopSession
 
 import builtins
 import sys
-USE_OLLAMA = False
+
 
     
 
@@ -214,17 +214,14 @@ class Player:
         save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
 
         # Display saves by number ONLY if not using AI
-        if not USE_OLLAMA:
-            for idx, name in enumerate(save_names, start=1):
-                print(f"{idx}. {name}")
+
 
         # Use the AI_File parser from the global 'player' object.
         # This assumes 'global player' is set to the player instance
         # *before* this function is called.
         slot_choice_name = player.AI_File.parse_choice(
             save_names,
-            "Choose a save slot:",
-            USE_OLLAMA
+            "Choose a save slot:"
         )
 
         # parse_choice returns the name (e.g., "my_save") or "none"
@@ -563,7 +560,7 @@ class Player:
 
         while True:
             # 1. Get input
-            parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions, use_ollama=False)
+            parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions)
             action_result = parsed.get('action', 'none')
 
             # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
@@ -949,7 +946,7 @@ class Player:
         print("Ask the sheriff to teach you some skills.")
         print("Leave the jail.")
         available_choices = ["pay fine", "return criminal", "ask rumors", "teach skills", "leave"]
-        choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=False)
+        choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ")
         if choice == "pay fine":
             if self.Hostility > 0:
                 fine = self.Hostility * 5
@@ -1014,7 +1011,7 @@ class Player:
             print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
             available_choices = ['durability', 'trail', 'strength', 'shadow']
-            skill_choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ", use_ollama=False)
+            skill_choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ")
             if skill_choice == "shadow":
                 gold = (self.shadow_skill - 2) * 5
                 if gold > self.gold:
@@ -1132,7 +1129,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
             NpC = "blacksmith"
-            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC)
 
         item_prices = {
             'boots': 15,
@@ -1207,7 +1204,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
             NpC = "doctor"
-            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC)
         doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, False)
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
@@ -1221,7 +1218,7 @@ class Player:
             game_state = player.generate_game_state()
             event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
             NpC = "gunsmith"
-            self.AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+            self.AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
 
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
@@ -1277,11 +1274,11 @@ class Player:
             
             # 4. Get and parse the user's input
             # Pass the full list, including "leave", to the parser
-            choice = self.AI_File.parse_choice(available_choices, "Choice: ", use_ollama=False)
+            choice = self.AI_File.parse_choice(available_choices, "Choice: ")
             
             # 4. Get and parse the user's input
             # Pass the full list, including "leave", to the parser
-            choice = self.AI_File.parse_choice(available_choices, "Choice: ", use_ollama=False)
+            choice = self.AI_File.parse_choice(available_choices, "Choice: ")
 
             # 5. Handle the parsed choice
             if choice == "leave":
@@ -1606,7 +1603,7 @@ class Player:
             print("A merchant walks up to you.")
             NpC = "merchant"
             event = "A merchant asks if the player will help load wagons at the stable."
-            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice.strip().lower() == "yes":
                 earned = random.randint(20, 40)
                 self.gold += earned
@@ -1620,7 +1617,7 @@ class Player:
             NpC = "farmer"
             print("A farmer waves you over.")
             event = "A farmer waves the player over. 'My plow's busted—can you help fix it?'"
-            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice == "yes":
                 if "rope" in self.itemsinventory:
                     print("You tie it back together with your rope.")
@@ -1646,7 +1643,7 @@ class Player:
             print("A schoolteacher walks over.")
             NpC = "schoolteacher"
             event = "A schoolteacher asks if the player will speak to the children about survival."
-            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice == "yes":
                 self.Time += 2
                 self.shadow_skill += 1
@@ -2746,7 +2743,7 @@ class Player:
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
         print("You have learned from this adventure, you become more agile. +1 speed.")
         print("You may choose either a strength, shadow, or trail skill increase.")
-        skill_choice = self.AI_File.parse_choice(["strength", "shadow", "trail"], "Which skill do you choose to improve? (strength/shadow/trail): ", use_ollama=False).strip().lower()
+        skill_choice = self.AI_File.parse_choice(["strength", "shadow", "trail"], "Which skill do you choose to improve? (strength/shadow/trail): ").strip().lower()
         if choice == "strength":
             self.strength_skill += 2
             print("Your strength skill increases by 2.")
@@ -4155,7 +4152,7 @@ class Player:
             
             custom_line_added = False # Flag for numerical mode
             # --- END FIX ---
-            
+            USE_OLLAMA = True
             if USE_OLLAMA:
                 # Use the new AI function to generate and print the entry
                 game_state = self.generate_game_state()
@@ -4265,7 +4262,6 @@ class Player:
         selected_tone = self.AI_File.parse_choice(
             available_choices=tones,
             player_prompt=prompt,
-            use_ollama=USE_OLLAMA  # Pass the global flag
         )
 
         return selected_tone
