@@ -341,9 +341,10 @@ class Player:
                 "current_town_name": self.current_town_name,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
+# In Western_Sim.py
 
     def main_game_loop(self):
-        global player
+        global player # <-- FIX 1: Add this line
         
         # --- NEW CODE ---
         prompt = "Would you like to Start a New Game or Load a Save?"
@@ -354,8 +355,10 @@ class Player:
         # --- END NEW ---
 
         if choice_str == "load a save": # Note: parse_choice returns lowercase
+            player = self # <-- FIX 2: Add this line
             player = Player.load_game() # This will still use text boxes (for now)
         else:
+            player = self # <-- FIX 3: Add this line
             # "Start New Game" path
             print("Would you like the instructions (Yes/No)?")
             Choice = self.AI_File.parse_YN(": ")
