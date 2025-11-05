@@ -151,7 +151,7 @@ class ShopSession:
             print(f"You bought {amount} {item.name} for ${total_cost}. Remaining gold: ${self.player.gold:.2f}")
             time.sleep(1)
 
-def run_trade_session(self, sell_prices, trade_offers):
+    def run_trade_session(self, sell_prices, trade_offers):
         """Runs a full trade/sell session."""
         self.player.play_sound("store_bell.mp3")
         print("You walk into the trading post. The trader greets you.")
