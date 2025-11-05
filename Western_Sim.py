@@ -546,9 +546,9 @@ class Player:
         def print_action_list():
             """Helper function to print the correct list format."""
             print("\n--- Available Actions ---")
-            for i, action_text in enumerate(self.possibleactions, 1):
-                print(f"{i}. {action_text.capitalize()}")
-            print(f"{len(self.possibleactions) + 1}. Help")
+            for action_text in self.possibleactions:
+                print(f"{action_text.capitalize()}")
+            print(f"Help")
             print("-------------------------")
 
         # Initial prompt
@@ -675,10 +675,9 @@ class Player:
                 "winchester stock": "Bring it to the blacksmith with a winchester barrel to make a winchester rifle.",
             }
 
-            for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
+            for item, qty in self.itemsinventory.items():
                 description = item_descriptions.get(item, "This item can't be used.")
-                print(f"{idx}. {item.capitalize()} (x{qty}) - {description}")
-
+                print(f"{item.capitalize()} (x{qty}) - {description}")
             # --- MODIFICATION START ---
             # Define the list of choices for the parser
             item_list = list(self.itemsinventory.keys())
@@ -4091,11 +4090,11 @@ class Player:
             display_choices = []
             
             # Print the list to the console (like you did before)
-            for i, (item, qty) in enumerate(self.itemsinventory.items(), 1):
-                print(f"{i}) {item} x{qty}")
+            for item, qty in self.itemsinventory.items():
+                print(f"{item} x{qty}")
                 display_choices.append(item) # Add the item name
             
-            print("0) Done donating")
+            print("Done donating")
             display_choices.append("Done donating") # Add the exit option
 
             # --- FIX 1: Replaced input() with parse_choice ---
@@ -4571,9 +4570,8 @@ class Combat:
                                                 ability_auto_ammo_belt = False
                                             ammo_count = self.player.itemsinventory.get(ammo_type, 0)
                                             ammo_info = f" | Ammo: {ammo_count}"
-                                        print(f"{i}. {weapon.capitalize()} (Damage: {dmg}){ammo_info}")
-                                    print(f"{len(owned_weapons) + 1}. Fists (No weapon)")
-
+                                        print(f"{weapon.capitalize()} (Damage: {dmg}){ammo_info}")
+                                    print(f"Fists (No weapon)")
                                     try:
                                         weapon_choice = int(input("Choice: "))
                                         if weapon_choice == len(owned_weapons) + 1:
