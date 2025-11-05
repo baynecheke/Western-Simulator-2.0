@@ -200,6 +200,7 @@ class Player:
 
     @classmethod
     def load_game(cls):
+        global player
         print("\n--- Load Game ---")
         save_folder = 'saves'
         if not os.path.exists(save_folder):
@@ -208,19 +209,31 @@ class Player:
         save_files = [f for f in os.listdir(save_folder) if f.endswith('.json')]
         if not save_files:
             print("No save files found. Starting a new game.")
-            return 
+            return player 
 
-        # Display saves by number
-        for idx, filename in enumerate(save_files, start=1):
-            print(f"{idx}. {filename.replace('save_', '').replace('.json', '')}")
+        save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
 
-        slot_choice = input("Enter the number of the save slot you want to load: ").strip()
+        # Display saves by number ONLY if not using AI
+        if not USE_OLLAMA:
+            for idx, name in enumerate(save_names, start=1):
+                print(f"{idx}. {name}")
 
-        if not slot_choice.isdigit() or not (1 <= int(slot_choice) <= len(save_files)):
+        # Use the AI_File parser from the global 'player' object.
+        # This assumes 'global player' is set to the player instance
+        # *before* this function is called.
+        slot_choice_name = player.AI_File.parse_choice(
+            save_names,
+            "Choose a save slot:",
+            USE_OLLAMA
+        )
+
+        # parse_choice returns the name (e.g., "my_save") or "none"
+        if slot_choice_name not in save_names:
             print("Invalid choice. Starting a new game.")
-            return 
+            return player # Return the existing (empty) player
 
-        save_file = save_files[int(slot_choice) - 1]
+        # Re-construct the original save_file name from the chosen name
+        save_file = f"save_{slot_choice_name}.json"
         filepath = os.path.join(save_folder, save_file)
         with open(filepath, 'r') as f:
             save_data = json.load(f)
@@ -353,13 +366,20 @@ class Player:
                 time.sleep(2,)
                 print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
                 time.sleep(2,)
-                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-                choice = input(": ").strip()
-                if choice == "1":
+                
+                # --- MODIFICATION START ---
+                available_choices = ["adventure", "frontier", "savage"]
+                prompt = "Choose a difficulty:"
+                
+                # This one call replaces the print and input
+                choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+                # 'choice' will be "adventure", "frontier", or "savage"
+                
+                if choice == "adventure": # <-- Changed from "1"
                     self.difficulty = 'adventure'
-                elif choice == "3":
+                elif choice == "savage": # <-- Changed from "3"
                     self.difficulty = 'savage'
-                else:
+                else: # <-- This now correctly defaults to "frontier"
                     self.difficulty = 'frontier'
                 time.sleep(2,)
                 print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
@@ -381,13 +401,18 @@ class Player:
             else:
                 self.change_music("Town.mp3", -1)
                 self.add_item("diary")
-                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-                choice = input(": ").strip()
-                if choice == "1":
+                available_choices = ["adventure", "frontier", "savage"]
+                prompt = "Choose a difficulty:"
+                
+                # This one call replaces the print and input
+                choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+                # 'choice' will be "adventure", "frontier", or "savage"
+                
+                if choice == "adventure": # <-- Changed from "1"
                     self.difficulty = 'adventure'
-                elif choice == "3":
+                elif choice == "savage": # <-- Changed from "3"
                     self.difficulty = 'savage'
-                else:
+                else: # <-- This now correctly defaults to "frontier"
                     self.difficulty = 'frontier'
 
 
@@ -426,7 +451,7 @@ class Player:
             if player.Health <= 0:
                 break
             player.save_game()
-            choice = input("Would you like to quit? (yes/no): ").strip().lower()
+            choice = player.AI_File.parse_YN("Would you like to quit?")
             if choice == 'yes':
                 print("Thanks for playing! See you next time.")
                 exit()
@@ -667,20 +692,27 @@ class Player:
                 description = item_descriptions.get(item, "This item can't be used.")
                 print(f"{idx}. {item.capitalize()} (x{qty}) - {description}")
 
-            choice = input("Enter the number of the item you want to use (or 'q to leave'): ").strip().lower()
+            # --- MODIFICATION START ---
+            # Define the list of choices for the parser
+            item_list = list(self.itemsinventory.keys())
+            choices_for_parser = item_list + ["leave"] # Add "leave" as an explicit choice
 
-            if choice == "q":
+            # Replace the input() with parse_choice
+            choice = self.AI_File.parse_choice(
+                choices_for_parser, 
+                "Choose an item to use:", 
+                USE_OLLAMA
+            )
+            # 'choice' is now the item *name* (e.g., "bread") or "leave"
+
+            if choice == "leave": # <-- Changed from "q"
                 print("You decided not to use anything.")
                 use_continue = False
                 break
 
-            item_list = list(self.itemsinventory.keys())
-
-            if not choice.isdigit() or int(choice) < 1 or int(choice) > len(item_list):
-                print("Invalid choice.")
-                continue
-
-            selected_item = item_list[int(choice) - 1]
+            # We no longer need the isdigit() check or the index conversion.
+            # 'choice' is already the item name.
+            selected_item = choice
             if combat == False:
                 if selected_item == "bread":
                     self.Hunger = self.Hunger - 1
@@ -715,17 +747,19 @@ class Player:
                     self.read_diary_day()
 
                 elif selected_item == "ammo cartridge":
+                    # --- MODIFICATION START ---
                     # Let player choose which ammo to receive
-                    print("Which ammo type would you like?") 
-                    print("1) Pistol Ammo")
-                    print("2) Rifle Ammo")
-                    print("3) Shotgun Ammo")
-                    choice = input("Choice: ").strip()
-                    if choice == "1":
+                    prompt = "Which ammo type would you like?"
+                    available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
+                    
+                    choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+                    # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
+                    
+                    if choice == "pistol ammo":
                         ammo = "pistol_ammo"
-                    elif choice == "2":
+                    elif choice == "rifle ammo":
                         ammo = "rifle_ammo"
-                    elif choice == "3":
+                    elif choice == "shotgun ammo":
                         ammo = "shotgun_ammo"
                     else:
                         print("Invalid selection. No ammo granted.")
@@ -835,17 +869,19 @@ class Player:
                     self.Armor_Boost = 0.7
 
                 elif selected_item == "ammo cartridge":
+                    # --- MODIFICATION START ---
                     # Let player choose which ammo to receive
-                    print("Which ammo type would you like?") 
-                    print("1) Pistol Ammo")
-                    print("2) Rifle Ammo")
-                    print("3) Shotgun Ammo")
-                    choice = input("Choice: ").strip()
-                    if choice == "1":
+                    prompt = "Which ammo type would you like?"
+                    available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
+                    
+                    choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+                    # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
+                    
+                    if choice == "pistol ammo":
                         ammo = "pistol_ammo"
-                    elif choice == "2":
+                    elif choice == "rifle ammo":
                         ammo = "rifle_ammo"
-                    elif choice == "3":
+                    elif choice == "shotgun ammo":
                         ammo = "shotgun_ammo"
                     else:
                         print("Invalid selection. No ammo granted.")
@@ -911,7 +947,7 @@ class Player:
         #print(f"Your role is {self.active_role.name.capitalize()} (XP: {self.active_role.xp}).")
         print(self.hunger_check())
         print(f"Your health is {self.Health}.")
-        input("Press Enter to continue:")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to continue:", USE_OLLAMA)
 
     def TownJail(self):
         print("You walk into the town jail.")
@@ -941,17 +977,18 @@ class Player:
             if "outlaw" in self.caravan:
                 print("You turn in the outlaw you captured.")
                 print("The sheriff approaches you.")
-                print("How can we reward you for bringing in this outlaw? (1) Gold (2) Supplies?")
-                choice = input(": ").strip()
-                if choice == "1":
+                prompt = "How can we reward you for bringing in this outlaw?"
+                available_choices = ["Gold", "Supplies"]
+                
+                choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+                if choice == "gold": # <-- Changed from "1"
                     reward = random.randint(20, 40)
                     self.gold += reward
                     print(f"The sheriff thanks you and gives you {reward} gold as a reward.")
-                else:
+                else: # <-- This now handles "supplies"
                     supply = random.choice(self.rare_loot)
                     self.add_item(supply)
                     print(f"The sheriff thanks you and gives you some supplies: {supply}.")
-                self.caravan.remove("outlaw")
             else:
                 print("You have no criminals to turn in.")
         elif choice == "ask rumors":
@@ -4517,15 +4554,13 @@ class Combat:
                             enemy_health -= posse_damage
                             del self.player.player_effects["posse_help"]
                         print("\n--- Your Turn ---")
-                        print("What will you do?")
-                        print("1. Attack")
-                        print("2. Use Item")
-                        print("3. Try to Retreat")
+                        available_choices = ["Attack", "Use Item", "Retreat"]
+                        prompt = "What will you do?"
 
-                        choice = input("Choose an action: ").strip()
+                        choice = self.player.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
 
 
-                        if choice == "1":
+                        if choice == "attack":
                             player_turn_complete = True
                             # Get list of owned weapons (weapons with known names)
                             owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
@@ -4607,11 +4642,11 @@ class Combat:
                             print(f"Your health is {self.player.Health}.")
                             print(f"Enemy health is {enemy_health}.")
 
-                        elif choice == "2":
+                        elif choice == "Use Item":
                             self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
 
 
-                        elif choice == "3":
+                        elif choice == "Retreat":
                             player_turn_complete = True
                             new_speed = self.player.Speed + escape_boost
                             if self.EnemyCombatant.get("bound", False) == True:
