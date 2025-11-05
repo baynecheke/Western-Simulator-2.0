@@ -130,7 +130,7 @@ class AI_Control:
         
         try:
             response = self.groq_client.chat.completions.create(
-                model="llama3-groq-8b-8192-tool-use-preview", 
+                model="llama-3.1-8b-instant", 
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
