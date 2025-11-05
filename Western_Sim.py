@@ -543,66 +543,53 @@ class Player:
             return final_score >= adjusted_target
 
     def TakeActionsChose(self):
-            # This function will now ONLY print the list if USE_OLLAMA is false.
-            # If USE_OLLAMA is true, it prints the simple list.
+        # This function will now ONLY print the list if USE_OLLAMA is false.
+        # If USE_OLLAMA is true, it prints the simple list.
+        
+        def print_action_list():
+            """Helper function to print the correct list format."""
+            print("\n--- Available Actions ---")
+            for i, action_text in enumerate(self.possibleactions, 1):
+                print(f"{i}. {action_text.capitalize()}")
+            print(f"{len(self.possibleactions) + 1}. Help")
+            print("-------------------------")
+
+        # Initial prompt
+        # Print the numbered list for the first time
+        print("\nAvailable Actions:")
+        for i, action_text in enumerate(self.possibleactions, 1):
+            print(f"{i}. {action_text.capitalize()}")
+        print(f"{len(self.possibleactions) + 1}. Help")
+
+        while True:
+            # 1. Get input
+            parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions, use_ollama=False)
+            action_result = parsed.get('action', 'none')
+
+            # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
+
+            # 3. Parse the action
+            # AI_File.parse_action will now handle the number-to-action conversion
+            # or the text-to-action conversion.
             
-            def print_action_list():
-                """Helper function to print the correct list format."""
-                print("\n--- Available Actions ---")
-                if USE_OLLAMA:
-                    for action1 in self.possibleactions:
-                        print(action1)
-                else:
-                    for i, action_text in enumerate(self.possibleactions, 1):
-                        print(f"{i}. {action_text.capitalize()}")
-                    print(f"{len(self.possibleactions) + 1}. Help")
-                print("-------------------------")
 
-            # Initial prompt
-            if USE_OLLAMA:
-                print("You may choose an action to take:")
-                for action1 in self.possibleactions:
-                    print(action1)
+            # 4. Handle result
+            if action_result in self.possibleactions:
+                # if USE_OLLAMA: # We don't need this feedback line anymore
+                #     print(f"[{action_result.capitalize()}]") 
+                return action_result # Success!
+            
+            elif action_result == "help":
+                print_action_list()
+                continue # Ask for input again
+            
             else:
-                # Print the numbered list for the first time
-                print("\nAvailable Actions:")
-                for i, action_text in enumerate(self.possibleactions, 1):
-                    print(f"{i}. {action_text.capitalize()}")
-                print(f"{len(self.possibleactions) + 1}. Help")
-
-            while True:
-                # 1. Get input
-                if USE_OLLAMA:
-                    parsed = self.AI_File.parse_action(": ", self.possibleactions, use_ollama=False)
-                    action_result = parsed.get('action', 'none')
-                else:
-                    parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions, use_ollama=False)
-                    action_result = parsed.get('action', 'none')
-
-                # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
-
-                # 3. Parse the action
-                # AI_File.parse_action will now handle the number-to-action conversion
-                # or the text-to-action conversion.
-                
-
-                # 4. Handle result
-                if action_result in self.possibleactions:
-                    if USE_OLLAMA:
-                        print(f"[{action_result.capitalize()}]") # Give feedback on AI choice
-                    return action_result # Success!
-                
-                elif action_result == "help":
-                    print_action_list()
-                    continue # Ask for input again
-                
-                else:
-                    # In Ollama mode, print a generic error
-                    if USE_OLLAMA:
-                        print("Invalid or unavailable choice. Try again.")
-                    # In Numerical mode, parse_action already printed the error.
-                    # We just loop to re-prompt.
-                    pass
+                # In Ollama mode, print a generic error
+                # if USE_OLLAMA: # We don't need this branch
+                #     print("Invalid or unavailable choice. Try again.")
+                # In Numerical mode, parse_action already printed the error.
+                # We just loop to re-prompt.
+                pass
 
     def generate_game_state(self):
         if self.invillage == True:
@@ -1288,8 +1275,9 @@ class Player:
                 # This text will be shown in both modes
                 print(f"{building.capitalize()} (Level {current_level}) - Price to upgrade: {price} gold.")
             
-            if USE_OLLAMA:
-                print("Leave") # Explicitly tell Ollama users they can leave
+            # 4. Get and parse the user's input
+            # Pass the full list, including "leave", to the parser
+            choice = self.AI_File.parse_choice(available_choices, "Choice: ", use_ollama=False)
             
             # 4. Get and parse the user's input
             # Pass the full list, including "leave", to the parser
@@ -4277,10 +4265,11 @@ class Player:
         selected_tone = self.AI_File.parse_choice(
             available_choices=tones,
             player_prompt=prompt,
-            use_ollama=False  # Pass the global flag
+            use_ollama=USE_OLLAMA  # Pass the global flag
         )
 
         return selected_tone
+
     def health_tone_phrase(self, tone):
         options = {
             "witty": [
