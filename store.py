@@ -61,12 +61,8 @@ class ShopSession:
             for i, (item_name, item_obj) in enumerate(self.inventory.items(), 1):
                 price = self._calculate_price(item_obj, action="buy")
                 
-                if not self.use_ollama:
-                    # Numerical mode: "1. Item - $Price | Stock: X"
-                    print(f"{i}. {item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
-                else:
-                    # Ollama (text) mode: "Item - $Price | Stock: X"
-                    print(f"{item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
+                # Numerical mode: "1. Item - $Price | Stock: X"
+                print(f"{i}. {item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
                     
                 item_list.append(item_name) # This list is just names, which is correct
                 
@@ -93,17 +89,19 @@ class ShopSession:
             # We want "Inventory" then "Leave"
             actions = ['inventory', 'leave'] 
             
-            if not self.use_ollama:
-                # Print the numbered options for actions
-                print("\nOptions:")
-                base_num = len(item_list) # Start numbering after the items
-                print(f"{base_num + 1}. Inventory")
-                print(f"{base_num + 2}. Leave")
-                print("\nEnter a number (e.g., '1' for the item, or '1 10' for quantity 10):")
-            else:
-                # Print the text-based prompt for Ollama
-                print("\nWhat would you like to buy?")
-                print("You can 'leave' or look at your 'inventory' at any time.")
+
+            print("\nOptions:")
+            base_num = len(item_list) # Start numbering after the items
+            print(f"{base_num + 1}. Inventory")
+            print(f"{base_num + 2}. Leave")
+            print("\nEnter a number (e.g., '1' for the item, or '1 10' for quantity 10):")
+            # The complete_list must match the printed number order
+            complete_list = item_list + actions
+            parsed = self.ai_file.parse_purchase(complete_list, ": ", use_ollama=False)
+
+            # Print the text-based prompt for Ollama
+            print("\nWhat would you like to buy?")
+            print("You can 'leave' or look at your 'inventory' at any time.")
             
 
             # The complete_list must match the printed number order
@@ -170,17 +168,13 @@ class ShopSession:
         
         while True:
             print("\n--- Trading Post ---")
-            if not self.use_ollama:
-                # Numerical prompt
-                print("1. Sell items")
-                print("2. Swap items")
-                print("3. Leave")
-            else:
-                # Text prompt
-                print("You can 'sell' items, 'swap' items, or 'leave'.")
+            # Numerical prompt
+            print("1. Sell items")
+            print("2. Swap items")
+            print("3. Leave")
 
             # Use the AI_Control parser
-            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ", self.use_ollama)
+            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ", False)
             # --- END FIX ---
 
             if choice == "sell": # Replaced "1"
