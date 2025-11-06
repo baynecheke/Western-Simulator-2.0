@@ -9,11 +9,12 @@ class ShopItem:
         self.quantity = quantity
 
 class ShopSession:
-    def __init__(self, player, ai_file, store_name, inventory): 
+    def __init__(self, player, ai_file, store_name, inventory, NPC): 
             self.player = player
             self.ai_file = ai_file
             self.store_name = store_name
             self.inventory = inventory # Dict of {'item_name': ShopItem}
+            self.NPC = NPC
 
 
     def _show_player_inventory(self):
@@ -76,8 +77,7 @@ class ShopSession:
             print(f"The owner walks over and greets you.")
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
-            NpC = "store owner"
-            leave = self.ai_file.narrate_shop(game_state, event, NpC)
+            leave = self.ai_file.narrate_shop(game_state, event, self.NPC)
             if leave == 'leave':
                 return
         

@@ -2,7 +2,8 @@ import json
 import os
 import time
 from textwrap import dedent
-from groq import Groq # We can safely import this at the top now
+from groq import Groq 
+from groq.types.chat import ChatCompletionMessageParam # <-- ADD THIS LINE
 
 class AI_Control:
     def __init__(self, outbox_queue, inbox_queue):
@@ -173,20 +174,109 @@ class AI_Control:
         if raw_text in available_actions: return {"action": raw_text}
         else: return {"action": "help"}
 
-    def narrate_shop(self, game_state, event, NPC):
-        if self.use_ai:
-            prompt = dedent(f"""
+    def narrate_shop(self, game_state, event, NPC, use_ollama, store_name="the shop"):
+        # This function now supports a full, back-and-forth conversation.
+        
+        # We check self.use_ai (which is true if Groq is loaded)
+        if self.use_ai and self.groq_client: 
+            # --- Setup Conversation ---
+            base_prompt = dedent(f"""
             You are an NPC for a western text RPG.
             The world state is: {game_state}. Event: {event}. You are {NPC}.
             Stay in character, answer very briefly in dialogue style (1-2 sentences).
             Make sure you respond with the correct hostility.
+            Do NOT greet the player, just respond to what they say.
+            If the player just enters your shop, you should greet them.
             """)
-            narration = self._call_groq(prompt, "The player enters your shop.", is_json=False)
-            if narration: self.print_to_client(f"{NPC}: {narration}")
-            else: self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
+            
+            # This will store the conversation history
+            dialogue_history: list[ChatCompletionMessageParam] = [
+                {"role": "system", "content": base_prompt}
+            ]
+            
+            # Define keywords that trigger actions
+            leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya"}
+            buy_words = {"buy", "shop", "wares", "see wares", "trade", "show me", "what do you have", "see what you have", "purchase"}
+
+            count = 0
+            
+            # --- First Message from AI ---
+            try:
+                # This is the "user" action that starts the conversation
+                # FIX: We append the dictionary literal directly to satisfy Pylance
+                dialogue_history.append({"role": "user", "content": f"The player walks into {store_name}."})
+
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=dialogue_history, # Send system prompt + user action
+                    response_format=None,
+                    temperature=0.2
+                )
+                # FIX: Check for None before calling .strip()
+                raw_content = response.choices[0].message.content
+                narration = raw_content.strip() if raw_content else "Welcome in."
+                
+            except Exception as e:
+                self.print_to_client(f"[Groq API Error: {e}]")
+                narration = "Welcome to the shop. Take a look."
+
+            # Send the AI's first greeting
+            self.print_to_client(f"{NPC}: {narration}")
+            # FIX: We append the dictionary literal directly
+            dialogue_history.append({"role": "assistant", "content": narration})
+
+            # --- Start Conversation Loop ---
+            while count < 4: # Allow up to 4 exchanges
+                count += 1
+                
+                # --- Get Player's Text Input from Web UI ---
+                player_input = self._get_web_input("You: ", input_type='text')
+                player_lower = player_input.lower().strip()
+
+                # 1. Check for LEAVE intent
+                if any(word in player_lower.split() for word in leave_words) or player_lower in leave_words:
+                    self.print_to_client(f"{NPC}: Safe travels, stranger.")
+                    return 'leave'
+
+                # 2. Check for BUY intent
+                if any(phrase in player_lower for phrase in buy_words):
+                    self.print_to_client(f"{NPC}: Here is what I've got:")
+                    return 'buy'
+
+                # 3. If not leaving/buying, continue conversation
+                # FIX: We append the dictionary literal directly
+                dialogue_history.append({"role": "user", "content": player_input})
+                
+                try:
+                    # Send the last 5 messages (system + 2 pairs)
+                    response = self.groq_client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=dialogue_history[-5:], 
+                        response_format=None,
+                        temperature=0.2
+                    )
+                    # FIX: Check for None before calling .strip()
+                    raw_content = response.choices[0].message.content
+                    narration = raw_content.strip() if raw_content else "Sorry, lost my train of thought."
+
+                except Exception as e:
+                    self.print_to_client(f"[Groq API Error: {e}]")
+                    narration = "Sorry, lost my train of thought."
+                
+                # Send the AI's reply
+                self.print_to_client(f"{NPC}: {narration}")
+                # FIX: We append the dictionary literal directly
+                dialogue_history.append({"role": "assistant", "content": narration})
+                
+            # If loop finishes, default to showing the shop
+            self.print_to_client(f"{NPC}: Well, if you're not buyin', I've got work to do. Here's what I have.")
             return 'buy'
+
         else:
+            # --- Numerical Fallback Logic ---
             self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
+            # This forces a "Continue" button press to pause the screen
+            self.parse_choice(["Continue"], "")
             return 'buy'
 
     def narrate_dialogue_once(self, game_state, event, NPC):

@@ -1088,7 +1088,7 @@ class Player:
         ]
 
         # We don't need a buy inventory, so we pass an empty dict {}
-        trader_session = ShopSession(self, self.AI_File, "Trading Post", {})
+        trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, "Trader")
 
         # Call our new, specialized method!
         trader_session.run_trade_session(sell_prices, trade_offers)
@@ -1113,12 +1113,7 @@ class Player:
                 self.add_item("winchester rifle")
                 print("You have assembled a Winchester rifle!")
         time.sleep(2,)
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
-            NpC = "blacksmith"
-            self.AI_File.narrate_shop(game_state, event, NpC)
+
 
         item_prices = {
             'boots': 15,
@@ -1143,7 +1138,7 @@ class Player:
         for name in available_items:
             # Use a default quantity of 5 for this example
             shop_inventory[name] = ShopItem(name, item_prices[name], 5)
-        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory)
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory, "Blacksmith")
         BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
@@ -1188,13 +1183,8 @@ class Player:
             'field dressing kit': ShopItem('field dressing kit', 20, 5),
             'antivenom': ShopItem('antivenom', 10, 5),
         }
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
-            NpC = "doctor"
-            self.AI_File.narrate_shop(game_state, event, NpC)
-        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory)
+
+        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, "Doctor")
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
 
@@ -1202,12 +1192,6 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You enter the gunsmith.")
         print("The gunsmith greets you with a nod. Guns line the walls.")
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
-            NpC = "gunsmith"
-            self.AI_File.narrate_shop(game_state, event, NpC)
         time.sleep(2,)
 
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
@@ -1235,7 +1219,7 @@ class Player:
             'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10),
         })
 
-        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory)
+        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory, "Gunsmith")
         GunsmithStore.run_buy_session()
 
     def Bank(self):
@@ -1323,7 +1307,7 @@ class Player:
                     'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory)
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, "Armory soldier")
                 ammo_shop.run_buy_session()
             elif choice == "3":
                 print("The armory clerk hands you a crate of supplies...")
@@ -1855,7 +1839,7 @@ class Player:
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
         }
-        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory)
+        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, "store owner")
         gen_shop.run_buy_session()
 
     def HostilityFunc(self):
@@ -2578,7 +2562,7 @@ class Player:
             wandering_trader_inventory[name] = ShopItem(name, price, quantity)
 
         # --- Open shop session ---
-        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory)
+        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory, "Wandering Trader")
         trader_shop.run_buy_session()
 
         print("You thank the trader and continue down the dusty trail.")

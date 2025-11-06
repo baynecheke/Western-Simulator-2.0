@@ -170,6 +170,7 @@ def send_response():
     This is where the browser sends the player's answer (from a button click
     or text input) back to the server.
     """
+    
     data = request.json
     player_inbox.put(data['choice']) # Put the answer in the inbox
     return jsonify({"status": "Response received"})
