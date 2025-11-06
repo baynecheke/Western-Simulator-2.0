@@ -119,8 +119,43 @@ def get_update():
     It drains all pending messages from the outbox and sends them as a list.
     """
     messages = []
+    
+    # --- NEW: Proactive Stat Update ---
+    # On every poll, check if the player object exists and send its current state.
+    # This is non-blocking and doesn't lag the game thread.
+    if player_object is not None:
+        try:
+            # Manually create a stat update message
+            stat_payload = {
+                'type': 'update_stats',
+                'payload': {
+                    'health': player_object.Health,
+                    'max_health': player_object.MaxHealth,
+                    'hunger': player_object.Hunger,
+                    'gold': player_object.gold,
+                    'day': player_object.Day,
+                    'time': f"{player_object.Time}:00",
+                    'location': player_object.current_town_name if player_object.invillage else "On the Trail",
+                    'difficulty': player_object.difficulty.capitalize()
+                }
+            }
+            messages.append(stat_payload)
+        except Exception as e:
+            # This might fail if the player object is in a weird state during init
+            # It's not critical, so we just log it and move on
+            print(f"[Stat Poll Error]: {e}")
+    # --- END NEW ---
+
     while not server_outbox.empty():
         msg = server_outbox.get()
+        
+        # --- MODIFICATION: Prevent duplicate stat messages ---
+        # If we just added a stat update, and the queue also has one,
+        # skip the one from the queue to avoid sending two.
+        if msg.get("type") == "update_stats" and any(m.get("type") == "update_stats" for m in messages):
+            continue
+        # --- END MODIFICATION ---
+        
         messages.append(msg)
         # If the message is a question, stop sending more messages.
         # This ensures the browser only gets one question at a time.
