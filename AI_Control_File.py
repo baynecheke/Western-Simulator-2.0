@@ -174,7 +174,7 @@ class AI_Control:
         if raw_text in available_actions: return {"action": raw_text}
         else: return {"action": "help"}
 
-    def narrate_shop(self, game_state, event, NPC, use_ollama, store_name="the shop"):
+    def narrate_shop(self, game_state, event, NPC, use_ollama, store_name):
         # This function now supports a full, back-and-forth conversation.
         
         # We check self.use_ai (which is true if Groq is loaded)

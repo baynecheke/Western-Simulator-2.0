@@ -77,7 +77,7 @@ class ShopSession:
             print(f"The owner walks over and greets you.")
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
-            leave = self.ai_file.narrate_shop(game_state, event, self.NPC)
+            leave = self.ai_file.narrate_shop(game_state, event, self.NPC, True, self.store_name)
             if leave == 'leave':
                 return
         
