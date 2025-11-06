@@ -569,9 +569,7 @@ class Player:
                 #     print(f"[{action_result.capitalize()}]") 
                 return action_result # Success!
             
-            elif action_result == "help":
-                print_action_list()
-                continue # Ask for input again
+
             
             else:
                 # In Ollama mode, print a generic error
