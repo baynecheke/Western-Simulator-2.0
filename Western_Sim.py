@@ -5,8 +5,8 @@ import json
 import os
 
 from store import ShopItem, ShopSession
-
-
+global USE_OLLAMA
+USE_OLLAMA = True
 import builtins
 import sys
 

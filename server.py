@@ -26,7 +26,7 @@ player_thread = None
 player_object = None 
 
 # --- The Main Game Loop Function ---
-def run_game_loop():
+def run_game_loop(ai_file):
     """ 
     This function runs the actual game logic in a separate thread.
     It will start, run until it needs input, and then pause, waiting 
@@ -90,19 +90,28 @@ def index():
 def start_game():
     """
     Browser calls this *once* on page load to start the game thread.
+    This function now RE-INITIALIZES the game every time.
     """
-    global player_thread
-    if player_thread is None or not player_thread.is_alive():
-        # Clear any old messages
-        while not server_outbox.empty():
-            server_outbox.get()
-        while not player_inbox.empty():
-            player_inbox.get()
+    global player_thread, server_outbox, player_inbox, ai_file, player_object
+
+    # 1. Log if an old thread is being orphaned
+    if player_thread is not None and player_thread.is_alive():
+        print("[SERVER] WARNING: Old game thread was still alive. It is now orphaned.")
             
-        player_thread = threading.Thread(target=run_game_loop)
-        player_thread.start()
-        return jsonify({"status": "Game started"})
-    return jsonify({"status": "Game already running"})
+    # 2. Create NEW queues for this new game session
+    server_outbox = queue.Queue()
+    player_inbox = queue.Queue()
+    
+    # 3. Create a NEW AI_Control object using the NEW queues
+    ai_file = AI_Control(server_outbox, player_inbox) 
+    
+    # 4. Reset the player object reference
+    player_object = None 
+
+    # 5. Start the new game thread, passing it the NEW ai_file
+    player_thread = threading.Thread(target=run_game_loop, args=(ai_file,))
+    player_thread.start()
+    return jsonify({"status": "Game started"})
 
 @app.route('/get_update')
 def get_update():
