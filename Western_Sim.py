@@ -542,21 +542,14 @@ class Player:
     def TakeActionsChose(self):
         # This function will now ONLY print the list if USE_OLLAMA is false.
         # If USE_OLLAMA is true, it prints the simple list.
-        
-        def print_action_list():
-            """Helper function to print the correct list format."""
-            print("\n--- Available Actions ---")
-            for action_text in self.possibleactions:
-                print(f"{action_text.capitalize()}")
-            print(f"Help")
-            print("-------------------------")
-
         # Initial prompt
         # Print the numbered list for the first time
         print("\nAvailable Actions:")
-        for i, action_text in enumerate(self.possibleactions, 1):
-            print(f"{i}. {action_text.capitalize()}")
-        print(f"{len(self.possibleactions) + 1}. Help")
+        print("\n--- Available Actions ---")
+        for action_text in self.possibleactions:
+            print(f"{action_text.capitalize()}")
+        print(f"Help")
+        
 
         while True:
             # 1. Get input
