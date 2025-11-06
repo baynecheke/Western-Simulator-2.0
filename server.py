@@ -46,7 +46,6 @@ def run_game_loop(ai_file):
         # All calls to 'input()' in the game thread will now ask the web.
         builtins.input = ai_file.patched_input
         # Speed up the game by patching 'time.sleep'
-        time.sleep = lambda seconds: None # Does nothing
         
         # 1. Create the Player *inside the thread*
         player_object = Player(ai_file_arg=ai_file) 

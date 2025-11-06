@@ -9,7 +9,7 @@ class ShopItem:
         self.quantity = quantity
 
 class ShopSession:
-    def __init__(self, player, ai_file, store_name, inventory): # Added use_ollama
+    def __init__(self, player, ai_file, store_name, inventory): 
             self.player = player
             self.ai_file = ai_file
             self.store_name = store_name
@@ -168,7 +168,7 @@ class ShopSession:
             print("Leave")
 
             # Use the AI_Control parser
-            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ", False)
+            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ")
 
             if choice == "sell": # Replaced "1"
                 # --- Sell logic ---

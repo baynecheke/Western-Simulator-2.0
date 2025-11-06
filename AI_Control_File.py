@@ -10,6 +10,7 @@ class AI_Control:
         self.outbox = outbox_queue # The "mailbox" to send commands TO the browser
         self.inbox = inbox_queue   # The "mailbox" to receive answers FROM the browser
         self.use_ai = False
+        self.original_sleep = time.sleep
         
         # We can safely initialize the Groq client here.
         # The library conflicts are gone.

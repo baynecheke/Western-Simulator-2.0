@@ -4,3 +4,11 @@ __pycache__/
 WesternSim.spec
 saves/
 .env
+
+venv/
+.venv/
+
+
+__pycache__/
+*.pyc
+
