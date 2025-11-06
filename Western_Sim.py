@@ -4557,7 +4557,7 @@ class Combat:
                             else:
                                 while True:
                                     print("Choose a weapon:")
-                                    for i, weapon in enumerate(owned_weapons, start=1):
+                                    for weapon in owned_weapons:
                                         info = weapons_data[weapon]
                                         dmg = info['damage']
                                         ammo_type = info['ammo']
@@ -4571,15 +4571,20 @@ class Combat:
                                             ammo_info = f" | Ammo: {ammo_count}"
                                         print(f"{weapon.capitalize()} (Damage: {dmg}){ammo_info}")
                                     print(f"Fists (No weapon)")
+
                                     try:
-                                        weapon_choice = int(input("Choice: "))
-                                        if weapon_choice == len(owned_weapons) + 1:
+                                        button_choices = owned_weapons + ["fists"]
+                                        weapon_choice = self.player.AI_File.parse_choice(
+                                        button_choices, 
+                                        "Choose a weapon:"
+                                        )
+                                        if weapon_choice == "fists":
                                             player_attack = random.randint(2, 5)
                                             print("You swing your fists!")
                                             player.play_sound("punch.mp3")
-                                            break
-                                        elif 1 <= weapon_choice <= len(owned_weapons):
-                                            weapon = owned_weapons[weapon_choice - 1]
+                                            break # Exit the 'while True' loop
+                                        elif weapon_choice in owned_weapons:
+                                            weapon = weapon_choice # The choice *is* the weapon name
                                             info = weapons_data[weapon]
                                             ammo_type = info['ammo']
                                             # check ammo
@@ -4588,7 +4593,7 @@ class Combat:
                                                     print(f"You're out of {ammo_type}! Choose another weapon.")
                                                     player.play_sound("blank_click.mp3")
                                                     time.sleep(1)
-                                                    continue
+                                                    continue # Stay in the 'while True' loop
                                                 else:
                                                     self.player.itemsinventory[ammo_type] -= 1
                                                     if self.player.itemsinventory[ammo_type] <= 0:
