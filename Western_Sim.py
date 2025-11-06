@@ -3950,7 +3950,7 @@ class Player:
         self.AI_File.play_sound(filename)
 
     def weapon_sound(self, weapon):
-        self.AI_File.play_sound(weapon)
+        self.AI_File.weapon_sound(weapon)
 
     def enemy_sound(self, name):
         if name == "rattlesnake":
