@@ -53,7 +53,9 @@ class AI_Control:
         
     def weapon_sound(self, weapon):
         """ Tells the client to play a weapon sound. """
-        if "rifle" in weapon: self.play_sound("rifle_shot.mp3")
+        if "rifle" in weapon: 
+            self.play_sound("rifle_shot.mp3")
+            self.play_sound("rifle_prime.mp3")
         elif "revolver" in weapon or "pistol" in weapon: self.play_sound("revolver_shot.mp3")
         elif "shotgun" in weapon: self.play_sound("shotgun.mp3")
         elif "knife" in weapon or "saber" in weapon: self.play_sound("knife.mp3")
