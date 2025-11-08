@@ -11,7 +11,7 @@ import builtins
 import sys
 
 
-    
+
 
 
 
@@ -211,26 +211,34 @@ class Player:
             print("No save files found. Starting a new game.")
             return player 
 
+        # save_names now has the original capitalization, e.g., "Bayne_real"
         save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
 
-        # Display saves by number ONLY if not using AI
-
-
-        # Use the AI_File parser from the global 'player' object.
-        # This assumes 'global player' is set to the player instance
-        # *before* this function is called.
+        # slot_choice_name is the lowercase version, e.g., "bayne_real"
         slot_choice_name = player.AI_File.parse_choice(
             save_names,
             "Choose a save slot:"
         )
 
-        # parse_choice returns the name (e.g., "my_save") or "none"
-        if slot_choice_name not in save_names:
+        # --- START FIX ---
+        # We must find the original, capitalized name that matches the
+        # lowercase choice we received from parse_choice.
+        
+        original_cased_name = None
+        for name in save_names:
+            if name.lower() == slot_choice_name:
+                original_cased_name = name
+                break # We found our match
+
+        if original_cased_name is None:
+            # This catches if the choice was "none" or didn't match
             print("Invalid choice. Starting a new game.")
             return player # Return the existing (empty) player
 
-        # Re-construct the original save_file name from the chosen name
-        save_file = f"save_{slot_choice_name}.json"
+        # Now, use the *original cased name* to build the file path
+        save_file = f"save_{original_cased_name}.json"
+        # --- END FIX ---
+        
         filepath = os.path.join(save_folder, save_file)
         with open(filepath, 'r') as f:
             save_data = json.load(f)
@@ -276,12 +284,15 @@ class Player:
         player.quests_done = save_data.get("quests_done", [])
         player.event = save_data.get("event", [])
         player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
-        player.player_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
+        
+        # --- FIX: Use the original_cased_name as the fallback ---
+        player.player_name = save_data.get("save_name", original_cased_name)
         player.current_town_name = save_data.get("current_town_name", "Dustbowl")
 
         print(f"Game loaded from {save_file} successfully!")
-        # Update possible actions based on whether the player is in a village
-        player.save_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
+        
+        # --- FIX: Use the original_cased_name as the fallback ---
+        player.save_name = save_data.get("save_name", original_cased_name)
         player.update_actions()
         return player
 
