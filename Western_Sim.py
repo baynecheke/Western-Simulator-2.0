@@ -4618,11 +4618,11 @@ class Combat:
                             print(f"Your health is {self.player.Health}.")
                             print(f"Enemy health is {enemy_health}.")
 
-                        elif choice == "Use Item":
+                        elif choice == "use item":
                             self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
 
 
-                        elif choice == "Retreat":
+                        elif choice == "retreat":
                             player_turn_complete = True
                             new_speed = self.player.Speed + escape_boost
                             if self.EnemyCombatant.get("bound", False) == True:
