@@ -2058,7 +2058,7 @@ class Player:
             print("Will you try and capture him? (yes/no)")
             choice = self.AI_File.parse_YN(": ")
             time.sleep(2,)
-            if choice == "Yes":
+            if choice == "yes":
                 print("You attempt to capture the outlaw.")
                 if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                     print("You successfully capture the outlaw.")
