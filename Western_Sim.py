@@ -1303,30 +1303,36 @@ class Player:
 
         for i in range(2):
             print(f"\n--- Choice {i+1}/2 ---")
-            print("1) Heal to full health")
-            print("2) Buy ammo")
-            print("3) Get supplies")
-            choice = input("What would you like to do? (1-3): ").strip()
-
-            if choice == "1":
+            
+            # --- MODIFICATION START ---
+            prompt = f"What would you like to do? (Choice {i+1}/2)"
+            available_choices = ["Heal to full health", "Buy ammo", "Get supplies"]
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            # 'choice' will be the lowercase string of the selected option
+            
+            if choice == "heal to full health":
                 self.Health = self.MaxHealth
                 print(f"You are fully healed. Health is now {self.Health}.")
-            elif choice == "2":
+            elif choice == "buy ammo":
                 ammo_inventory = {
                     'pistol_ammo': ShopItem('pistol_ammo', 2, 10),
                     'rifle_ammo': ShopItem('rifle_ammo', 3, 10),
                     'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, "Armory soldier")
+                # Note: Updated to use USE_OLLAMA to match your current Store class
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, USE_OLLAMA)
                 ammo_shop.run_buy_session()
-            elif choice == "3":
+            elif choice == "get supplies":
                 print("The armory clerk hands you a crate of supplies...")
                 loot = random.choice(["colt pistol", "revolver", "bandage", "ammo cartridge", "bread", "rope"])
                 self.loot_drop(loot)
                 time.sleep(1)
             else:
-                print("Invalid choice. You missed that opportunity.")
+                print("You decided to do nothing.")
+            # --- MODIFICATION END ---
+            
             time.sleep(1)
 
         print("\nYou step out of the Armory, ready for what comes next.")
@@ -1341,21 +1347,30 @@ class Player:
 
         for i in range(max(3-self.counter,0)):
             self.counter += 1
-            print("\nWhat would you like to do?")
-            print("1) Talk to the barkeeper")
-            print("2) Sing a drinking song")
-            print("3) Talk to the patrons")
-            print("4) Leave the bar")
-            choice = input("Choice: ").strip()
-            if choice == "1":
+            
+            # --- MODIFICATION START ---
+            prompt = "\nWhat would you like to do?"
+            available_choices = [
+                "Talk to the barkeeper",
+                "Sing a drinking song", 
+                "Talk to the patrons",
+                "Leave the bar"
+            ]
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            # choice is now a lowercase string like "talk to the barkeeper"
+
+            if choice == "talk to the barkeeper":
                 self.saloon_barkeeper()
-            elif choice == "2":
+            elif choice == "sing a drinking song":
                 self.saloon_song()
-            elif choice == "3":
+            elif choice == "talk to the patrons":
                 self.saloon_patrons()
-            else:
+            else: # Covers "leave the bar"
                 print("You decide to just watch the crowd for a while.")
                 break
+            # --- MODIFICATION END ---
+            
             time.sleep(1)
         print("You have gathered all new information.")
         self.change_music("Town.mp3", -1)
@@ -1413,43 +1428,57 @@ class Player:
         else:
             print("Lot's of people gather around the saloon's door and inside.")
 
+
     def saloon_barkeeper(self):
-        print("\nThe barkeeper polishes a glass and nods.")
-        print("1) Ask about rumors")
-        print("2) Buy a drink (5 gold)")
-        choice = input("Choice: ").strip()
-        if choice == "1":
+            print("\nThe barkeeper polishes a glass and nods.")
+            
+            # --- MODIFICATION START ---
+            # Define the choices for the buttons
+            # I included the cost in the button text so the player knows before clicking
+            available_choices = ["Ask about rumors", "Buy a drink (5 gold)"]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?", USE_OLLAMA)
+            # choice will be the lowercase string of the button clicked
 
-            if "barkeeper_rumor" not in self.rumors_heard:
-                self.rumors_heard.append("barkeeper_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-                "old_mine_lights": "Nobody goes near the old mine anymore.",
-                }
-            topic, rumor = random.choice(list(rumor_topics.items()))
-            print(f"The barkeeper murmurs: \"{rumor}\"")
-            self.rumors[topic] = self.rumors.get(topic, 0) + 1
-            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-            # Example: trigger a quest after hearing a rumor 2 times
-            if self.rumors[topic] == 2:
-                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                self.quest.append(topic)
-            else:
-                print("Unfortunately, the barkeeper has no new rumors for you.")
-            self.rumors_heard.append("barkeeper_rumor")
-            time.sleep(2)
-        elif choice == "2":
-            if self.gold >= 5:
-                self.gold -= 5
-                print("You pay 5 gold and down a shot. +5 health.")
-                print("You feel a warm buzz, and faster. +1 speed.")
-                self.Health = min(self.Health + 5, self.MaxHealth)
-                self.Temporaryspdboost += 1
-            else:
-                print("You check your pouch—you don't have enough gold.")
+            if choice == "ask about rumors": # <-- Changed from "1"
+                if "barkeeper_rumor" not in self.rumors_heard:
+                    self.rumors_heard.append("barkeeper_rumor")
+                    rumor_topics = {
+                    "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                    "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    }
+                    # Fix: Initialize topic and rumor properly before use
+                    topic, rumor = random.choice(list(rumor_topics.items()))
+                    
+                    print(f"The barkeeper murmurs: \"{rumor}\"")
+                    self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                    print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                    
+                    # Example: trigger a quest after hearing a rumor 2 times
+                    if self.rumors[topic] == 2:
+                        print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                        self.quest.append(topic)
+                else:
+                    print("Unfortunately, the barkeeper has no new rumors for you.")
+                
+                # Ensure this flag is added (it was in your original code, seemingly outside the 'if' but logic suggests it marks the interaction)
+                if "barkeeper_rumor" not in self.rumors_heard:
+                    self.rumors_heard.append("barkeeper_rumor")
+                time.sleep(2)
 
-        else:
-            print("He shrugs: \"Suit yourself.\"")
+            elif choice == "buy a drink (5 gold)": # <-- Changed from "2"
+                if self.gold >= 5:
+                    self.gold -= 5
+                    print("You pay 5 gold and down a shot. +5 health.")
+                    print("You feel a warm buzz, and faster. +1 speed.")
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+                    self.Temporaryspdboost += 1
+                else:
+                    print("You check your pouch—you don't have enough gold.")
+
+            else:
+                print("He shrugs: \"Suit yourself.\"")
+            # --- MODIFICATION END ---
 
     def saloon_song(self):
         print("\nYou stand and clear your throat to sing...")
@@ -1517,58 +1546,73 @@ class Player:
             print("You decide against the risk and keep singing.")
 
     def saloon_patrons(self):
-        print("\nYou join a group of patrons at a table.")
-        print("1) Gather gossip")
-        print("2) Play cards (gamble)")
-        print("3) Arm-wrestling contest")
-        choice = input("Choice: ").strip()
-        if choice == "1":
-            if "patron_rumor" not in self.rumors_heard:
+            print("\nYou join a group of patrons at a table.")
+            
+            # --- MODIFICATION START ---
+            available_choices = [
+                "Gather gossip", 
+                "Play cards (gamble)", 
+                "Arm-wrestling contest"
+            ]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?", USE_OLLAMA)
+            # choice is now a lowercase string
 
-                self.rumors_heard.append("patron_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-                "old_mine_lights": "Nobody goes near the old mine anymore.",
-                }
-                topic, rumor = random.choice(list(rumor_topics.items()))
-                print(f"A patron murmurs: \"{rumor}\"")
-                self.rumors[topic] = self.rumors.get(topic, 0) + 1
-                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-                # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 2:
-                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    self.quest.append(topic)
-            else:
-                print("They shrug: \"We'll let you know if something happens.\"")
-            time.sleep(2)
-        elif choice == "2":
-            bet = input("Enter bet amount: ").strip()
-            if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
-                bet = int(bet)
-                self.gold -= bet
+            if choice == "gather gossip": # <-- Changed from "1"
+                if "patron_rumor" not in self.rumors_heard:
 
-                if self.perform_stat_check(self.shadow_skill, base_target=16):
-                    winnings = bet + 10 + bet//2
-                    self.gold += winnings
-                    print(f"You win! You gain {winnings} gold.")
+                    self.rumors_heard.append("patron_rumor")
+                    rumor_topics = {
+                    "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                    "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    }
+                    # Ensure topic/rumor variables are defined inside the scope or earlier
+                    topic, rumor = random.choice(list(rumor_topics.items()))
+                    print(f"A patron murmurs: \"{rumor}\"")
+                    self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                    print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                    # Example: trigger a quest after hearing a rumor 2 times
+                    if self.rumors[topic] == 2:
+                        print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                        self.quest.append(topic)
                 else:
-                    print("You lose the hand and your bet.")
-                    print("If you had been more stealthy, you might have won.")
+                    print("They shrug: \"We'll let you know if something happens.\"")
+                time.sleep(2)
+
+            elif choice == "play cards (gamble)": # <-- Changed from "2"
+                # input() is patched by server.py to show a text box on the web UI
+                bet = input("Enter bet amount: ").strip()
+                
+                if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
+                    bet = int(bet)
+                    self.gold -= bet
+
+                    if self.perform_stat_check(self.shadow_skill, base_target=16):
+                        winnings = bet + 10 + bet//2
+                        self.gold += winnings
+                        print(f"You win! You gain {winnings} gold.")
+                    else:
+                        print("You lose the hand and your bet.")
+                        print("If you had been more stealthy, you might have won.")
+                else:
+                    print("Invalid bet.")
+
+            elif choice == "arm-wrestling contest": # <-- Changed from "3"
+                print("You grip a burly patron's hand and push...")
+                if self.perform_stat_check(self.strength_skill, base_target=13) == True:
+                    prize = 5
+                    print(f"You win the arm-wrestle! +{prize} gold.")
+                    self.gold += prize
+                else:
+                    print("You lose and take a punch. -5 health.")
+                    print("If you had been stronger, you might have won.")
+                    self.Health -= 5
+            
             else:
-                print("Invalid bet.")
-        elif choice == "3":
-            print("You grip a burly patron's hand and push...")
-            if self.perform_stat_check(self.strength_skill, base_target=13) == True:
-                prize = 5
-                print(f"You win the arm-wrestle! +{prize} gold.")
-                self.gold += prize
-            else:
-                print("You lose and take a punch. -5 health.")
-                print("If you had been stronger, you might have won.")
-                self.Health -= 5
-        else:
-            print("No one notices your hesitation.")
-        time.sleep(2)
+                print("No one notices your hesitation.")
+            # --- MODIFICATION END ---
+                
+            time.sleep(2)
 
     def Townspeople(self):
         if self.Hostility >= 3:
@@ -1885,11 +1929,16 @@ class Player:
             print("Your stats:")
             print(f"Days survived: {self.Day}")
             print(f"Score: {self.score}")
-            input("Press Enter to continue...")
+            
+
+            self.AI_File.parse_choice(["Continue"], "Press Enter to continue...", USE_OLLAMA)
+            
             self.Statcheck()
-            print("You have come so far, would you like to respawn at your current position? (yes/no)")
+            
+            # 2. Replace the yes/no prompt
             print("You will no longer track score.")
-            choice = self.AI_File.parse_YN(": ")
+            prompt = "You have come so far, would you like to respawn at your current position?"
+            choice = self.AI_File.parse_YN(prompt)
             if choice == "yes":
                 self.lose_random_item(2)
                 self.gold -= self.gold/2
@@ -2094,147 +2143,178 @@ class Player:
             time.sleep(2,)
 
     def encounter_abandoned_house(self):
-        print("You see an abandoned house by the side of the road.")
-        print("It could have some valuable loot, but you have no idea what is inside.")
-        print("You could (1) leave it, (2) enter the broken down door, (3) enter the cellar, or (4) loot the garden.")
-        choice = input(": ")
-        if choice == "1":
-            print("You decide it is wisest to leave it alone.")
-            time.sleep(2,)
-        elif choice == "2":
-            print("You enter the door.")
-            print("It makes a creaking sound as you walk in.")
-            time.sleep(2,)
-            print("(1) On the wall hangs a dusty rifle,(2) on the table lies a bundle, and (3), there is a painting on the far wall.")
-            choice = input(": ")
-            if choice == "1":
-                Random = random.randint(1,2)
-                if Random == 1:
-                    print("As you head over to the table you hear a noise.")
-                    time.sleep(2,)
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("There must be a way to disable the traps...")
-                    self.Health -= 20
-                    time.sleep(2,)
-                else:
-                    print("You grab the rifle")
-                    self.loot_drop("rifle")
-                    time.sleep(2,)
-            elif choice == "2":
-                Random = random.randint(1,3)
-                if Random == 1:
-                    print("As you head over to the table you hear a noise.")
-                    time.sleep(2,)
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("There must be a way to disable the traps...")
-                    self.Health -= 10
-                    time.sleep(2,)
-                else:
-                    print("You rummage around through the table")
-                    self.loot_drop(random.choice(self.common_loot))
-            elif choice == "3":
-                print("You examine the picture...")
+            print("You see an abandoned house by the side of the road.")
+            print("It could have some valuable loot, but you have no idea what is inside.")
+            
+            # --- MODIFICATION 1: Main Entry Menu ---
+            available_choices = ["Leave it", "Enter door", "Enter cellar", "Loot garden"]
+            prompt = "What do you want to do?"
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            
+            if choice == "leave it":
+                print("You decide it is wisest to leave it alone.")
                 time.sleep(2,)
-                if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
-                    print("You accidentally trigger the trap attached to the painting!")
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("You were, close, if your shadow skill was higher you have had a better chance of disarming it.")
-                    time.sleep(4,)
-                else:
-                    print("You notice the elaborate trap around the painting, and streching around the room.")
-                    print("You carefully disarm the trap, glad your shadow skills have served you.")
-                    time.sleep(2,)
-                    print("You find a crate behind the painting.")
-                    print("Now that the trap is disarmed, you can loot the room safely.")
-                    print("(1), On the wall hangs a dusty rifle,(2), on the table lies a bundle, and (3), there is a crate behind the painting.")
-                    time.sleep(2,)
-                    choice = input(": ")
-                    if choice == "1":
+                
+            elif choice == "enter door":
+                print("You enter the door.")
+                print("It makes a creaking sound as you walk in.")
+                time.sleep(2,)
+                
+                # --- MODIFICATION 2: Inside the House Menu ---
+                print("You see three things of interest:")
+                print("1. A dusty rifle on the wall.")
+                print("2. A bundle on the table.")
+                print("3. A painting on the far wall.")
+                
+                choices_inside = ["Dusty Rifle", "Bundle", "Painting"]
+                choice_inside = self.AI_File.parse_choice(choices_inside, "What do you inspect?", USE_OLLAMA)
+
+                if choice_inside == "dusty rifle":
+                    Random = random.randint(1,2)
+                    if Random == 1:
+                        print("As you head over to the table you hear a noise.")
+                        time.sleep(2,)
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("There must be a way to disable the traps...")
+                        self.Health -= 20
+                        time.sleep(2,)
+                    else:
                         print("You grab the rifle")
                         self.loot_drop("rifle")
-                    elif choice == "2":
+                        time.sleep(2,)
+                
+                elif choice_inside == "bundle":
+                    Random = random.randint(1,3)
+                    if Random == 1:
+                        print("As you head over to the table you hear a noise.")
+                        time.sleep(2,)
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("There must be a way to disable the traps...")
+                        self.Health -= 10
+                        time.sleep(2,)
+                    else:
                         print("You rummage around through the table")
                         self.loot_drop(random.choice(self.common_loot))
-                    elif choice == "3":
-                        print("You find a wealth of supplies")
-                        self.gold += 20
-                        self.loot_drop(random.choice(self.uncommon_loot))
-                        self.loot_drop(random.choice(self.rare_loot))
+                
+                elif choice_inside == "painting":
+                    print("You examine the picture...")
+                    time.sleep(2,)
+                    if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
+                        print("You accidentally trigger the trap attached to the painting!")
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("You were close. If your shadow skill was higher you might have disarmed it.")
+                        time.sleep(4,)
+                    else:
+                        print("You notice the elaborate trap around the painting, stretching around the room.")
+                        print("You carefully disarm the trap, glad your shadow skills have served you.")
+                        time.sleep(2,)
+                        print("You find a crate behind the painting.")
+                        print("Now that the trap is disarmed, you can loot the room safely.")
+                        
+                        # --- MODIFICATION 3: Behind Painting Menu ---
+                        choices_loot = ["Dusty Rifle", "Bundle", "Crate"]
+                        choice_loot = self.AI_File.parse_choice(choices_loot, "What do you want to take?", USE_OLLAMA)
+                        
+                        if choice_loot == "dusty rifle":
+                            print("You grab the rifle")
+                            self.loot_drop("rifle")
+                        elif choice_loot == "bundle":
+                            print("You rummage around through the table")
+                            self.loot_drop(random.choice(self.common_loot))
+                        elif choice_loot == "crate":
+                            print("You find a wealth of supplies")
+                            self.gold += 20
+                            self.loot_drop(random.choice(self.uncommon_loot))
+                            self.loot_drop(random.choice(self.rare_loot))
+                
+                else:
+                    print("Invalid choice.")
+                    return
 
+            elif choice == "enter cellar":
+                print("You enter the cellar, it is damp and dirty.")
+                if "lantern" in self.itemsinventory:
+                    print("You use your lantern to light the way.")
+                    time.sleep(1,)
+                    print("You found a rare item!")
+                    rare = random.choice(["winchester stock", "winchester barrel"])
+                    self.loot_drop(rare)
+                    for i in range(3):
+                        self.loot_drop("rifle_ammo")
+                else:
+                    print("It is too dark to explore so you leave.")
+                    time.sleep(1,)
+            
+            elif choice == "loot garden":
+                print("You loot the garden.")
+                self.loot_drop(random.choice(self.common_loot))
+                time.sleep(2,)
+            
             else:
-                print("Invalid")
+                print("Invalid choice.")
                 return
-        elif choice == "3":
-            print("You enter the cellar, it is damp and dirty.")
-            if "lantern" in self.itemsinventory:
-                print("You use your lantern to light the way.")
-                time.sleep(1,)
-                print("You found a rare item!")
-                rare = random.choice(["winchester stock", "winchester barrel"])
-                self.loot_drop(rare)
-                for i in range(3):
-                    self.loot_drop("rifle_ammo")
-            else:
-                print("It is too dark to explore so you leave.")
-                time.sleep(1,)
-        elif choice == "4":
-            print("You loot the garden.")
-            self.loot_drop(random.choice(self.common_loot))
+
+            print("Suddenly, you hear someone approaching the house.")
+            print("You quickly exit the house and get back on the road.")
             time.sleep(2,)
-        else:
-            print("Invalid choice.")
-            return
-        print("Suddenly, you hear someone approaching the house.")
-        print("You quickly exit the house and get back on the road.")
-        time.sleep(2,)
 
     def encounter_stage_coach(self):
-        print("You come upon a stagecoach dangling over a ravine. The driver pleads for help.")
-        print("1) Attempt to secure the coach with your rope")
-        print("2) Try to push the coach back yourself")
-        print("3) Leave the scene and continue on your way")
-        choice = input(": ").strip()
+            print("You come upon a stagecoach dangling over a ravine. The driver pleads for help.")
+            
+            # --- MODIFICATION START ---
+            available_choices = [
+                "Secure with rope", 
+                "Push it back", 
+                "Leave it"
+            ]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What do you do?", USE_OLLAMA)
 
-        if choice == "1":
-            if "rope" in self.itemsinventory:
-                print("You tie off your rope and carefully secure the stagecoach...")
-                if random.randint(1, 4) == 1:  # 75% chance of success
-                    print("With effort, you pull it back to safety! The driver rewards you.")
-                    print("The rope frays! The coach lurches but you can't hold it.")
-                    print("Your rope isn't strong enough. The coach slips over the edge.")
-                    self.Health -= 5
-                    print("-5 health from the strain.")
+            if choice == "secure with rope": # <-- Changed from "1"
+                if "rope" in self.itemsinventory:
+                    print("You tie off your rope and carefully secure the stagecoach...")
+                    
+                    # Logic Fix: 1 is failure (25%), Else is success (75%)
+                    if random.randint(1, 4) == 1: 
+                        print("The rope frays! The coach lurches but you can't hold it.")
+                        print("Your rope isn't strong enough. The coach slips over the edge.")
+                        self.Health -= 5
+                        print("-5 health from the strain.")
+                    else:
+                        print("With effort, you pull it back to safety! The driver rewards you.")
+                        reward = random.randint(10, 30)
+                        self.gold += reward
+                        self.itemsinventory["rope"] -= 1
+                        if self.itemsinventory["rope"] <= 0:
+                            del self.itemsinventory["rope"]
+                        print(f"+{reward} gold")
                 else:
+                    print("You rummage through your bag, but realize you have no rope!")
+                    print("You try to pull the coach back but you are too late and it slips over the edge.")
+                    self.Time += 1
+
+            elif choice == "push it back": # <-- Changed from "2"
+                print("You brace yourself and try to push the stagecoach back...")
+                if self.perform_stat_check(self.strength_skill, base_target=14) == True:
+                    print("Your strength prevails! You save the stagecoach and earn a reward.")
                     reward = random.randint(10, 30)
                     self.gold += reward
-                    self.itemsinventory["rope"] -= 1
-                    if self.itemsinventory["rope"] <= 0:
-                        del self.itemsinventory["rope"]
                     print(f"+{reward} gold")
-            else:
-                print("You rummage through your bag, but realize you have no rope!")
-                print("You try to pull the coach back but you are too late and it slips over the edge.")
+                else:
+                    print("Your strength isn't enough. The coach slips over the edge.")
+                    self.Health -= 5
+                    print("-5 health from the effort.")
+
+            else: # Covers "leave it"
+                print("You decide it's too dangerous and ride on, losing some daylight.")
                 self.Time += 1
+            # --- MODIFICATION END ---
 
-        elif choice == "2":
-            print("You brace yourself and try to push the stagecoach back...")
-            if self.perform_stat_check(self.strength_skill, base_target=14) == True:
-                print("Your strength prevails! You save the stagecoach and earn a reward.")
-                reward = random.randint(10, 30)
-                self.gold += reward
-                print(f"+{reward} gold")
-            else:
-                print("Your strength isn't enough. The coach slips over the edge.")
-                self.Health -= 5
-                print("-5 health from the effort.")
-
-        else:
-            print("You decide it's too dangerous and ride on, losing some daylight.")
-            self.Time += 1
-        time.sleep(2,)
+            time.sleep(2,)
 
     def encounter_dry_river_bed(self):
         print("A dry river bed lies in your path.")
