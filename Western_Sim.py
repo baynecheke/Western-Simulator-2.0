@@ -1449,7 +1449,7 @@ class Player:
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
                 # Note: Updated to use USE_OLLAMA to match your current Store class
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, USE_OLLAMA)
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, "Quartermaster")
                 ammo_shop.run_buy_session()
             elif choice == "get supplies":
                 print("The armory clerk hands you a crate of supplies...")
@@ -2098,7 +2098,7 @@ class Player:
             print(f"Score: {self.score}")
             
 
-            self.AI_File.parse_choice(["Continue"], "Press Enter to continue...", USE_OLLAMA)
+            self.AI_File.parse_choice(["Continue"], "Press Enter to continue...")
             
             self.Statcheck()
             
@@ -2336,7 +2336,7 @@ class Player:
                 print("3. A painting on the far wall.")
                 
                 choices_inside = ["Dusty Rifle", "Bundle", "Painting"]
-                choice_inside = self.AI_File.parse_choice(choices_inside, "What do you inspect?", USE_OLLAMA)
+                choice_inside = self.AI_File.parse_choice(choices_inside, "What do you inspect?")
 
                 if choice_inside == "dusty rifle":
                     Random = random.randint(1,2)
@@ -2385,7 +2385,7 @@ class Player:
                         
                         # --- MODIFICATION 3: Behind Painting Menu ---
                         choices_loot = ["Dusty Rifle", "Bundle", "Crate"]
-                        choice_loot = self.AI_File.parse_choice(choices_loot, "What do you want to take?", USE_OLLAMA)
+                        choice_loot = self.AI_File.parse_choice(choices_loot, "What do you want to take?")
                         
                         if choice_loot == "dusty rifle":
                             print("You grab the rifle")
@@ -2440,7 +2440,7 @@ class Player:
                 "Leave it"
             ]
             
-            choice = self.AI_File.parse_choice(available_choices, "What do you do?", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, "What do you do?")
 
             if choice == "secure with rope": # <-- Changed from "1"
                 if "rope" in self.itemsinventory:
@@ -2521,7 +2521,7 @@ class Player:
     def encounter_abandoned_wagon(self):
             print("You notice an abandoned wagon a little ways off the trail.")
             
-            choice = self.AI_File.parse_choice(["Search it", "Leave it"], "You could either search the wagon or leave and save time.", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(["Search it", "Leave it"], "You could either search the wagon or leave and save time.")
 
             if choice == "search it":
                 print("You take the time to search the wagon.")
@@ -2550,7 +2550,7 @@ class Player:
             Random = random.randint(1, 100)
             print("\nYou spot a wounded bandit slumped against a rock. His pistol lies beside him.")
             
-            choice = self.AI_File.parse_choice(["Help him", "Loot him", "Leave him be"], "What do you do?", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(["Help him", "Loot him", "Leave him be"], "What do you do?")
             
             if choice == "help him":
                 print("You tend his wounds and give him water.")
@@ -2579,7 +2579,7 @@ class Player:
     def encounter_caravan_attack(self):
             print("\nYou hear gunshots up ahead—a merchant caravan is under attack!")
             
-            choice = self.AI_File.parse_choice(["Join the fight", "Stay hidden", "Loot after"], "What will you do?", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(["Join the fight", "Stay hidden", "Loot after"], "What will you do?")
 
             if choice == "join the fight":
                 print("You rush in to defend them!")
@@ -2606,7 +2606,7 @@ class Player:
     def encounter_wild_stallion(self):
         print("\nA wild stallion rears up in a clearing—untamed and swift.")
         
-        choice = self.AI_File.parse_choice(["Try to catch it", "Leave it be"], "What will you do?", USE_OLLAMA)
+        choice = self.AI_File.parse_choice(["Try to catch it", "Leave it be"], "What will you do?")
 
         if choice == "try to catch it":
             if "rope" in self.itemsinventory:
