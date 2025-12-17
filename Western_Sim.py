@@ -1435,7 +1435,7 @@ class Player:
             prompt = f"What would you like to do? (Choice {i+1}/2)"
             available_choices = ["Heal to full health", "Buy ammo", "Get supplies"]
             
-            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, prompt)
             # 'choice' will be the lowercase string of the selected option
             
             if choice == "heal to full health":
@@ -1503,7 +1503,7 @@ class Player:
             # --- 3. Get User Choice ---
             prompt = "\nWhat would you like to do?"
             # parse_choice typically returns the choice as a lowercase string
-            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, prompt)
 
             # --- 4. Handle Quest Buttons ---
             if choice in quest_map:
@@ -1589,7 +1589,7 @@ class Player:
             # I included the cost in the button text so the player knows before clicking
             available_choices = ["Ask about rumors", "Buy a drink (5 gold)"]
             
-            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?")
             # choice will be the lowercase string of the button clicked
 
             if choice == "ask about rumors": # <-- Changed from "1"
@@ -1707,7 +1707,7 @@ class Player:
                 "Arm-wrestling contest"
             ]
             
-            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?", USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?")
             # choice is now a lowercase string
 
             if choice == "gather gossip": # <-- Changed from "1"
@@ -2318,7 +2318,7 @@ class Player:
             available_choices = ["Leave it", "Enter door", "Enter cellar", "Loot garden"]
             prompt = "What do you want to do?"
             
-            choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            choice = self.AI_File.parse_choice(available_choices, prompt)
             
             if choice == "leave it":
                 print("You decide it is wisest to leave it alone.")
@@ -2492,7 +2492,7 @@ class Player:
         time.sleep(2,)
         available_choices = ["Cross the river", "Go around"]
         prompt = "What will you do?"
-        choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+        choice = self.AI_File.parse_choice(available_choices, prompt)
         
         if choice == "cross the river": 
             print("You take the chance and cross the river bank.")
@@ -4370,7 +4370,7 @@ class Player:
             max_q = self.itemsinventory[item]
             
             # --- FIX 2: Replaced input() with ask_free_text ---
-            num_str = self.AI_File.ask_free_text(f"How many {item}? (1–{max_q}): ")
+            num_str = input(f"How many {item}? (1-{max_q}): ")
             
             if not num_str.isdigit() or not (1 <= int(num_str) <= max_q):
                 print("Invalid quantity.")
