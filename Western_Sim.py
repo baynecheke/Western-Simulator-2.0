@@ -4362,7 +4362,7 @@ class Player:
             # This will show buttons for each item and "Done donating"
             choice = self.AI_File.parse_choice(display_choices, "Choose item:")
             
-            if choice == "Done donating":
+            if choice == "done donating":
                 break
 
             # 'choice' is now the item *name* (e.g., "bread")
