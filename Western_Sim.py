@@ -59,7 +59,12 @@ class Player:
         self.distancenext = 0
         self.event = []
         self.number_of_towns_visited = 0
-
+        self.town_event_occurred = False
+        self.quest_flags = {
+            "iron_tracks": {"stage": 0, "bonus": 0},
+            "earp_vendetta": {"stage": 0, "bonus": 0},
+            "defend_town": {"outcome": None, "bonus": 0} 
+        }
         
         self.EmptyTown = False
         self.Speed = 3
@@ -128,85 +133,79 @@ class Player:
         }
         self.quest_flags = {}
         self.QUEST_DATABASE = [
+            # --- IRON TRACKS ---
             {
                 "id": "iron_intro",
                 "theme": "railroad",
-                "trigger": "saloon",  
-                "description": "Railroad men are discussing expansion.",
+                "trigger": "saloon",  # This appears as a button in the Saloon
+                "description": "Talk to Railroad Men (Start Quest)",
                 "condition": lambda p: "iron_tracks" not in p.quests_done and p.Tquest == "None",
                 "function": "encounter_iron_intro"
             },
-
             {
                 "id": "iron_missing_wagon",
                 "theme": "railroad",
-                "trigger": "arrive_town", 
+                "trigger": "arrive_town", # Happens automatically on arrival
                 "description": "The Railroad Foreman looks furious and is asking for help.",
-                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 1,
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 1,
                 "function": "encounter_iron_stage1"
             },
-
             {
                 "id": "iron_depot_night",
                 "theme": "railroad",
-                "trigger": "leave_town", 
+                "trigger": "leave_town", # Happens when you try to leave
                 "description": "You hear shouting coming from the train depot.",
-                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 2,
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 2,
                 "function": "encounter_iron_stage2"
             },
-
             {
                 "id": "iron_train_defense",
                 "theme": "railroad",
-                "trigger": "railroad_station", 
+                "trigger": "town_event", # Happens during daily update
                 "description": "The first train is arriving. The Foreman needs guards.",
-                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 3,
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 3,
                 "function": "encounter_iron_stage3"
             },
-
             {
                 "id": "iron_bridge",
                 "theme": "railroad",
-                "trigger": "bridge", 
+                "trigger": "town_event",
                 "description": "The Foreman runs up to you with urgent news about the bridge.",
-                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 4,
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 4,
                 "function": "encounter_iron_stage4"
             },
-
             {
                 "id": "iron_dynamite_boss",
                 "theme": "railroad",
-                "trigger": "town_center",
+                "trigger": "town_event",
                 "description": "The notorious Dynamite Kid has ridden into town.",
-                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 5,
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 5,
                 "function": "encounter_iron_stage5"
             },
 
-
+            # --- TOWN DEFENSE ---
             {
                 "id": "town_def_1",
                 "theme": "town_defense",
                 "trigger": "town_event",
                 "description": "The Sheriff looks frantic and is asking for volunteers.",
-                "condition": lambda p: p.Tquest == "defend_town" and p.town_defense_outcome is None,
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is None,
                 "function": "encounter_town_part1"
             },
-
             {
                 "id": "town_def_2",
                 "theme": "town_defense",
                 "trigger": "town_event",
                 "description": "The town is scarred from the raid. They are rebuilding.",
-                "condition": lambda p: p.Tquest == "defend_town" and p.town_defense_outcome is not None and p.town_aftermath_outcome is None,
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is not None and p.get_flag("defend_town", "aftermath") is None,
                 "function": "encounter_town_part2"
             },
-            
             {
                 "id": "town_def_3",
                 "theme": "town_defense",
                 "trigger": "town_event",
                 "description": "Rumors say the bandits are returning for revenge tonight.",
-                "condition": lambda p: p.Tquest == "defend_town" and p.town_aftermath_outcome is not None and p.town_final_outcome is None,
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "aftermath") is not None and p.get_flag("defend_town", "final") is None,
                 "function": "encounter_town_part3"
             }
         ]
@@ -247,10 +246,6 @@ class Player:
         self.Tquest = "None"  
         self.quest_today = False
         self.quest = []
-        self.iron_stage = 0
-        self.iron_bonus = 0
-        self.earp_stage = 0 # Add this line
-        self.earp_bonus = 0 # Add this line
         self.quests_done = []
         self.boots_used = False
         self.town_defense_outcome   = None
@@ -357,16 +352,19 @@ class Player:
         player.rumors_heard = save_data.get("rumors_heard", [])
         player.enemy_effects = save_data.get("enemy_effects", [])
         player.player_effects = save_data.get("player_effects", [])
-        player.iron_bonus = save_data.get("iron_bonus", 0)
-        player.iron_stage = save_data.get("iron_stage", 0)
         player.shadow_skill = save_data.get("shadow_skill", 3)
         player.trail_skill = save_data.get("trail_skill", 3)
         player.strength_skill = save_data.get("strength_skill", 3)
-        player.earp_bonus = save_data.get("earp_bonus", 0)
-        player.earp_stage = save_data.get("earp_stage", 0)
         player.quests_done = save_data.get("quests_done", [])
         player.event = save_data.get("event", [])
         player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
+        player.quest_flags = save_data.get("quest_flags", {})
+        if "iron_tracks" not in player.quest_flags:
+            player.quest_flags["iron_tracks"] = {
+                "stage": save_data.get("iron_stage", 0),
+                "bonus": save_data.get("iron_bonus", 0)
+            }
+        
         
         # --- FIX: Use the original_cased_name as the fallback ---
         player.player_name = save_data.get("save_name", original_cased_name)
@@ -417,19 +415,16 @@ class Player:
                 "rumors_heard": self.rumors_heard,
                 "enemy_effects": self.enemy_effects,
                 "player_effects": self.player_effects,
-                "iron_bonus": self.iron_bonus,
-                "iron_stage": self.iron_stage,
                 "rebirth": self.rebirth,
                 "shadow_skill": self.shadow_skill,
                 "trail_skill": self.trail_skill,
                 "strength_skill": self.strength_skill,
-                "earp_bonus": self.earp_bonus,
-                "earp_stage": self.earp_stage,
                 "quests_done": self.quests_done,
                 "event": self.event,
                 "number_of_towns_visited": self.number_of_towns_visited,
                 "player_name": self.player_name,
                 "current_town_name": self.current_town_name,
+                "quest_flags": self.quest_flags,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 # In Western_Sim.py
@@ -1437,8 +1432,26 @@ class Player:
                 "Talk to the patrons",
                 "Leave the bar"
             ]
+            quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
+            quest_map = {}
+            if quest_options:
+                for q in quest_options:
+                    # Add the quest description to the top of the list
+                    btn_text = q['description']
+                    available_choices.insert(0, btn_text)
+                    quest_map[btn_text.lower()] = q
             
             choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+            if choice in quest_map:
+                # Retrieve the quest object and run its function
+                selected_quest = quest_map[choice]
+                method_to_call = getattr(self, selected_quest["function"])
+                method_to_call()
+                
+                # If we start a quest, we usually exit the loop or refresh
+                if self.Tquest != "None": 
+                    break 
+                continue
             # choice is now a lowercase string like "talk to the barkeeper"
 
             if choice == "talk to the barkeeper":
@@ -1826,6 +1839,7 @@ class Player:
             self.add_item(item)
 
     def LeaveTown(self):
+        self.process_quest_triggers("leave_town", is_menu_option=False)
         if self.event == "final_earp_confrontation":
             print("Earp yells at you to stop, 'We need to finish Curly Bill.'")
             print("Will you stay and help him? (yes/no)")
@@ -1885,44 +1899,37 @@ class Player:
                 self.Interaction()
 
     def town_encounter(self):
-        quest_chance = random.randint(1, 2)
-        if self.Tquest == "None" and quest_chance >= 2:
-            Random = random.choice(["defend_town","iron_tracks"])
-            if Random == "defend_town" and "defend_town" not in self.quests_done:
-                # Episode 1 not done yet?
-                if self.town_defense_outcome is None:
-                    self.encounter_town_part1()
-            elif Random == "iron_tracks" and "iron_tracks" not in self.quests_done:
-                    self.encounter_iron_intro()
-                    return
-        if self.Tquest == "defend_town":
-            # Episode 2 pending?
-            if self.town_defense_outcome and self.town_aftermath_outcome is None:
-                self.encounter_town_part2()
-                return
-            # Episode 3 pending?
-            if self.town_aftermath_outcome and self.town_final_outcome is None:
-                self.encounter_town_part3()
-                return
-        elif self.Tquest == "iron_tracks":
-            if self.iron_stage == 1:
-                self.encounter_iron_stage1()
-                return
-            elif self.iron_stage == 2:
-                self.encounter_iron_stage2()
-                return
-            elif self.iron_stage == 3:
-                self.encounter_iron_stage3()
-                return
-            elif self.iron_stage == 4:
-                self.encounter_iron_stage4()
-                return
-            elif self.iron_stage == 5:
-                self.encounter_iron_stage5()
-                return
+        """
+        Handles daily events in town.
+        Prioritizes active quest progression over random new quests.
+        """
+        
+        # 1. Check for Active Quest Progression (The "Must Do" events)
+        # We check triggers marked "town_event" (Stages 3, 4, 5 of Iron Tracks, etc)
+        event_happened = self.process_quest_triggers("town_event", is_menu_option=False)
+        
+        if event_happened:
+            return # We did a quest step, so we skip random generation this turn
+
+        # 2. If no active quest step happened, try to start a NEW quest
+        # Only if we aren't currently on a main quest
+        if self.Tquest == "None":
+            roll = random.randint(1, 10)
+            
+            # 30% chance to start the Town Defense quest (Force Start)
+            if roll <= 3 and "defend_town" not in self.quests_done:
+                print("\nSomething is happening in town...")
+                self.Tquest = "defend_town" # Set as active
+                self.encounter_town_part1() # Start it immediately
+                
+            # 30% chance to hear the Iron Tracks rumor (Hint)
+            elif roll <= 6 and "iron_tracks" not in self.quests_done:
+                # We don't force start this because the trigger is in the Saloon
+                print("\n[Rumor] You see a new poster: 'Railroad Hiring - See Foreman at Saloon'.")
+                
             else:
-                self.encounter_iron_intro()
-                return
+                # Fallback: Just a quiet day
+                print("The town is relatively quiet today.")
 
     def ArriveTown(self):
         name = f"{random.choice(self.TownNames1)} {random.choice(self.TownNames2)}"
@@ -1932,7 +1939,7 @@ class Player:
         self.change_music("Town.mp3", -1)
         self.number_of_towns_visited += 1
         self.current_town_name = name
-
+        self.town_event_occurred = False
         if "family" in self.caravan:
             self.travel_bonus += 1
             print("The family thanks you sincerely for allowing them to travel with you, and gives you a handsome reward. +20 gold.")
@@ -1945,7 +1952,8 @@ class Player:
         self.update_actions()
         self.score = self.score + 5
         time.sleep(2)
-        
+        event_happened = self.process_quest_triggers("arrive_town", is_menu_option=False)
+
         if self.Tquest == "earp_vendetta" and self.earp_stage == 4:
             print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
             print("'Word is Curly Bill is holed up here in town. This ends now.'")
@@ -3445,11 +3453,12 @@ class Player:
         if choice == "yes":
             print("You agree to aid the foreman in keeping the line safe.")
             self.Tquest = "iron_tracks"
-            self.iron_stage = 1
+            self.set_flag("iron_tracks", "stage", 1)
             print("They give you a reward of 10 gold and a box of ammo cartridges.")
             self.gold += 10
             self.loot_drop("ammo cartridge")
-            self.iron_bonus += 2
+            current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+            self.set_flag("iron_tracks", "bonus", current_bonus + 2)
         else:
             print("You shake your head. The railroad men mutter that you're missing an opportunity.")
             self.Tquest = "None"
@@ -3473,7 +3482,8 @@ class Player:
                 print("You sneak up and catch the bandits off guard, taking them down silently.")
                 self.gold += 15
                 self.loot_drop("ammo cartridge")
-                self.iron_bonus += 2
+                current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                self.set_flag("iron_tracks", "bonus", current_bonus + 2)
                 self.trail_skill += 1
             else:
                 print("The bandits spot you! A fight breaks out.")
@@ -3484,15 +3494,18 @@ class Player:
                     print("You defeat the bandits and recover the supplies.")
                     self.gold += 20
                     self.loot_drop("ammo cartridge")
-                    self.iron_bonus += 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus + 1)
                 else:
                     print("You retreat to save yourself.")
                     self.Tquest = "None"
-                    self.iron_bonus -= 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 1)
         else:
             print("The foreman scowls. 'Fine, I'll find someone else.'")
-            self.iron_bonus -= 2
-        self.iron_stage = 2
+            current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+            self.set_flag("iron_tracks", "bonus", current_bonus - 2)
+        self.set_flag("iron_tracks", "stage", 2)
         time.sleep(2,)
 
     def encounter_iron_stage2(self):
@@ -3506,7 +3519,7 @@ class Player:
             print("You sneak into the depot and spot saboteurs planting dynamite.")
             if self.perform_stat_check(self.shadow_skill, base_target=16) == True:
                 print("You catch one saboteur alive. He blurts out about a coming train heist.")
-                self.iron_stage = 3
+                self.set_flag("iron_tracks", "stage", 3)
             else:
                 print("The saboteurs notice you! A fight breaks out.")
                 combat = Combat(self)
@@ -3515,13 +3528,14 @@ class Player:
                 if escape == False:
                     if self.Health > 0:
                         print("You stop the sabotage, but the plot deepens.")
-                        self.iron_stage = 3
+                        self.set_flag("iron_tracks", "stage", 3)
                     else:
                         print("You fall at the depot. The railroad effort is doomed.")
                         self.Tquest = "None"
                 else:
                     print("You flee, unable to stop the saboteurs.")
-                    self.iron_bonus -= 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 1)
         else:
             print("You ignore the commotion. In the morning, the depot lies in ruins.")
             self.Hostility += 1
@@ -3546,12 +3560,13 @@ class Player:
             print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
             time.sleep(2,)
             print("As the train chugs along, 7 mounted bandits ride up, firing their pistols at the train!")
-            if self.iron_bonus >= 2:
+            if int(self.get_flag("iron_tracks", "bonus", 0) or 0) >= 2:
                 print("You may spend two bonus points you have gained to gain a temporary boost!")
                 print("Will you spend them now?")
                 choice = input(": ").strip()
                 if choice.lower() == "yes":
-                    self.iron_bonus -= 2
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 2)
                     self.MaxHealth += 20
                     self.Health += 20
                     bonus_used = True
@@ -3722,9 +3737,11 @@ class Player:
                         print("You collapse on the train floor. The bandits overrun it.")
                         print("A passenger revives you, but the bandits have already left with the loot.")
                         self.Health = 20
-                        self.iron_bonus -= 2
+                        current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                        self.set_flag("iron_tracks", "bonus", current_bonus - 2)
                     else:
-                        self.iron_bonus -= 1
+                        current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                        self.set_flag("iron_tracks", "bonus", current_bonus - 1)
                         print("The car burns around you.")
                         print("The bandits have already taken everything of value.")
                     if bonus_used == True:
@@ -3741,7 +3758,7 @@ class Player:
                 print("You helped save the railroad! The foreman rewards you handsomely. +35 gold")
                 self.gold += 35
                 self.loot_drop(random.choice(self.rare_loot))
-                self.iron_stage = 4
+                self.set_flag("iron_tracks", "stage", 4)
             if bonus_used == True:
                 self.MaxHealth -= 20
 
@@ -3768,7 +3785,7 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You save the bridge! The train can continue.")
-                self.iron_stage = 5
+                self.set_flag("iron_tracks", "stage", 5)
             else:
                 print("You fall. The bridge collapses. The railroad halts here forever.")
                 self.Tquest = "None"
@@ -3797,7 +3814,7 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You defeat Dynamite Dave in a blazing showdown!")
-                if self.iron_bonus <= 0:
+                if int(self.get_flag("iron_tracks", "bonus", 0) or 0) <= 0:
                     print("")
                 self.gold += 70
                 self.loot_drop("winchester rifle")
@@ -3819,7 +3836,7 @@ class Player:
 
         # Quest complete
         self.Tquest = "None"
-        self.iron_stage = None
+        self.set_flag("iron_tracks", "stage", 0)
         self.quests_done.append("iron_tracks")
 
     def coyote_camp_quest(self):
@@ -4546,35 +4563,62 @@ class Player:
 
         time.sleep(2)
 
-    def get_valid_quests(self, current_trigger):
+    def process_quest_triggers(self, trigger_location, is_menu_option=False):
         """
-        Scans the QUEST_DATABASE for quests that match the current trigger
-        and whose conditions are met by the player.
-        Returns a list of matching quest dictionaries.
+        The Master Quest Handler.
+        trigger_location: "arrive_town", "leave_town", "saloon", "sheriff", etc.
+        is_menu_option: 
+            - False: Runs the quest immediately (Auto-trigger). 
+            - True: Returns the quest details so you can add it as a button.
         """
-        valid_options = []
         
+        # 1. Identify valid quests based on Trigger + Condition
+        valid_quests = []
         for quest in self.QUEST_DATABASE:
-            # 1. Does the trigger match? (e.g. "arrival")
-            if quest["trigger"] != current_trigger:
-                continue
+            if quest["trigger"] == trigger_location:
+                # Check the specific condition lambda defined in database
+                if quest["condition"](self):
+                    valid_quests.append(quest)
+
+        # If no quests match, return appropriately
+        if not valid_quests:
+            return None if is_menu_option else False
+
+        # 2. Handle "Auto" Triggers (Arrival / Leave)
+        if not is_menu_option:
+            # Check double-dip prevention for town arrival events
+            if trigger_location == "arrive_town" and self.town_event_occurred:
+                return False 
+
+            # Execute the first valid quest found
+            active_quest = valid_quests[0]
+            print(f"\n[!] {active_quest['description']}") # Optional flavor text
             
-            # 2. Is the custom condition met? (e.g. correct stage, not done yet)
-            # We pass 'self' (the player) into the lambda function
-            if quest["condition"](self):
-                valid_options.append(quest)
-                
-        return valid_options
+            # Dynamically call the function
+            method_to_call = getattr(self, active_quest["function"])
+            method_to_call()
+            
+            # Mark that an event happened in this town
+            self.town_event_occurred = True 
+            return True
 
-    def run_quest_by_id(self, quest_id):
-        """Finds the quest and runs its associated function."""
-        for quest in self.QUEST_DATABASE:
-            if quest["id"] == quest_id:
-                # Dynamically call the function by name
-                method_to_call = getattr(self, quest["function"])
-                method_to_call()
-                return
+        # 3. Handle "Menu" Triggers (Saloon / Sheriff)
+        else:
+            # Return the list of valid quests so the Menu can create buttons
+            return valid_quests
 
+    def get_flag(self, quest_id, key, default=None):
+            """Safely gets a value from quest_flags."""
+            if quest_id not in self.quest_flags:
+                return default
+            return self.quest_flags[quest_id].get(key, default)
+
+    def set_flag(self, quest_id, key, value):
+        """Safely sets a value in quest_flags."""
+        if quest_id not in self.quest_flags:
+            self.quest_flags[quest_id] = {}
+        self.quest_flags[quest_id][key] = value
+        
 class Combat:
     def __init__(self, player):
         self.player = player
