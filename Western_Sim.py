@@ -207,8 +207,57 @@ class Player:
                 "description": "Rumors say the bandits are returning for revenge tonight.",
                 "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "aftermath") is not None and p.get_flag("defend_town", "final") is None,
                 "function": "encounter_town_part3"
+            },
+            {
+                "id": "earp_meet_saloon",
+                "theme": "earp",
+                "trigger": "saloon",
+                "description": "Approach the table where Wyatt Earp sits.",
+                # Condition: Tquest is Earp, but stage is 0 (Waiting)
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 0,
+                "function": "encounter_earp_intro" 
+            },
+            
+            # 2. Stage 1: Pete Spence's Camp
+            {
+                "id": "earp_stage_1",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "The Posse rides to Pete Spence's wood camp.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 1,
+                "function": "encounter_earp_stage1"
+            },
+
+            # 3. Stage 2: Florentino Cruz
+            {
+                "id": "earp_stage_2",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "Word comes that Florentino Cruz is near the San Pedro River.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 2,
+                "function": "encounter_earp_stage2"
+            },
+
+            # 4. Stage 3: The Clanton Brothers
+            {
+                "id": "earp_stage_3",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "The Clanton brothers have been spotted nearby.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 3,
+                "function": "encounter_earp_stage3"
+            },
+
+            # 5. Stage 4: Curly Bill Showdown
+            {
+                "id": "earp_stage_4",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "The final showdown with Curly Bill Brocius at Iron Springs.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 4,
+                "function": "encounter_earp_stage4"
             }
-        ]
+            ]
 
 
 
@@ -1070,7 +1119,9 @@ class Player:
                 if self.rumors[topic] == 2:
                     if topic == "earp_vendetta":
                         print("I don't tell anybody this, but go to the saloon, Wyatt Earp is looking for help.")
-                        self.event.append("Earp_Saloon")
+                        self.Tquest = "earp_vendetta"
+                        self.set_flag("earp_vendetta", "stage", 0) 
+                        print("\n[Quest Update] You can now approach Wyatt Earp in the Saloon.")
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
                     print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
                     if self.AI_File.parse_YN(": ") == "yes":
@@ -1419,64 +1470,72 @@ class Player:
         print("The saloon is alive with music and conversation.")
         self.change_music("Saloon_music.mp3", -1)
         time.sleep(1)
+        
+        # Random flavor event (Brawls, cards, etc.)
         self.saloon_entry_event()
 
-        for i in range(max(3-self.counter,0)):
+        # Allow multiple interactions
+        for i in range(max(3-self.counter, 0)):
             self.counter += 1
             
-            # --- MODIFICATION START ---
-            prompt = "\nWhat would you like to do?"
+            # --- 1. Base Menu Options ---
             available_choices = [
                 "Talk to the barkeeper",
                 "Sing a drinking song", 
                 "Talk to the patrons",
                 "Leave the bar"
             ]
+            
+            # --- 2. Dynamic Quest Wiring ---
+            # Ask the database: "Are there any buttons for the Saloon right now?"
             quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
             quest_map = {}
-            if quest_options:
+            
+            # If we got a list of quests back, add them as buttons
+            if isinstance(quest_options, list):
                 for q in quest_options:
-                    # Add the quest description to the top of the list
                     btn_text = q['description']
+                    # Add to the top of the list so they are seen first
                     available_choices.insert(0, btn_text)
+                    # Map the lowercase text to the quest object for lookup
                     quest_map[btn_text.lower()] = q
             
+            # --- 3. Get User Choice ---
+            prompt = "\nWhat would you like to do?"
+            # parse_choice typically returns the choice as a lowercase string
             choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+
+            # --- 4. Handle Quest Buttons ---
             if choice in quest_map:
-                # Retrieve the quest object and run its function
                 selected_quest = quest_map[choice]
+                # Run the specific function (e.g., encounter_iron_intro)
                 method_to_call = getattr(self, selected_quest["function"])
                 method_to_call()
                 
-                # If we start a quest, we usually exit the loop or refresh
+                # If the quest state changed (e.g. you accepted a quest), 
+                # break the loop to refresh the game state/menu
                 if self.Tquest != "None": 
                     break 
                 continue
-            # choice is now a lowercase string like "talk to the barkeeper"
 
+            # --- 5. Handle Standard Options ---
             if choice == "talk to the barkeeper":
                 self.saloon_barkeeper()
             elif choice == "sing a drinking song":
                 self.saloon_song()
             elif choice == "talk to the patrons":
                 self.saloon_patrons()
-            else: # Covers "leave the bar"
+            else: # Leave the bar
                 print("You decide to just watch the crowd for a while.")
                 break
-            # --- MODIFICATION END ---
             
             time.sleep(1)
+            
         print("You have gathered all new information.")
         self.change_music("Town.mp3", -1)
 
     def saloon_entry_event(self):
         roll = random.randint(1,7)
-        if "Earp_Saloon" in self.event and "earp_vendetta" not in self.quests_done:
-            roll = 5
-            self.event.remove("Earp_Saloon")
-        if "final_earp_confrontation" in self.event:
-            self.encounter_earp_stage4()
-            self.event.remove("final_earp_confrontation")
         if roll == 1:
             print("A brawl erupts in the corner—chairs fly as punches land.")
             combat = Combat(self)
@@ -1839,36 +1898,66 @@ class Player:
             self.add_item(item)
 
     def LeaveTown(self):
+        # 1. Run standard triggers (like Iron Tracks Stage 2)
+        # We assume these don't block leaving, they just play a scene.
         self.process_quest_triggers("leave_town", is_menu_option=False)
-        if self.event == "final_earp_confrontation":
-            print("Earp yells at you to stop, 'We need to finish Curly Bill.'")
-            print("Will you stay and help him? (yes/no)")
-            choice = self.AI_File.parse_YN(": ")
+
+        # 2. Earp Vendetta Interception
+        # Check if we are on Stage 4 OR if we deferred the fight earlier
+        on_finale_stage = (self.Tquest == "earp_vendetta" and self.get_flag("earp_vendetta", "stage") == 4)
+
+
+        if on_finale_stage:
+            print("\nAs you head for the edge of town, Wyatt Earp steps into the road, blocking your path.")
+            print("'We have business to finish with Curly Bill,' he says sternly.")
+            print("'You aren't riding out on us now, are you?'")
+            
+            # Ask the player what to do
+            choice = self.AI_File.parse_YN("Do you stay and fight? (yes/no): ")
+            
             if choice == "yes":
-                print("'Meet me at the saloon,' Earp says.")
-                return
+                print("'Good. Meet me at the Saloon. We ride out soon.'")
+                # Ensure the deferred flag is set so the button appears in the Saloon
+                if "final_earp_confrontation" not in self.event:
+                    self.event.append("final_earp_confrontation")
+                return # Cancel leaving, go back to town menu
+            
             else:
-                print("You decide to leave Earp to his vendetta.")
-                print("You turn your back, leaving him behind.")
-                print("Suddenly some gunshots ring out from behind you...")
+                print("You shake your head and push past him.")
+                print("You turn your back, leaving the vendetta behind.")
+                time.sleep(1)
+                print("Suddenly, gunshots ring out from the shadows!")
+                print("The Earp posse ambushes you for your cowardice! -20 health.")
                 self.Health -= 20
-                print("Earp and his posse ambush you as you leave! -20 health.")
+                
+                # FAIL THE QUEST (Clean up flags)
+                self.Tquest = "None"
+                if "final_earp_confrontation" in self.event:
+                    self.event.remove("final_earp_confrontation")
+                # Optional: Add to completed so it doesn't trigger again
+                self.quests_done.append("earp_vendetta") 
+
+        # 3. Cleanup Event Flags
         if "coin" in self.event:
             self.event.remove("coin")
         if "drink" in self.event:
             self.event.remove("drink")
+
+        # 4. Actual Leaving Logic
         self.counter = 0
         self.current_town_name = "none"
         self.distancenext = random.randint(15, 20) + self.number_of_towns_visited * 3
-        print("You leave the town and head down the road.")
+        
+        print("\nYou leave the town and head down the road.")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
+            
         self.play_sound("rolling_wheels.mp3")
         self.change_music("game_theme.mp3", -1)
         self.invillage = False
         self.Hostility = 0
         self.update_actions()
-        time.sleep(2,)
+        time.sleep(2)
 
     def Interaction(self):
         Random = random.randint(1,50)
@@ -1903,30 +1992,26 @@ class Player:
         Handles daily events in town.
         Prioritizes active quest progression over random new quests.
         """
-        
-        # 1. Check for Active Quest Progression (The "Must Do" events)
-        # We check triggers marked "town_event" (Stages 3, 4, 5 of Iron Tracks, etc)
-        event_happened = self.process_quest_triggers("town_event", is_menu_option=False)
-        
-        if event_happened:
-            return # We did a quest step, so we skip random generation this turn
-
-        # 2. If no active quest step happened, try to start a NEW quest
-        # Only if we aren't currently on a main quest
         if self.Tquest == "None":
             roll = random.randint(1, 10)
             
             # 30% chance to start the Town Defense quest (Force Start)
-            if roll <= 3 and "defend_town" not in self.quests_done:
+            if roll <= 2 and "defend_town" not in self.quests_done:
                 print("\nSomething is happening in town...")
                 self.Tquest = "defend_town" # Set as active
                 self.encounter_town_part1() # Start it immediately
                 
             # 30% chance to hear the Iron Tracks rumor (Hint)
-            elif roll <= 6 and "iron_tracks" not in self.quests_done:
+            elif roll <= 4 and "iron_tracks" not in self.quests_done:
                 # We don't force start this because the trigger is in the Saloon
                 print("\n[Rumor] You see a new poster: 'Railroad Hiring - See Foreman at Saloon'.")
-                
+                self.Tquest = "iron_tracks"
+                self.set_flag("iron_tracks", "stage", 0) 
+            elif roll <= 6:
+                self.Tquest = "earp_vendetta"
+                self.set_flag("earp_vendetta", "stage", 0) 
+                print("\nYou hear a rumor about a vendetta. You can now approach Wyatt Earp in the Saloon.")
+
             else:
                 # Fallback: Just a quiet day
                 print("The town is relatively quiet today.")
@@ -1952,20 +2037,14 @@ class Player:
         self.update_actions()
         self.score = self.score + 5
         time.sleep(2)
+        if self.Tquest == "earp_vendetta" and self.get_flag("earp_vendetta", "stage") == 4:
+            print("Wyatt Earp nods at you as you enter town.")
+            print("'Ready to finish this?' he asks.")
+            print("'I will be at the saloon when you are ready.'")
+
         event_happened = self.process_quest_triggers("arrive_town", is_menu_option=False)
 
-        if self.Tquest == "earp_vendetta" and self.earp_stage == 4:
-            print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
-            print("'Word is Curly Bill is holed up here in town. This ends now.'")
-            time.sleep(2)
-            # Optional: Ask if ready or want to prepare
-            ready = self.AI_File.parse_YN("Are you ready for the final confrontation? (yes/no): ")
-            if ready == "yes":
-                self.encounter_earp_stage4() # Directly trigger the final stage
-            else:
-                print("You tell Wyatt you need a moment to prepare.")
-                print("Find him at the Saloon when you're ready.")
-                self.event.append("final_earp_confrontation")
+            
         self.town_encounter()
 
     def GeneralStore(self):
@@ -2123,19 +2202,20 @@ class Player:
         Random = Random + self.Day*5-5
 
         if self.Tquest == "earp_vendetta" and not self.quest_today:
-                # Check ONLY for stages 1, 2, or 3 here
-            if self.earp_stage == 1:
-                self.quest_today = True
-                self.encounter_earp_stage1()
-                return # Quest event happened
-            elif self.earp_stage == 2:
-                self.quest_today = True
-                self.encounter_earp_stage2()
-                return # Quest event happened
-            elif self.earp_stage == 3:
-                self.quest_today = True
-                self.encounter_earp_stage3()
-                return # Quest event happened
+            random_roll = random.randint(1, 10)
+            if random_roll <= 5:
+                if self.get_flag("earp_vendetta", "stage", 0) == 1:
+                    self.quest_today = True
+                    self.encounter_earp_stage1()
+                    return 
+                elif self.get_flag("earp_vendetta", "stage", 0) == 2:
+                    self.quest_today = True
+                    self.encounter_earp_stage2()
+                    return 
+                elif self.get_flag("earp_vendetta", "stage", 0) == 3:
+                    self.quest_today = True
+                    self.encounter_earp_stage3()
+                    return 
                     
             # --- Rumor quest handler ---
         if self.quest_today == False:
@@ -3261,11 +3341,12 @@ class Player:
         if choice == "yes":
             print("You swear loyalty to the Vendetta Ride.")
             self.Tquest = "earp_vendetta"
-            self.earp_stage = 1
+            self.set_flag("earp_vendetta", "stage", 1)
             print("Wyatt gives you a box of shells and a share of collected funds. +15 gold.")
             self.gold += 15
             self.loot_drop("ammo cartridge")
-            self.earp_bonus += 1
+            current_bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", current_bonus + 1)
         else:
             print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
             self.Tquest = "None"
@@ -3290,7 +3371,8 @@ class Player:
             if self.Health > 0:
                 print("You help cut down the outlaw. The posse pushes forward.")
                 self.gold += 10
-                self.earp_bonus += 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 1)
             else:
                 print("You fall in the shootout. The posse drags you away as they move on.")
                 self.Tquest = "None"
@@ -3299,15 +3381,17 @@ class Player:
                 print("You flank the outlaw's position, forcing him into Wyatt's fire. Success!")
                 self.gold += 15
                 self.loot_drop("revolver")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
             else:
                 print("You trip in the brush — shots ring out! You're hit. -12hp")
                 self.Health -= 12
         else:
             print("You hang back. The posse fights without you.")
-            self.earp_bonus -= 1
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
-        self.earp_stage = 2
+        self.set_flag("earp_vendetta", "stage", 2)
 
     def encounter_earp_stage2(self):
         if self.Health < 90:
@@ -3327,16 +3411,18 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You gun down Florentino Cruz. Wyatt is grim but satisfied.")
-                self.earp_bonus += 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 1)
                 self.gold += 20
             else:
                 print("You're shot from ambush and collapse.")
                 self.Tquest = "None"
         else:
             print("You refuse. Wyatt mutters about weak resolve.")
-            self.earp_bonus -= 1
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
-        self.earp_stage = 3
+        self.set_flag("earp_vendetta", "stage", 3)
 
     def encounter_earp_stage3(self):
         print("The posse learns the Clanton brothers are nearby.")
@@ -3365,7 +3451,8 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("In a fierce shootout, one Clanton falls dead in the dust.")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
                 self.gold += 35
                 self.loot_drop("lever-action rifle")
             else:
@@ -3376,18 +3463,31 @@ class Player:
                 print("Your ambush works! You take the Clantons by surprise, killing one instantly.")
                 self.gold += 25
                 self.loot_drop("lever-action rifle")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
             else:
                 print("The Clantons sense danger. They escape into the hills.")
-                self.earp_bonus -= 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus - 1)
         else:
             print("You abandon the vendetta. The posse brands you a coward.")
             self.Hostility += 1
             self.Tquest = "None"
 
-        self.earp_stage = 4
+        self.set_flag("earp_vendetta", "stage", 4)
 
     def encounter_earp_stage4(self):
+        print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
+        print("'Word is Curly Bill is holed up here in town. This ends now.'")
+        time.sleep(2)
+            
+        ready = self.AI_File.parse_YN("Are you ready for the final confrontation? (yes/no): ")
+        if ready == "yes":
+            print("You nod to Wyatt, ready to face Curly Bill.")
+        else:
+            print("You tell Wyatt you need a moment to prepare.")
+            print("Find him at the Saloon when you're ready.")
+            return
         print("The Vendetta Posse closes in on Curly Bill Brocius at Iron Springs.")
         print("This is the showdown that will decide everything.")
         print("Options:")
@@ -3404,7 +3504,8 @@ class Player:
                 print("Curly Bill is gunned down in a storm of lead. The Vendetta is triumphant!")
                 self.gold += 75
                 self.loot_drop("sawed-off shotgun")
-                self.earp_bonus += 3
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 3)
             else:
                 print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
@@ -3412,7 +3513,8 @@ class Player:
             if self.perform_stat_check(self.trail_skill, base_target=18) == True:
                 print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
                 self.gold += 30
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
             else:
                 print("Your shot misses! Curly Bill fires back, grazing you. -10hp")
                 print("If only you had better trail skills...")
@@ -3423,20 +3525,21 @@ class Player:
                 combat.Attack()
         else:
             print("You freeze. The others charge ahead without you.")
-            self.earp_bonus -= 2
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 2)
 
         # Quest complete
         print("The Vendetta Ride is over. The Cowboys are broken, scattered to the winds.")
         self.Tquest = "None"
-        self.earp_stage = None
-        rewards = 20 + (self.earp_bonus * 10)
+        self.set_flag("earp_vendetta", "stage", -1)
+        rewards = 20 + (int(self.get_flag("earp_vendetta", "bonus", 0) or 0) * 10)
         print(f"You receive {rewards} gold for your efforts.")
-        if self.earp_bonus <= 0:
+        if int(self.get_flag("earp_vendetta", "bonus", 0) or 0) <= 0:
             print("Your neutral actions earned you no bonus or penalty.")
-        elif self.earp_bonus == 1:
+        elif int(self.get_flag("earp_vendetta", "bonus", 0) or 0) == 1:
             print("Your efforts were noted.")
             self.loot_drop("pendant of recognition")
-        elif self.earp_bonus >= 2:
+        elif int(self.get_flag("earp_vendetta", "bonus", 0) or 0) >= 3:
             print("Your valor stood out! You are hailed as a hero of the Vendetta.")
             self.loot_drop("vendetta badge")
             print("'You have done well today,' Wyatt says with a grin.")
