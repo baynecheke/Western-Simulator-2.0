@@ -126,7 +126,90 @@ class Player:
                 "sawed-off shotgun"
             ]
         }
+        self.quest_flags = {}
+        self.QUEST_DATABASE = [
+            {
+                "id": "iron_intro",
+                "theme": "railroad",
+                "trigger": "saloon",  
+                "description": "Railroad men are discussing expansion.",
+                "condition": lambda p: "iron_tracks" not in p.quests_done and p.Tquest == "None",
+                "function": "encounter_iron_intro"
+            },
 
+            {
+                "id": "iron_missing_wagon",
+                "theme": "railroad",
+                "trigger": "arrive_town", 
+                "description": "The Railroad Foreman looks furious and is asking for help.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 1,
+                "function": "encounter_iron_stage1"
+            },
+
+            {
+                "id": "iron_depot_night",
+                "theme": "railroad",
+                "trigger": "leave_town", 
+                "description": "You hear shouting coming from the train depot.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 2,
+                "function": "encounter_iron_stage2"
+            },
+
+            {
+                "id": "iron_train_defense",
+                "theme": "railroad",
+                "trigger": "railroad_station", 
+                "description": "The first train is arriving. The Foreman needs guards.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 3,
+                "function": "encounter_iron_stage3"
+            },
+
+            {
+                "id": "iron_bridge",
+                "theme": "railroad",
+                "trigger": "bridge", 
+                "description": "The Foreman runs up to you with urgent news about the bridge.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 4,
+                "function": "encounter_iron_stage4"
+            },
+
+            {
+                "id": "iron_dynamite_boss",
+                "theme": "railroad",
+                "trigger": "town_center",
+                "description": "The notorious Dynamite Kid has ridden into town.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.iron_stage == 5,
+                "function": "encounter_iron_stage5"
+            },
+
+
+            {
+                "id": "town_def_1",
+                "theme": "town_defense",
+                "trigger": "town_event",
+                "description": "The Sheriff looks frantic and is asking for volunteers.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.town_defense_outcome is None,
+                "function": "encounter_town_part1"
+            },
+
+            {
+                "id": "town_def_2",
+                "theme": "town_defense",
+                "trigger": "town_event",
+                "description": "The town is scarred from the raid. They are rebuilding.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.town_defense_outcome is not None and p.town_aftermath_outcome is None,
+                "function": "encounter_town_part2"
+            },
+            
+            {
+                "id": "town_def_3",
+                "theme": "town_defense",
+                "trigger": "town_event",
+                "description": "Rumors say the bandits are returning for revenge tonight.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.town_aftermath_outcome is not None and p.town_final_outcome is None,
+                "function": "encounter_town_part3"
+            }
+        ]
 
 
 
@@ -382,7 +465,7 @@ class Player:
                 available_choices = ["adventure", "frontier", "savage"]
                 prompt = "Choose a difficulty:"
                 
-                # This one call replaces the print and input
+
                 choice = self.AI_File.parse_choice(available_choices, prompt)
                 # 'choice' will be "adventure", "frontier", or "savage"
                 
@@ -415,7 +498,6 @@ class Player:
                 available_choices = ["adventure", "frontier", "savage"]
                 prompt = "Choose a difficulty:"
                 
-                # This one call replaces the print and input
                 choice = self.AI_File.parse_choice(available_choices, prompt)
                 # 'choice' will be "adventure", "frontier", or "savage"
                 
@@ -563,7 +645,7 @@ class Player:
         
 
         while True:
-            # 1. Get input
+
             parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions)
             action_result = parsed.get('action', 'none')
 
@@ -685,7 +767,7 @@ class Player:
             item_list = list(self.itemsinventory.keys())
             choices_for_parser = item_list + ["leave"] # Add "leave" as an explicit choice
 
-            # Replace the input() with parse_choice
+
             choice = self.AI_File.parse_choice(
                 choices_for_parser, 
                 "Choose an item to use:"
@@ -1256,11 +1338,10 @@ class Player:
                 # This text will be shown in both modes
                 print(f"{building.capitalize()} (Level {current_level}) - Price to upgrade: {price} gold.")
             
-            # 4. Get and parse the user's input
+
             # Pass the full list, including "leave", to the parser
             choice = self.AI_File.parse_choice(available_choices, "Choice: ")
-            
-            # 4. Get and parse the user's input
+
             # Pass the full list, including "leave", to the parser
             choice = self.AI_File.parse_choice(available_choices, "Choice: ")
 
@@ -1428,7 +1509,6 @@ class Player:
         else:
             print("Lot's of people gather around the saloon's door and inside.")
 
-
     def saloon_barkeeper(self):
             print("\nThe barkeeper polishes a glass and nods.")
             
@@ -1580,7 +1660,7 @@ class Player:
                 time.sleep(2)
 
             elif choice == "play cards (gamble)": # <-- Changed from "2"
-                # input() is patched by server.py to show a text box on the web UI
+
                 bet = input("Enter bet amount: ").strip()
                 
                 if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
@@ -2322,10 +2402,11 @@ class Player:
         print("A storm is brewing in the West, and this location could flood easily.")
         print("You could either cross here, and risk the storm, or travel around.")
         time.sleep(2,)
-        print("(1) cross, (2) travel around.")
-        time.sleep(2,)
-        Choice = input(": ").strip()
-        if Choice == "1":
+        available_choices = ["Cross the river", "Go around"]
+        prompt = "What will you do?"
+        choice = self.AI_File.parse_choice(available_choices, prompt, USE_OLLAMA)
+        
+        if choice == "cross the river": 
             print("You take the chance and cross the river bank.")
             if "weather cloak" in self.itemsinventory:
                 print("Your weather cloak shields you from the flooding; you cross safely.")
@@ -2333,7 +2414,7 @@ class Player:
                 if self.itemsinventory["weather cloak"] <= 0:
                     del self.itemsinventory["weather cloak"]
             else:
-            # … your original flood/random-fail code …
+
                 Random = random.randint(1,10)
                 if Random < 6:
                     print("You cross safely, and the rain starts only after you get across.")
@@ -2345,106 +2426,101 @@ class Player:
                     time.sleep(2,)
                     print("You get back on the trail, but a lot of time has been wasted.")
                     self.Time += 2
-        else:
+        else: 
             print("You travel around the creek, but are glad you didn't take the risk")
             self.Time += 1
 
     def encounter_abandoned_wagon(self):
-        print(f"You notice an abandoned wagon a little ways off the trail.")
-        print(f"You could either search the wagon or leave and save time.")
-        time.sleep(2,)
-        print(f"1, search it.")
-        print(f"2, leave it.")
-        Choice = input(f": ")
-        if Choice == "1":
-            print(f"You take the time to search the wagon.")
-            Random1 = random.randint(1,2)
-            if Random1 == 1:
-                print(f"As you rummage through the bags and boxes you uncover a rattlesnake.")
-                if "rope" in self.itemsinventory:
-                    print("You use your rope to whack the snakes head away, and it flees through the grass.")
-                    selected_item = 'rope'
-                    self.itemsinventory[selected_item] -= 1
-                    if self.itemsinventory[selected_item] <= 0:
-                        del self.itemsinventory[selected_item]
-                elif self.Speed >= 5:
-                    print(f"You dodge the snakes attack, then strangle it")
-                else:
-                    print("The snake bites you, then retreats.")
-                    self.poisoned = 1
+            print("You notice an abandoned wagon a little ways off the trail.")
+            
+            choice = self.AI_File.parse_choice(["Search it", "Leave it"], "You could either search the wagon or leave and save time.", USE_OLLAMA)
+
+            if choice == "search it":
+                print("You take the time to search the wagon.")
+                Random1 = random.randint(1,2)
+                if Random1 == 1:
+                    print("As you rummage through the bags and boxes you uncover a rattlesnake.")
+                    if "rope" in self.itemsinventory:
+                        print("You use your rope to whack the snakes head away, and it flees through the grass.")
+                        self.itemsinventory["rope"] -= 1
+                        if self.itemsinventory["rope"] <= 0:
+                            del self.itemsinventory["rope"]
+                    elif self.Speed >= 5:
+                        print("You dodge the snakes attack, then strangle it")
+                    else:
+                        print("The snake bites you, then retreats.")
+                        self.poisoned = 1
+                    time.sleep(2,)
+                print("Inside the wagon you find many useful items.")
+                rare = random.choice(["colt pistol", "bowie knife", "bread", "rope"])
+                self.loot_drop(rare)
                 time.sleep(2,)
-            print("Inside the wagon you find many useful items.")
-            rare = random.choice(["colt pistol", "bowie knife", "bread", "rope"])
-            self.loot_drop(rare)
-            time.sleep(2,)
-        else:
-            print(f"You leave the wagon alone and proceed down the trail.")
+            else:
+                print("You leave the wagon alone and proceed down the trail.")
 
     def encounter_wounded_bandit(self):
-        Random = random.randint(1, 100)  # you can ignore or repurpose this if you like
-        print("\nYou spot a wounded bandit slumped against a rock. His pistol lies beside him.")
-        print("1) Help him")
-        print("2) Loot him")
-        print("3) Leave him be")
-        Choice = input(": ").strip()
-        if Choice == "1":
-            print("You tend his wounds and give him water.")
-            gold = random.randint(5, 15)
-            self.gold += gold
-            print(f"He thanks you and staggers off. +{gold} gold.")
-            if Random <= 50:
-                print("The bandit robbed you while you weren't looking!")
-                self.lose_random_item(1)
-        elif Choice == "2":
-            print("You search him and take what he has.")
-            gold = 5
-            self.gold += gold
-            if "revolver" not in self.itemsinventory:
-                self.itemsinventory["revolver"] = 1
-                print("You also pick up his revolver.")
-            print(f"+{gold} gold.")
-            if Random <= 50:
-                print("The bandit fights through his wounds and punches you!")
-                self.Health -= 10
-        else:
-            print("You decide not to get involved. You lose an hour of daylight.")
-            self.Time += 1
-        time.sleep(2)
+            Random = random.randint(1, 100)
+            print("\nYou spot a wounded bandit slumped against a rock. His pistol lies beside him.")
+            
+            choice = self.AI_File.parse_choice(["Help him", "Loot him", "Leave him be"], "What do you do?", USE_OLLAMA)
+            
+            if choice == "help him":
+                print("You tend his wounds and give him water.")
+                gold = random.randint(5, 15)
+                self.gold += gold
+                print(f"He thanks you and staggers off. +{gold} gold.")
+                if Random <= 50:
+                    print("The bandit robbed you while you weren't looking!")
+                    self.lose_random_item(1)
+            elif choice == "loot him":
+                print("You search him and take what he has.")
+                gold = 5
+                self.gold += gold
+                if "revolver" not in self.itemsinventory:
+                    self.itemsinventory["revolver"] = 1
+                    print("You also pick up his revolver.")
+                print(f"+{gold} gold.")
+                if Random <= 50:
+                    print("The bandit fights through his wounds and punches you!")
+                    self.Health -= 10
+            else:
+                print("You decide not to get involved. You lose an hour of daylight.")
+                self.Time += 1
+            time.sleep(2)
 
     def encounter_caravan_attack(self):
-        print("\nYou hear gunshots up ahead—a merchant caravan is under attack!")
-        print("1) Join the fight")
-        print("2) Stay hidden")
-        print("3) Loot the fallen afterwards")
-        Choice = input(": ").strip()
-        if Choice == "1":
-            print("You rush in to defend them!")
-            combat = Combat(self)
-            combat.FindAttacker("bandit")
-            escape = combat.Attack()
-            if escape == True:
-                return
+            print("\nYou hear gunshots up ahead—a merchant caravan is under attack!")
+            
+            choice = self.AI_File.parse_choice(["Join the fight", "Stay hidden", "Loot after"], "What will you do?", USE_OLLAMA)
+
+            if choice == "join the fight":
+                print("You rush in to defend them!")
+                combat = Combat(self)
+                combat.FindAttacker("bandit")
+                escape = combat.Attack()
+                if escape == True:
+                    return
+                else:
+                    if self.Health > 0:
+                        reward = random.randint(15, 30)
+                        self.gold += reward
+                        print(f"The grateful merchants reward you with {reward} gold.")
+                        print("They also give you some supplies.")
+                        self.loot_drop("bandage")
+            elif choice == "stay hidden":
+                print("You stay hidden until it's over. No one notices you.")
             else:
-                if self.Health > 0:
-                    reward = random.randint(15, 30)
-                    self.gold += reward
-                    print(f"The grateful merchants reward you with {reward} gold.")
-                    print("They also give you some supplies.")
-                    self.loot_drop("bandage")
-        elif Choice == "2":
-            print("You stay hidden until it's over. No one notices you.")
-        else:
-            print("You wait for the dust to settle, then loot the fallen.")
-            loot = random.choice(["bread", "pistol_ammo", "rope"])
-            self.loot_drop(loot)
-        time.sleep(2)
+                print("You wait for the dust to settle, then loot the fallen.")
+                loot = random.choice(["bread", "pistol_ammo", "rope"])
+                self.loot_drop(loot)
+            time.sleep(2)
 
     def encounter_wild_stallion(self):
         print("\nA wild stallion rears up in a clearing—untamed and swift.")
-        print("1) Try to catch it with your rope")
-        print("2) Leave it be")
-        Choice = input(": ").strip()
-        if Choice == "1":
+        
+        choice = self.AI_File.parse_choice(["Try to catch it", "Leave it be"], "What will you do?", USE_OLLAMA)
+
+        if choice == "try to catch it":
             if "rope" in self.itemsinventory:
                 print("You manage to rope the stallion! Your travels feel faster now. +1 travel speed.")
                 self.travelspeed += 1
@@ -4469,6 +4545,35 @@ class Player:
         print(f"You lose {health_loss} health from poor conditions in the cell.")
 
         time.sleep(2)
+
+    def get_valid_quests(self, current_trigger):
+        """
+        Scans the QUEST_DATABASE for quests that match the current trigger
+        and whose conditions are met by the player.
+        Returns a list of matching quest dictionaries.
+        """
+        valid_options = []
+        
+        for quest in self.QUEST_DATABASE:
+            # 1. Does the trigger match? (e.g. "arrival")
+            if quest["trigger"] != current_trigger:
+                continue
+            
+            # 2. Is the custom condition met? (e.g. correct stage, not done yet)
+            # We pass 'self' (the player) into the lambda function
+            if quest["condition"](self):
+                valid_options.append(quest)
+                
+        return valid_options
+
+    def run_quest_by_id(self, quest_id):
+        """Finds the quest and runs its associated function."""
+        for quest in self.QUEST_DATABASE:
+            if quest["id"] == quest_id:
+                # Dynamically call the function by name
+                method_to_call = getattr(self, quest["function"])
+                method_to_call()
+                return
 
 class Combat:
     def __init__(self, player):
