@@ -4412,8 +4412,7 @@ class Player:
             
             custom_line_added = False # Flag for numerical mode
             # --- END FIX ---
-            USE_OLLAMA = True
-            if USE_OLLAMA:
+            if self.AI_File.use_ai:
                 # Use the new AI function to generate and print the entry
                 game_state = self.generate_game_state()
                 # The AI_File is self.AI_File
@@ -4487,14 +4486,9 @@ class Player:
             # Reset for next day (Same as before)
             self.day_memory = {k: None for k in self.day_memory}
             
-            # --- START FIX: Change bonus check to use Activity Score ---
-            # Passive bonus check
-            # OLD: entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
-            # NEW:
+
             entry_count = sum(entry.get("Activity", 1) for entry in self.diary_entries)
-            # We use .get("Activity", 1) as a fallback for old save files
-            # that don't have the "Activity" key, so they are counted as 1.
-            # --- END FIX ---
+
             
             for milestone, (title, bonus) in diary_milestones.items():
                 bonus = f"day_{self.Day}_bonus"
