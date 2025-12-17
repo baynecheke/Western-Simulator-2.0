@@ -477,7 +477,34 @@ class Player:
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 # In Western_Sim.py
+    def export_save(self):
+            """Prints the raw save data so the user can copy-paste it to their PC."""
+            if not self.save_name:
+                print("You haven't saved the game yet.")
+                return
 
+            save_file = f"save_{self.save_name}.json"
+            save_path = os.path.join('saves', save_file)
+            
+            if not os.path.exists(save_path):
+                print(f"No save file found for '{self.save_name}'.")
+                return
+
+            print("\n--- SAVE DATA EXPORT ---")
+            print("INSTRUCTIONS: Copy everything between the START and END lines below.")
+            print("Create a new text file on your computer, paste the text in, and name it 'save_YourName.json'.")
+            print("-" * 20)
+            print("--- START SAVE DATA ---")
+            
+            with open(save_path, 'r') as f:
+                # Read the file and print it raw
+                print(f.read())
+                
+            print("--- END SAVE DATA ---")
+            print("-" * 20)
+            # Pause so the user can copy it
+            self.AI_File.parse_choice(["Done"], "Press 'Done' once you have copied the text.")
+            
     def main_game_loop(self):
         global player # <-- FIX 1: Add this line
         
@@ -588,13 +615,21 @@ class Player:
             if player.Health <= 0:
                 break
             player.save_game()
-            choice = player.AI_File.parse_YN("Would you like to quit?")
-            if choice == 'yes':
+            print("Game Saved.")
+            prompt = "What would you like to do?"
+            choices = ["Continue Playing", "Export Save Data", "Quit"]
+            decision = player.AI_File.parse_choice(choices, prompt)
+            if decision == "export save data":
+                player.export_save()
+                print("Continuing your adventure...")
+                time.sleep(2)
+                
+            elif decision == "quit":
                 print("Thanks for playing! See you next time.")
                 exit()
             else:
                 print("Continuing your adventure...")
-                time.sleep(4,)
+                time.sleep(4)
 
     def update_actions(self):
         """
