@@ -1,4 +1,4 @@
-# This file just holds our HTML frontend as a Python string.
+# game_html.py - WINTER VERSION
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -6,113 +6,102 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Western Simulator</title>
+    <title>Western Simulator - Winter</title>
     <link rel="icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
-        /* =========================================
-           1. OLD THEME (COMMENTED OUT)
-           ========================================= */
-        /*
+        /* WINTER THEME */
         body {
             font-family: 'Merriweather', serif;
-            background-color: #3a2e25; 
-            background-image: url('https://www.toptal.com/designers/subtlepatterns/uploads/wood-pattern.png');
-            color: #fdf6e3; 
-        }
-        */
-
-        /* =========================================
-           2. NEW WINTER THEME (ACTIVE)
-           ========================================= */
-        body {
-            font-family: 'Merriweather', serif;
-            /* Dark Slate / Icy Blue Background */
-            background-color: #0f172a; 
-            color: #e2e8f0; 
-            
-            /* Optional: Snow Texture */
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
             background-image: url('https://www.transparenttextures.com/patterns/snow.png');
         }
 
-        /* Custom Scrollbar (Recolored for Ice) */
+        /* Custom Scrollbar (Icy Blue) */
         #game-display::-webkit-scrollbar { width: 8px; }
         #game-display::-webkit-scrollbar-track { background: #1e293b; }
         #game-display::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
 
-        /* Button Styling (Cold Steel Look) */
+        /* Button Styling (Cold Steel) */
         .game-button {
             transition: all 0.15s ease-in-out;
-            border: 2px solid #475569; /* Slate border */
-            background-color: #1e293b; /* Dark Blue interior */
+            border: 1px solid #475569; /* Slate border */
+            background-color: #1e293b; 
             color: #f1f5f9;
         }
         .game-button:hover {
             background-color: #334155; 
-            border-color: #cbd5e1; 
-            transform: translateY(-1px);
+            border-color: #94a3b8; 
+            transform: translateY(-2px);
+            box-shadow: 0 0 10px rgba(148, 163, 184, 0.3); /* Icy glow */
+        }
+        
+        .progress-bar-bg {
+            background-color: #334155; 
+            border: 1px solid #64748b;
+        }
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
         }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-5xl bg-[#fdf6e3] shadow-2xl rounded-lg border-4 border-[#8b4513] overflow-hidden" style="box-shadow: 0 10px 25px rgba(0,0,0,0.5); height: 90vh; display: flex; flex-direction: column;">
+    <div class="w-full max-w-5xl bg-[#1e293b] shadow-2xl rounded-lg border-2 border-[#475569] overflow-hidden" style="box-shadow: 0 10px 25px rgba(0,0,0,0.8); height: 90vh; display: flex; flex-direction: column;">
         
-        <header class="p-4 bg-[#8b4513] text-white grid grid-cols-2 sm:grid-cols-4 gap-4 border-b-4 border-[#5a2d0c]">
-            <div><strong>Location:</strong> <span id="stat-location">Starting...</span></div>
-            <div><strong>Day:</strong> <span id="stat-day">1</span></div>
-            <div><strong>Time:</strong> <span id="stat-time">9:00</span></div>
-            <div><strong>Difficulty:</strong> <span id="stat-difficulty">Frontier</span></div>
+        <header class="p-4 bg-[#0f172a] text-blue-100 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b-2 border-[#334155]">
+            <div><strong>Location:</strong> <span id="stat-location" class="text-blue-200">Starting...</span></div>
+            <div><strong>Day:</strong> <span id="stat-day" class="text-blue-200">1</span></div>
+            <div><strong>Time:</strong> <span id="stat-time" class="text-blue-200">9:00</span></div>
+            <div><strong>Difficulty:</strong> <span id="stat-difficulty" class="text-blue-200">Frontier</span></div>
         </header>
 
-        <section class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border-b-2 border-[#d2b48c] bg-[#f7eecf]">
+        <section class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border-b-2 border-[#334155] bg-[#1e293b]">
             <div class="flex flex-col">
-                <div class="flex justify-between font-bold text-sm">
+                <div class="flex justify-between font-bold text-sm text-slate-300">
                     <span>Health:</span>
                     <span id="stat-health-text">100 / 100</span>
                 </div>
                 <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-health-bar" class="progress-bar-fill bg-red-600 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+                    <div id="stat-health-bar" class="progress-bar-fill bg-cyan-700 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
                 </div>
             </div>
             <div class="flex flex-col">
-                <div class="flex justify-between font-bold text-sm">
-                    <span>Hunger:</span>
+                <div class="flex justify-between font-bold text-sm text-slate-300">
+                    <span>Heat/Hunger:</span>
                     <span id="stat-hunger-text">0</span>
                 </div>
                 <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-hunger-bar" class="progress-bar-fill bg-yellow-600 h-full" style="width: 0%;"></div>
+                    <div id="stat-hunger-bar" class="progress-bar-fill bg-orange-600 h-full" style="width: 0%;"></div>
                 </div>
             </div>
-            <div class="text-lg font-bold">
-                Gold: $<span id="stat-gold">50</span>
+            <div class="text-lg font-bold text-slate-200">
+                Gold: $<span id="stat-gold" class="text-yellow-400">50</span>
             </div>
         </section>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             
-            <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3">
-                <p class="text-gray-700">Connecting to server...</p>
+            <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 bg-[#0f172a]">
+                <p class="text-slate-400">Connecting to server...</p>
             </div>
 
-            <div class="w-full md:w-1/3 p-6 bg-[#f7eecf] border-t-2 md:border-t-0 md:border-l-2 border-[#d2b48c] overflow-y-auto">
-                <h3 id="action-title" class="text-xl font-bold mb-4 border-b-2 border-gray-400 pb-2">Actions</h3>
+            <div class="w-full md:w-1/3 p-6 bg-[#1e293b] border-t-2 md:border-t-0 md:border-l-2 border-[#334155] overflow-y-auto">
+                <h3 id="action-title" class="text-xl font-bold mb-4 border-b-2 border-slate-600 pb-2 text-blue-100">Actions</h3>
                 <div id="action-area" class="flex flex-col space-y-2">
-                    <p class="text-gray-500">Waiting for game to start...</p>
+                    <p class="text-slate-500">Waiting for game to start...</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Get DOM Elements ---
         const display = document.getElementById('game-display');
         const actionArea = document.getElementById('action-area');
         const actionTitle = document.getElementById('action-title');
-        
-        // Stat elements
         const statLocation = document.getElementById('stat-location');
         const statDay = document.getElementById('stat-day');
         const statTime = document.getElementById('stat-time');
@@ -123,7 +112,6 @@ HTML_CONTENT = """
         const statHungerBar = document.getElementById('stat-hunger-bar');
         const statGold = document.getElementById('stat-gold');
         
-        // --- NEW AUDIO LOGIC ---
         const soundEffects = {};
         let backgroundMusic = null;
 
@@ -133,82 +121,52 @@ HTML_CONTENT = """
                     backgroundMusic.pause();
                     backgroundMusic = null;
                 }
-                
                 let audio = soundEffects[src];
                 if (!audio) {
                     audio = new Audio(src);
                     soundEffects[src] = audio;
                 }
-                
                 audio.loop = loop;
-                audio.play().catch(e => console.warn(`Audio play failed (user may need to click first): ${e.message}`));
-
-                if (loop) {
-                    backgroundMusic = audio;
-                }
-            } catch (e) {
-                console.error(`Error playing sound ${src}:`, e);
-            }
+                audio.play().catch(e => console.warn(`Audio play failed: ${e.message}`));
+                if (loop) backgroundMusic = audio;
+            } catch (e) { console.error(`Error playing sound ${src}:`, e); }
         }
 
-        // --- Helper Function to Add Messages ---
+        // Updated for Winter text color
         function addMessage(text) {
             const p = document.createElement('p');
             p.innerHTML = text.replace(/(\\n|\\r\\n|\\r)/gm, '<br>');
-            p.className = "text-gray-800";
+            p.className = "text-slate-300"; // Light grey text for dark background
             display.appendChild(p);
-            display.scrollTop = display.scrollHeight; // Auto-scroll
+            display.scrollTop = display.scrollHeight; 
         }
 
-        function clearActions() {
-            actionArea.innerHTML = '';
-        }
+        function clearActions() { actionArea.innerHTML = ''; }
 
-        // --- NEW: Send player's response to the server ---
         async function sendResponse(choice) {
             clearActions();
             actionTitle.textContent = "Actions";
-            actionArea.innerHTML = '<p class="text-gray-500">Waiting for server...</p>';
-            
+            actionArea.innerHTML = '<p class="text-slate-500">Waiting for server...</p>';
             try {
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 'choice': choice })
                 });
-                // After sending, immediately poll for the next update
                 pollServer();
-            } catch (error) {
-                addMessage(`[Connection Error] Could not send response: ${error.message}`);
-            }
+            } catch (error) { addMessage(`[Connection Error]: ${error.message}`); }
         }
         
-        // --- NEW: Handle all commands from the server ---
         function handleServerMessages(messages) {
             messages.forEach(msg => {
                 switch (msg.type) {
-                    case 'game_message':
-                        addMessage(msg.text);
-                        break;
-                    case 'play_sound':
-                        loadAndPlaySound(msg.file, msg.loop);
-                        break;
-                    case 'change_music':
-                        loadAndPlaySound(msg.file, msg.loop);
-                        break;
-                    case 'update_stats':
-                        updateStats(msg.payload);
-                        break;
-                    case 'ask_for_choice':
-                        showChoices(msg.prompt, msg.choices);
-                        break;
-                    case 'ask_for_text':
-                        showTextInput(msg.prompt);
-                        break;
-                    case 'game_over':
-                        addMessage(msg.text);
-                        stopPolling(); // Stop the game loop
-                        break;
+                    case 'game_message': addMessage(msg.text); break;
+                    case 'play_sound': loadAndPlaySound(msg.file, msg.loop); break;
+                    case 'change_music': loadAndPlaySound(msg.file, msg.loop); break;
+                    case 'update_stats': updateStats(msg.payload); break;
+                    case 'ask_for_choice': showChoices(msg.prompt, msg.choices); break;
+                    case 'ask_for_text': showTextInput(msg.prompt); break;
+                    case 'game_over': addMessage(msg.text); stopPolling(); break;
                 }
             });
         }
@@ -234,53 +192,43 @@ HTML_CONTENT = """
                 choices.forEach(choice => {
                     const button = document.createElement('button');
                     button.textContent = choice.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    button.className = "game-button w-full text-left p-3 bg-[#8b4513] text-white rounded shadow-md";
+                    // Winter Button Styles
+                    button.className = "game-button w-full text-left p-3 rounded shadow-md text-blue-100 hover:text-white";
                     button.onclick = () => sendResponse(choice); 
                     actionArea.appendChild(button);
                 });
-            } else {
-                addMessage("[Error: Server asked for a choice but provided no options.]")
-            }
+            } else { addMessage("[Error: Server asked for a choice but provided no options.]") }
         }
 
         function showTextInput(prompt) {
             clearActions();
             actionTitle.textContent = prompt || "Enter a value:";
-            
             const input = document.createElement('input');
             input.type = "text";
-            input.className = "w-full p-2 border-2 border-gray-400 rounded focus:border-[#8b4513] outline-none";
-            
+            // Winter Input Styles
+            input.className = "w-full p-2 border-2 border-slate-600 bg-slate-900 text-white rounded focus:border-blue-400 outline-none";
             const submit = document.createElement('button');
             submit.textContent = "Submit";
-            submit.className = "game-button w-full p-2 bg-[#8b4513] text-white rounded shadow-md mt-2";
-            
+            // Winter Submit Styles
+            submit.className = "game-button w-full p-2 text-white rounded shadow-md mt-2";
             submit.onclick = () => sendResponse(input.value);
-            input.onkeydown = (e) => {
-                if (e.key === 'Enter') sendResponse(input.value);
-            };
-            
+            input.onkeydown = (e) => { if (e.key === 'Enter') sendResponse(input.value); };
             actionArea.appendChild(input);
             actionArea.appendChild(submit);
             input.focus();
         }
 
-        // --- NEW: Polling Logic ---
         let pollInterval;
-        let isPolling = false; // Prevents multiple polls at once
+        let isPolling = false; 
 
         async function pollServer() {
-            if (isPolling) return; // Don't stack requests
+            if (isPolling) return; 
             isPolling = true;
             try {
                 const response = await fetch('/get_update');
-                if (!response.ok) {
-                    throw new Error(`Server responded with status ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const data = await response.json();
-                if (data.messages && data.messages.length > 0) {
-                    handleServerMessages(data.messages);
-                }
+                if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
             } catch (error) {
                 addMessage(`[Connection Error] Lost connection to server. Retrying...`);
                 console.error("Poll error:", error);
@@ -288,37 +236,20 @@ HTML_CONTENT = """
             isPolling = false;
         }
 
-        function startPolling() {
-            pollInterval = setInterval(pollServer, 1000); // Poll every 1 second
-        }
+        function startPolling() { pollInterval = setInterval(pollServer, 1000); }
+        function stopPolling() { clearInterval(pollInterval); }
 
-        function stopPolling() {
-            clearInterval(pollInterval);
-        }
-
-        // --- NEW: Start the Game ---
         async function initializeGame() {
             display.innerHTML = '';
             addMessage('Connecting to server...');
             try {
-                // 1. Tell the server to start the game thread
                 await fetch('/start_game', { method: 'POST' });
                 addMessage('Connected! Starting game...');
-                
-                // 2. Start polling for updates
                 startPolling();
-                
-                // Note: We don't need save game logic for this rewrite,
-                // but you could add it back here later.
-                
-            } catch (error) {
-                addMessage(`[Fatal Error] Could not connect to server: ${error.message}`);
-            }
+            } catch (error) { addMessage(`[Fatal Error] Could not connect to server: ${error.message}`); }
         }
 
-        // Start the game when the page loads
         initializeGame();
-
     </script>
 </body>
 </html>
