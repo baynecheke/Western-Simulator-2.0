@@ -81,7 +81,9 @@ class AI_Control:
                     'day': player_obj.Day,
                     'time': f"{player_obj.Time}:00",
                     'location': player_obj.current_town_name if player_obj.invillage else "On the Trail",
-                    'difficulty': player_obj.difficulty.capitalize()
+                    'difficulty': player_obj.difficulty.capitalize(),
+                    'heat': getattr(player_obj, 'Heat', 100),
+                    'max_heat': getattr(player_obj, 'MaxHeat', 100),
                 }
             })
         except Exception as e:

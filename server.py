@@ -131,12 +131,15 @@ def get_update():
                 'payload': {
                     'health': player_object.Health,
                     'max_health': player_object.MaxHealth,
+                    'heat': getattr(player_object, 'Heat', 100), 
+                    'max_heat': getattr(player_object, 'MaxHeat', 100),
                     'hunger': player_object.Hunger,
                     'gold': player_object.gold,
                     'day': player_object.Day,
                     'time': f"{player_object.Time}:00",
                     'location': player_object.current_town_name if player_object.invillage else "On the Trail",
                     'difficulty': player_object.difficulty.capitalize()
+                    
                 }
             }
             messages.append(stat_payload)
