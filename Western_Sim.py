@@ -161,7 +161,7 @@ class Player:
             {
                 "id": "iron_train_defense",
                 "theme": "railroad",
-                "trigger": "town_event", # Happens during daily update
+                "trigger": "leave_town", # Happens during daily update
                 "description": "The first train is arriving. The Foreman needs guards.",
                 "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 3,
                 "function": "encounter_iron_stage3"
@@ -169,7 +169,7 @@ class Player:
             {
                 "id": "iron_bridge",
                 "theme": "railroad",
-                "trigger": "town_event",
+                "trigger": "leave_town",
                 "description": "The Foreman runs up to you with urgent news about the bridge.",
                 "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 4,
                 "function": "encounter_iron_stage4"
@@ -177,7 +177,7 @@ class Player:
             {
                 "id": "iron_dynamite_boss",
                 "theme": "railroad",
-                "trigger": "town_event",
+                "trigger": "leave_town",
                 "description": "The notorious Dynamite Kid has ridden into town.",
                 "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 5,
                 "function": "encounter_iron_stage5"
@@ -187,7 +187,7 @@ class Player:
             {
                 "id": "town_def_1",
                 "theme": "town_defense",
-                "trigger": "town_event",
+                "trigger": "arrive_town",
                 "description": "The Sheriff looks frantic and is asking for volunteers.",
                 "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is None,
                 "function": "encounter_town_part1"
@@ -195,7 +195,7 @@ class Player:
             {
                 "id": "town_def_2",
                 "theme": "town_defense",
-                "trigger": "town_event",
+                "trigger": "arrive_town",
                 "description": "The town is scarred from the raid. They are rebuilding.",
                 "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is not None and p.get_flag("defend_town", "aftermath") is None,
                 "function": "encounter_town_part2"
@@ -203,7 +203,7 @@ class Player:
             {
                 "id": "town_def_3",
                 "theme": "town_defense",
-                "trigger": "town_event",
+                "trigger": "leave_town",
                 "description": "Rumors say the bandits are returning for revenge tonight.",
                 "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "aftermath") is not None and p.get_flag("defend_town", "final") is None,
                 "function": "encounter_town_part3"
@@ -232,7 +232,7 @@ class Player:
             {
                 "id": "earp_stage_2",
                 "theme": "earp",
-                "trigger": "town_event",
+                "trigger": "on_the_trail",
                 "description": "Word comes that Florentino Cruz is near the San Pedro River.",
                 "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 2,
                 "function": "encounter_earp_stage2"
@@ -252,7 +252,7 @@ class Player:
             {
                 "id": "earp_stage_4",
                 "theme": "earp",
-                "trigger": "town_event",
+                "trigger": "saloon",
                 "description": "The final showdown with Curly Bill Brocius at Iron Springs.",
                 "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 4,
                 "function": "encounter_earp_stage4"
