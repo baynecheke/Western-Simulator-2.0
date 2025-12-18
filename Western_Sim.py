@@ -326,6 +326,7 @@ class Player:
         self.update_actions()
 
     @classmethod
+
     def load_game(cls):
         global player
         print("\n--- Load Game ---")
@@ -333,97 +334,136 @@ class Player:
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
 
+        # 1. Get existing save files on the server
         save_files = [f for f in os.listdir(save_folder) if f.endswith('.json')]
-        if not save_files:
+        save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
+
+        # 2. Add the "Upload" option
+        upload_option = "Upload Save File (Paste Data)"
+        menu_choices = save_names + [upload_option]
+
+        if not menu_choices:
+            # If no files and no menu generated (unlikely with upload option), just start new
             print("No save files found. Starting a new game.")
             return player 
 
-        # save_names now has the original capitalization, e.g., "Bayne_real"
-        save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
-
-        # slot_choice_name is the lowercase version, e.g., "bayne_real"
-        slot_choice_name = player.AI_File.parse_choice(
-            save_names,
-            "Choose a save slot:"
+        # 3. Ask the user
+        choice = player.AI_File.parse_choice(
+            menu_choices,
+            "Choose a save slot or Upload a file:"
         )
 
-        # --- START FIX ---
-        # We must find the original, capitalized name that matches the
-        # lowercase choice we received from parse_choice.
-        
-        original_cased_name = None
-        for name in save_names:
-            if name.lower() == slot_choice_name:
-                original_cased_name = name
-                break # We found our match
+        save_data = None
 
-        if original_cased_name is None:
-            # This catches if the choice was "none" or didn't match
-            print("Invalid choice. Starting a new game.")
-            return player # Return the existing (empty) player
+        # --- PATH A: UPLOAD (PASTE) LOGIC ---
+        if choice == upload_option.lower():
+            print("\n--- Upload Save ---")
+            print("Open the .json save file on your computer with Notepad.")
+            print("Copy ALL the text inside and paste it here.")
+            
+            # Use patched_input to get the raw string
+            try:
+                # We check if ask_free_text exists (it should if you added it previously)
+                if hasattr(player.AI_File, 'ask_free_text'):
+                    save_string = player.AI_File.ask_free_text("Paste JSON data here:")
+                else:
+                    save_string = player.AI_File.patched_input("Paste JSON data here:")
 
-        # Now, use the *original cased name* to build the file path
-        save_file = f"save_{original_cased_name}.json"
-        # --- END FIX ---
-        
-        filepath = os.path.join(save_folder, save_file)
-        with open(filepath, 'r') as f:
-            save_data = json.load(f)
+                # convert string to dictionary
+                save_data = json.loads(save_string)
+                print("Save data recognized!")
+                
+                # Save it to the server temp disk so it persists for this session
+                # This prevents you from having to re-upload if you reload within the same session
+                temp_name = save_data.get("save_name", "uploaded")
+                with open(os.path.join(save_folder, f"save_{temp_name}.json"), 'w') as f:
+                    json.dump(save_data, f)
 
+            except json.JSONDecodeError:
+                print("Error: The text you pasted is not valid JSON. Starting new game.")
+                return player
+            except Exception as e:
+                print(f"Error reading upload: {e}")
+                return player
 
-        # Restore saved data
-        player.rebirth = save_data.get("rebirth", False)
-        player.gold = save_data.get("gold", 0)
-        player.itemsinventory = save_data.get("itemsinventory", {})
-        player.distancenext = save_data.get("distancenext", 0)
-        player.Day = save_data.get("Day", 1)
-        player.Time = save_data.get("Time", 9)
-        player.Health = save_data.get("Health", 100)
-        player.Hunger = save_data.get("Hunger", 0)
-        player.Hostility = save_data.get("Hostility", 0)
-        player.score = save_data.get("score", 0)
-        player.invillage = save_data.get("invillage", True)
-        player.travel_bonus = save_data.get("travel_bonus", 0)
-        player.trade_bonus = save_data.get("trade_bonus", 0)
-        player.caravan = save_data.get("caravan", [])
-        player.town_defense_outcome = save_data.get("defense_outcome", False)
-        player.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
-        player.town_final_outcome = save_data.get("final_outcome", False)
-        player.boots_used = save_data.get("boots", False)
-        player.diary_entries = save_data.get("diary_entries", [])
-        player.difficulty = save_data.get("difficulty", [])
-        player.MaxHealth = save_data.get("MaxHealth", 0)
-        player.TownUpgrades = save_data.get("TownUpgrades", [])
-        player.Tquest = save_data.get("Tquest", "None")
-        player.quest = save_data.get("quest", [])
-        player.rumors = save_data.get("rumors", {})
-        player.diary_bonuses = save_data.get("diary_bonuses", [])
-        player.rumors_heard = save_data.get("rumors_heard", [])
-        player.enemy_effects = save_data.get("enemy_effects", [])
-        player.player_effects = save_data.get("player_effects", [])
-        player.shadow_skill = save_data.get("shadow_skill", 3)
-        player.trail_skill = save_data.get("trail_skill", 3)
-        player.strength_skill = save_data.get("strength_skill", 3)
-        player.quests_done = save_data.get("quests_done", [])
-        player.event = save_data.get("event", [])
-        player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
-        player.quest_flags = save_data.get("quest_flags", {})
-        if "iron_tracks" not in player.quest_flags:
-            player.quest_flags["iron_tracks"] = {
-                "stage": save_data.get("iron_stage", 0),
-                "bonus": save_data.get("iron_bonus", 0)
-            }
-        
-        
-        # --- FIX: Use the original_cased_name as the fallback ---
-        player.player_name = save_data.get("save_name", original_cased_name)
-        player.current_town_name = save_data.get("current_town_name", "Dustbowl")
+        # --- PATH B: LOAD LOCAL FILE LOGIC ---
+        else:
+            # Find the original case-sensitive name
+            original_cased_name = None
+            for name in save_names:
+                if name.lower() == choice:
+                    original_cased_name = name
+                    break
+            
+            if original_cased_name is None:
+                print("Invalid choice. Starting a new game.")
+                return player 
 
-        print(f"Game loaded from {save_file} successfully!")
-        
-        # --- FIX: Use the original_cased_name as the fallback ---
-        player.save_name = save_data.get("save_name", original_cased_name)
-        player.update_actions()
+            save_file = f"save_{original_cased_name}.json"
+            filepath = os.path.join(save_folder, save_file)
+            
+            try:
+                with open(filepath, 'r') as f:
+                    save_data = json.load(f)
+            except Exception as e:
+                print(f"Error loading file: {e}")
+                return player
+
+        # --- APPLY DATA TO PLAYER (Runs for both paths) ---
+        if save_data:
+            player.rebirth = save_data.get("rebirth", False)
+            player.gold = save_data.get("gold", 0)
+            player.itemsinventory = save_data.get("itemsinventory", {})
+            player.distancenext = save_data.get("distancenext", 0)
+            player.Day = save_data.get("Day", 1)
+            player.Time = save_data.get("Time", 9)
+            player.Health = save_data.get("Health", 100)
+            player.Hunger = save_data.get("Hunger", 0)
+            player.Hostility = save_data.get("Hostility", 0)
+            player.score = save_data.get("score", 0)
+            player.invillage = save_data.get("invillage", True)
+            player.travel_bonus = save_data.get("travel_bonus", 0)
+            player.trade_bonus = save_data.get("trade_bonus", 0)
+            player.caravan = save_data.get("caravan", [])
+            player.town_defense_outcome = save_data.get("defense_outcome", False)
+            player.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
+            player.town_final_outcome = save_data.get("final_outcome", False)
+            player.boots_used = save_data.get("boots", False)
+            player.diary_entries = save_data.get("diary_entries", [])
+            player.difficulty = save_data.get("difficulty", "frontier")
+            player.MaxHealth = save_data.get("MaxHealth", 100)
+            player.TownUpgrades = save_data.get("TownUpgrades", {})
+            player.Tquest = save_data.get("Tquest", "None")
+            player.quest = save_data.get("quest", [])
+            player.rumors = save_data.get("rumors", {})
+            player.diary_bonuses = save_data.get("diary_bonuses", [])
+            player.rumors_heard = save_data.get("rumors_heard", [])
+            player.enemy_effects = save_data.get("enemy_effects", [])
+            player.player_effects = save_data.get("player_effects", [])
+            player.shadow_skill = save_data.get("shadow_skill", 3)
+            player.trail_skill = save_data.get("trail_skill", 3)
+            player.strength_skill = save_data.get("strength_skill", 3)
+            player.quests_done = save_data.get("quests_done", [])
+            player.event = save_data.get("event", [])
+            player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
+            player.quest_flags = save_data.get("quest_flags", {})
+            
+            # Compatibility Check
+            if "iron_tracks" not in player.quest_flags:
+                player.quest_flags["iron_tracks"] = {
+                    "stage": save_data.get("iron_stage", 0),
+                    "bonus": save_data.get("iron_bonus", 0)
+                }
+
+            # Metadata
+            player.player_name = save_data.get("player_name", "default")
+            player.current_town_name = save_data.get("current_town_name", "Dustbowl")
+            player.save_name = save_data.get("save_name", "uploaded")
+
+            print(f"Game loaded successfully!")
+            player.update_actions()
+            return player
+
         return player
 
     def save_game(self):
