@@ -2384,7 +2384,7 @@ class Player:
                     continue
                 if self.invillage:
                     # Towns restore heat automatically
-                    self.Heat += 30
+                    self.Heat = min(self.Heat + 30, self.MaxHeat)
                     self.cold_penalty = 0
                 else:
                     # 1. Calculate Drain Amount
@@ -2400,7 +2400,7 @@ class Player:
                     if self.Heat <= 0:
                         self.Heat = 0
                         print(f"(!) HYPOTHERMIA. You are freezing to death. Heat: 0/{self.MaxHeat}")
-                        self.Health -= 15 # Massive damage
+                        self.Health -= 5 # Massive damage
                         self.cold_penalty = 5 # Massive stat reduction
                         
                     elif self.Heat < 30:
