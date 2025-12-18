@@ -47,7 +47,7 @@ class Player:
             loot_data = yaml.safe_load(file)
         
 
-
+        self.skip_freeze = False
         self.Time = 9
         self.Speed = 3
         self.counter = 0
@@ -65,6 +65,9 @@ class Player:
             "earp_vendetta": {"stage": 0, "bonus": 0},
             "defend_town": {"outcome": None, "bonus": 0} 
         }
+        self.Heat = 100
+        self.MaxHeat = 100
+        self.cold_penalty = 0
         
         self.EmptyTown = False
         self.Speed = 3
@@ -79,7 +82,8 @@ class Player:
         self.score = 0
         self.poisoned = 0
         self.difficulty = 'frontier'  # Default
-        
+        # --- WINTER UPDATE: INIT FLAG ---
+        self.winter_mode = False
         #boosts
         self.Armor_Boost = 1
         self.travel_bonus = 0
@@ -312,7 +316,7 @@ class Player:
         ]
         
         # Actions only available WHILE traveling
-        self.travel_actions = ["travel road"]
+        self.travel_actions = ["travel road", "make camp"] 
         
         # Actions available in BOTH states
         self.universal_actions = ["use item", "inventory"]
@@ -547,7 +551,20 @@ class Player:
             
     def main_game_loop(self):
         global player # <-- FIX 1: Add this line
-        
+        print("\nSelect a Season:")
+        print("1. Standard (Normal)")
+        print("2. The Long Winter (Hard Mode + Winter Events)")
+            
+        # This parses "1", "2", "standard", or "winter"
+        season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
+            
+        if season_choice == "winter":
+            self.winter_mode = True
+            print("You have chosen The Long Winter. Bundle up...")
+            # Optional: Force difficult setting if you want
+            # self.difficulty = 'survivalist' 
+        else:
+            self.winter_mode = False
         # --- NEW CODE ---
         prompt = "Would you like to Start a New Game or Load a Save?"
         choices = ["Start New Game", "Load a Save"]
@@ -684,6 +701,7 @@ class Player:
             # Traveling: Show travel actions + universal actions
             self.possibleactions = self.travel_actions + self.universal_actions
 
+
     def lose_random_item(self, amount):
         if not self.itemsinventory:
             print("You have no items to lose.")
@@ -729,13 +747,13 @@ class Player:
                 return True  # Critical Success (5% chance, always wins)
             if roll == 1:
                 return False # Critical Failure (5% chance, always fails)
-
+            
             # 2. Adjust target based on game difficulty
             adjusted_target = base_target
             if self.difficulty == 'adventure':
-                adjusted_target -= 3  # Make it easier
+                adjusted_target -= 2  # Make it easier
             elif self.difficulty == 'savage':
-                adjusted_target += 3  # Make it harder
+                adjusted_target += 2  # Make it harder
             # 'frontier' uses the base_target as-is
 
             # 3. Calculate the final score and check
@@ -743,7 +761,8 @@ class Player:
             # This makes your starting skill of 3 a "+0" (average) bonus.
             # A skill of 4 is +1. A skill of 2 is -1.
             stat_bonus = stat_value - 3 
-            
+            if self.winter_mode:
+                roll -= self.cold_penalty
             final_score = roll + stat_bonus
             
             # You can uncomment this for testing:
@@ -835,6 +854,8 @@ class Player:
                 self.Statcheck()
             case "travel road":
                 self.Explore()
+            case "make camp":
+                self.MakeCamp()
             case _:
                 print("That action is not currently available.")
 
@@ -902,13 +923,29 @@ class Player:
             # 'choice' is already the item name.
             selected_item = choice
             if combat == False:
+                
                 if selected_item == "bread":
                     self.Hunger = self.Hunger - 1
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
                     print(f"You eat some bread and reduce {1} hunger.")
+                elif selected_item == "salted pork":
+                    self.Hunger = max(0, self.Hunger - 2) # Reduces hunger by 2
+                    self.Health = min(self.Health + 10, self.MaxHealth)
+                    print("The salty meat is tough, but filling. -2 Hunger, +10 Health.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
 
+                elif selected_item == "pemmican":
+                    self.Hunger = 0 # Fully cures hunger
+                    self.Health = min(self.Health + 20, self.MaxHealth)
+                    print("You eat the nutrient-dense pemmican. You feel completely full. Hunger cleared.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+                
                 elif selected_item == "coffee tin":
                     print("You slam the coffee—your reflexes sharpen!")
                     self.Speed += 1
@@ -1300,7 +1337,24 @@ class Player:
             {"give": "medium hide", "get": "bandage"},
             {"give": "shotgun_ammo", "get": "rifle_ammo"},
         ]
-
+        price_mult = 1.25 if self.winter_mode else 1.0
+        if self.winter_mode: 
+            print("Trader: 'I pay extra for furs in this cold.'")
+            sell_prices = {
+                "small hide": int(12 * price_mult), 
+                "medium hide": int(20 * price_mult), 
+                "large hide": int(40 * price_mult),
+                "small meat": 12, "medium meat": 20, "large meat": 40,
+                "horn": 45, "bread": 2, "knife": 5,
+                "revolver": 15, "colt pistol": 20, "sharps rifle": 40,
+                "rifle": 15, "shotgun": 25,
+                "pistol_ammo": 1, "rifle_ammo": 2, "shotgun_ammo": 3,
+                "winchester rifle": 50, "carved horn": 40,
+                "gold nugget": random.randint(15, 45),
+                "silver watch": random.randint(10, 20),
+                "silver bar": random.randint(40, 60),
+                "gold bar": random.randint(45, 100)
+            }
         # We don't need a buy inventory, so we pass an empty dict {}
         trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, "Trader")
 
@@ -2135,7 +2189,16 @@ class Player:
             'tobacco pouch': ShopItem('tobacco pouch', 7, 7),
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
+            'salted pork': ShopItem('salted pork', 10, 10), # -2 Hunger
+            'pemmican': ShopItem('pemmican', 20, 5),        # -3 Hunger (Full)
+            'flint and steel': ShopItem('flint and steel', 15, 1), # Reusable fire starter
+            'firewood': ShopItem('firewood', 2, 20),        # Fuel
+            'wool blanket': ShopItem('wool blanket', 25, 1), # Passive heat drain reduction
+            'canvas tent': ShopItem('canvas tent', 60, 1),   # Better night healing
         }
+        if self.winter_mode:
+            general_inventory['heavy coat'] = ShopItem('heavy coat', 50, 5)
+            general_inventory['firewood'].base_price = 5
         gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, "store owner")
         gen_shop.run_buy_session()
 
@@ -2160,6 +2223,7 @@ class Player:
             self.jail_penalty()
 
     def Death(self, death_cause):
+        self.change_music("stop", 0)
         self.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
         time.sleep(2,)
@@ -2204,7 +2268,75 @@ class Player:
         time.sleep(2,)
         exit()
 
+    def MakeCamp(self):
+        print("\nYou pull your wagon off the road to set up a temporary camp.")
+        print("This will cost 1 hour of daylight.")
         
+        # 1. Define Camp Options
+        print("1. Build a Fire (Requires Firewood + Flint)")
+        print("2. Rest in Tent (Requires Canvas Tent)")
+        print("3. Cook Food")
+        print("4. Pack up and leave")
+        
+        choice = self.AI_File.parse_choice(["build fire", "rest", "cook", "leave"], "Camp Action:")
+        
+        if choice == "build fire":
+            self.skip_freeze = True
+            if "flint and steel" in self.itemsinventory and "firewood" in self.itemsinventory:
+                print("You strike the flint and light a roaring fire.")
+                self.itemsinventory["firewood"] -= 1
+                if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                
+                # Restore Heat
+                if self.winter_mode:
+                    print("The warmth thaws your frozen limbs. Heat fully restored.")
+                    self.Heat = self.MaxHeat
+                    self.cold_penalty = 0
+                
+                # Small morale/health boost
+                self.Health = min(self.Health + 5, self.MaxHealth)
+                self.Time += 1
+            else:
+                print("You need 'Flint and Steel' AND 'Firewood' to build a fire.")
+        
+        elif choice == "rest":
+            if "canvas tent" in self.itemsinventory:
+                print("You crawl into your sturdy tent for a quick nap.")
+                self.Health = min(self.Health + 15, self.MaxHealth)
+                print("You feel rested. +15 Health.")
+                
+                if self.winter_mode:
+                    self.Heat = min(self.Heat + 30, self.MaxHeat)
+                    print("You warm up slightly. +30 Heat.")
+                    self.skip_freeze = True
+                self.Time += 1
+            else:
+                print("You don't have a Canvas Tent.")
+
+        elif choice == "cook":
+            self.skip_freeze = True
+            # Allow converting raw meat to cooked meat if you have fire
+            if "flint and steel" in self.itemsinventory and "firewood" in self.itemsinventory:
+                if "small meat" in self.itemsinventory or "medium meat" in self.itemsinventory:
+                    print("You cook your raw meat over a fire.")
+                    self.itemsinventory["firewood"] -= 1
+                    if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                    
+                    # Simple conversion: Remove raw, add salted pork (gameplay abstraction)
+                    if "small meat" in self.itemsinventory:
+                        self.itemsinventory["small meat"] -= 1
+                        if self.itemsinventory["small meat"] <= 0: del self.itemsinventory["small meat"]
+                        self.add_item("salted pork")
+                        print("You cooked Small Meat into Salted Pork!")
+                    
+                    self.Time += 1
+                else:
+                    print("You have no raw meat to cook.")
+            else:
+                print("You need fire supplies to cook.")
+
+        else:
+            print("You pack up and head back to the road.")
 
 
     #RunDay
@@ -2239,7 +2371,42 @@ class Player:
                 self.Health = self.MaxHealth
             if self.Health <= 0:
                 self.Death("You have succumbed to your injuries during the day.")
-            self.quest_today = False
+            if self.winter_mode:
+                if self.skip_freeze:
+                    self.skip_freeze = False
+                    continue
+                if self.invillage:
+                    # Towns restore heat automatically
+                    self.Heat = self.MaxHeat
+                    self.cold_penalty = 0
+                else:
+                    # 1. Calculate Drain Amount
+                    heat_drain = 15 # You lose 15 Heat per hour by default
+                    
+                    if "heavy coat" in self.itemsinventory:
+                        heat_drain = 5 # Coat slows it down significantly
+                        
+                    # 2. Apply Drain
+                    self.Heat -= heat_drain
+                    
+                    # 3. Check Thresholds (The Danger Zone)
+                    if self.Heat <= 0:
+                        self.Heat = 0
+                        print(f"(!) HYPOTHERMIA. You are freezing to death. Heat: 0/{self.MaxHeat}")
+                        self.Health -= 15 # Massive damage
+                        self.cold_penalty = 5 # Massive stat reduction
+                        
+                    elif self.Heat < 30:
+                        print(f"(!) You are shivering violently. Heat: {self.Heat}/{self.MaxHeat}")
+                        self.Health -= 2 # Chip damage
+                        self.Hunger += 0.25 # Shivering burns calories (Lowers food stat)
+                        self.cold_penalty = 2 # Moderate stat reduction
+                    
+                    else:
+                        # Just getting cold, no damage yet
+                        print(f"The cold gnaws at you. Heat: {self.Heat}/{self.MaxHeat}")
+
+        self.quest_today = False
         time.sleep(1)
         if self.Health <= 0:
             self.Death("You have succumbed to your injuries during the day.")
@@ -2265,6 +2432,27 @@ class Player:
                 time.sleep(4,)
                 self.write_diary_entry()
         else:
+            warmth_bonus = 0
+            
+            if "canvas tent" in self.itemsinventory:
+                print("You sleep soundly in your Canvas Tent. (+10 Health)")
+                self.Health = min(self.Health + 10, self.MaxHealth)
+                warmth_bonus += 1
+            
+            if "wool blanket" in self.itemsinventory:
+                print("Your Wool Blanket keeps the chill away.")
+                warmth_bonus += 1
+
+            if self.winter_mode:
+                if warmth_bonus == 0:
+                    print("It is freezing tonight! You shiver uncontrollably. -10 Health.")
+                    self.Health -= 10
+                elif warmth_bonus == 1:
+                    print("It's cold, but your gear helps. -5 Health.")
+                    self.Health -= 5
+                else:
+                    print("Your tent and blanket make the winter night comfortable. No Health lost.")
+
             print("You make camp under the stars.")
             self.write_diary_entry()
             print("You sleep through the night")

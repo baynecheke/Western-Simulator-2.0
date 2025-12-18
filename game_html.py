@@ -7,35 +7,52 @@ HTML_CONTENT = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Western Simulator</title>
-    **<link rel="icon" href="/static/favicon.ico">**
+    <link rel="icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
+
+        /* =========================================
+           1. OLD THEME (COMMENTED OUT)
+           ========================================= */
+        /*
         body {
             font-family: 'Merriweather', serif;
-            background-color: #3a2e25; /* Dark brown background */
+            background-color: #3a2e25; 
             background-image: url('https://www.toptal.com/designers/subtlepatterns/uploads/wood-pattern.png');
+            color: #fdf6e3; 
         }
-        /* Custom scrollbar for the display */
+        */
+
+        /* =========================================
+           2. NEW WINTER THEME (ACTIVE)
+           ========================================= */
+        body {
+            font-family: 'Merriweather', serif;
+            /* Dark Slate / Icy Blue Background */
+            background-color: #0f172a; 
+            color: #e2e8f0; 
+            
+            /* Optional: Snow Texture */
+            background-image: url('https://www.transparenttextures.com/patterns/snow.png');
+        }
+
+        /* Custom Scrollbar (Recolored for Ice) */
         #game-display::-webkit-scrollbar { width: 8px; }
-        #game-display::-webkit-scrollbar-track { background: #fdf6e3; }
-        #game-display::-webkit-scrollbar-thumb { background: #8b4513; border-radius: 4px; }
+        #game-display::-webkit-scrollbar-track { background: #1e293b; }
+        #game-display::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+
+        /* Button Styling (Cold Steel Look) */
         .game-button {
             transition: all 0.15s ease-in-out;
-            border: 2px solid #5a2d0c;
+            border: 2px solid #475569; /* Slate border */
+            background-color: #1e293b; /* Dark Blue interior */
+            color: #f1f5f9;
         }
         .game-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            background-color: #a0522d; /* Sienna */
-        }
-        /* Style for the health/hunger bars */
-        .progress-bar-bg {
-            background-color: #c7a78b; /* Desaturated brown */
-            border: 2px solid #5a2d0c;
-        }
-        .progress-bar-fill {
-            transition: width 0.5s ease-in-out;
+            background-color: #334155; 
+            border-color: #cbd5e1; 
+            transform: translateY(-1px);
         }
     </style>
 </head>
