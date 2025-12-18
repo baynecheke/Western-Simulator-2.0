@@ -12,7 +12,7 @@ HTML_CONTENT = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
-        /* WINTER THEME */
+        /* WINTER THEME BACKGROUND */
         body {
             font-family: 'Merriweather', serif;
             background-color: #0f172a; /* Slate 900 */
@@ -50,7 +50,7 @@ HTML_CONTENT = """
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-5xl bg-[#1e293b] shadow-2xl rounded-lg border-2 border-[#475569] overflow-hidden" style="box-shadow: 0 10px 25px rgba(0,0,0,0.8); height: 90vh; display: flex; flex-direction: column;">
+    <div class="w-full max-w-6xl bg-[#1e293b] shadow-2xl rounded-lg border-2 border-[#475569] overflow-hidden" style="box-shadow: 0 10px 25px rgba(0,0,0,0.8); height: 90vh; display: flex; flex-direction: column;">
         
         <header class="p-4 bg-[#0f172a] text-blue-100 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b-2 border-[#334155]">
             <div><strong>Location:</strong> <span id="stat-location" class="text-blue-200">Starting...</span></div>
@@ -59,27 +59,42 @@ HTML_CONTENT = """
             <div><strong>Difficulty:</strong> <span id="stat-difficulty" class="text-blue-200">Frontier</span></div>
         </header>
 
-        <section class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border-b-2 border-[#334155] bg-[#1e293b]">
+        <section class="p-4 grid grid-cols-1 sm:grid-cols-4 gap-4 border-b-2 border-[#334155] bg-[#1e293b]">
+            
             <div class="flex flex-col">
                 <div class="flex justify-between font-bold text-sm text-slate-300">
                     <span>Health:</span>
                     <span id="stat-health-text">100 / 100</span>
                 </div>
                 <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-health-bar" class="progress-bar-fill bg-cyan-700 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+                    <div id="stat-health-bar" class="progress-bar-fill bg-red-600 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
                 </div>
             </div>
+
             <div class="flex flex-col">
                 <div class="flex justify-between font-bold text-sm text-slate-300">
-                    <span>Heat/Hunger:</span>
+                    <span>Heat:</span>
+                    <span id="stat-heat-text">100 / 100</span>
+                </div>
+                <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
+                    <div id="stat-heat-bar" class="progress-bar-fill bg-orange-500 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <div class="flex flex-col">
+                <div class="flex justify-between font-bold text-sm text-slate-300">
+                    <span>Hunger:</span>
                     <span id="stat-hunger-text">0</span>
                 </div>
                 <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-hunger-bar" class="progress-bar-fill bg-orange-600 h-full" style="width: 0%;"></div>
+                    <div id="stat-hunger-bar" class="progress-bar-fill bg-emerald-600 h-full" style="width: 0%;"></div>
                 </div>
             </div>
-            <div class="text-lg font-bold text-slate-200">
-                Gold: $<span id="stat-gold" class="text-yellow-400">50</span>
+
+            <div class="flex flex-col justify-center">
+                <div class="text-lg font-bold text-slate-200">
+                    Gold: $<span id="stat-gold" class="text-yellow-400">50</span>
+                </div>
             </div>
         </section>
 
@@ -102,15 +117,23 @@ HTML_CONTENT = """
         const display = document.getElementById('game-display');
         const actionArea = document.getElementById('action-area');
         const actionTitle = document.getElementById('action-title');
+        
+        // Stats
         const statLocation = document.getElementById('stat-location');
         const statDay = document.getElementById('stat-day');
         const statTime = document.getElementById('stat-time');
         const statDifficulty = document.getElementById('stat-difficulty');
+        const statGold = document.getElementById('stat-gold');
+        
+        // Bars
         const statHealthText = document.getElementById('stat-health-text');
         const statHealthBar = document.getElementById('stat-health-bar');
+        
+        const statHeatText = document.getElementById('stat-heat-text');
+        const statHeatBar = document.getElementById('stat-heat-bar');
+        
         const statHungerText = document.getElementById('stat-hunger-text');
         const statHungerBar = document.getElementById('stat-hunger-bar');
-        const statGold = document.getElementById('stat-gold');
         
         const soundEffects = {};
         let backgroundMusic = null;
@@ -132,11 +155,10 @@ HTML_CONTENT = """
             } catch (e) { console.error(`Error playing sound ${src}:`, e); }
         }
 
-        // Updated for Winter text color
         function addMessage(text) {
             const p = document.createElement('p');
             p.innerHTML = text.replace(/(\\n|\\r\\n|\\r)/gm, '<br>');
-            p.className = "text-slate-300"; // Light grey text for dark background
+            p.className = "text-slate-300"; 
             display.appendChild(p);
             display.scrollTop = display.scrollHeight; 
         }
@@ -177,9 +199,21 @@ HTML_CONTENT = """
             statTime.textContent = data.time;
             statDifficulty.textContent = data.difficulty;
             statGold.textContent = data.gold;
+            
+            // Health
             const healthPercent = (data.health / data.max_health) * 100;
             statHealthText.textContent = `${data.health} / ${data.max_health}`;
             statHealthBar.style.width = `${healthPercent}%`;
+            
+            // Heat (New!)
+            // Defaults to 100 if undefined
+            const currentHeat = data.heat !== undefined ? data.heat : 100;
+            const maxHeat = data.max_heat !== undefined ? data.max_heat : 100;
+            const heatPercent = (currentHeat / maxHeat) * 100;
+            statHeatText.textContent = `${currentHeat} / ${maxHeat}`;
+            statHeatBar.style.width = `${heatPercent}%`;
+
+            // Hunger
             const hungerPercent = (data.hunger / 3) * 100;
             statHungerText.textContent = data.hunger;
             statHungerBar.style.width = `${Math.min(hungerPercent, 100)}%`;
@@ -192,7 +226,6 @@ HTML_CONTENT = """
                 choices.forEach(choice => {
                     const button = document.createElement('button');
                     button.textContent = choice.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    // Winter Button Styles
                     button.className = "game-button w-full text-left p-3 rounded shadow-md text-blue-100 hover:text-white";
                     button.onclick = () => sendResponse(choice); 
                     actionArea.appendChild(button);
@@ -205,11 +238,9 @@ HTML_CONTENT = """
             actionTitle.textContent = prompt || "Enter a value:";
             const input = document.createElement('input');
             input.type = "text";
-            // Winter Input Styles
             input.className = "w-full p-2 border-2 border-slate-600 bg-slate-900 text-white rounded focus:border-blue-400 outline-none";
             const submit = document.createElement('button');
             submit.textContent = "Submit";
-            // Winter Submit Styles
             submit.className = "game-button w-full p-2 text-white rounded shadow-md mt-2";
             submit.onclick = () => sendResponse(input.value);
             input.onkeydown = (e) => { if (e.key === 'Enter') sendResponse(input.value); };

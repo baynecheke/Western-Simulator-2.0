@@ -451,7 +451,10 @@ class Player:
             player.event = save_data.get("event", [])
             player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
             player.quest_flags = save_data.get("quest_flags", {})
-            
+            player.Heat = save_data.get("Heat", 100)
+            player.MaxHeat = save_data.get("MaxHeat", 100)
+            player.cold_penalty = save_data.get("cold_penalty", 0)
+
             # Compatibility Check
             if "iron_tracks" not in player.quest_flags:
                 player.quest_flags["iron_tracks"] = {
@@ -518,6 +521,9 @@ class Player:
                 "player_name": self.player_name,
                 "current_town_name": self.current_town_name,
                 "quest_flags": self.quest_flags,
+                "Heat": self.Heat,
+                "MaxHeat": self.MaxHeat,
+                "cold_penalty": self.cold_penalty
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 # In Western_Sim.py
@@ -2308,6 +2314,7 @@ class Player:
                 if self.winter_mode:
                     self.Heat = min(self.Heat + 30, self.MaxHeat)
                     print("You warm up slightly. +30 Heat.")
+                    self.cold_penalty = 0
                     self.skip_freeze = True
                 self.Time += 1
             else:
@@ -2377,7 +2384,7 @@ class Player:
                     continue
                 if self.invillage:
                     # Towns restore heat automatically
-                    self.Heat = self.MaxHeat
+                    self.Heat += 30
                     self.cold_penalty = 0
                 else:
                     # 1. Calculate Drain Amount
