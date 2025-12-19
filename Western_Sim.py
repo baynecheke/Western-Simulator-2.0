@@ -1449,7 +1449,7 @@ class Player:
             if self.gold >= cost:
                 self.gold -= cost
                 print(f"You were healed {Heal}")
-                self.Health = 100
+                self.Health = self.MaxHealth
             else:
                 print("You do not have enough gold.")
             time.sleep(2,)
