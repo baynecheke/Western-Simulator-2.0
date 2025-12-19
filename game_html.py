@@ -1,4 +1,4 @@
-# game_html.py - WINTER VERSION
+# game_html.py - WINTER MULTIPLAYER VERSION
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -99,7 +99,6 @@ HTML_CONTENT = """
         </section>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-            
             <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 bg-[#0f172a]">
                 <p class="text-slate-400">Connecting to server...</p>
             </div>
@@ -118,34 +117,29 @@ HTML_CONTENT = """
         const actionArea = document.getElementById('action-area');
         const actionTitle = document.getElementById('action-title');
         
-        // Stats
+        // Stat Elements
         const statLocation = document.getElementById('stat-location');
         const statDay = document.getElementById('stat-day');
         const statTime = document.getElementById('stat-time');
         const statDifficulty = document.getElementById('stat-difficulty');
         const statGold = document.getElementById('stat-gold');
-        
-        // Bars
         const statHealthText = document.getElementById('stat-health-text');
         const statHealthBar = document.getElementById('stat-health-bar');
-        
         const statHeatText = document.getElementById('stat-heat-text');
         const statHeatBar = document.getElementById('stat-heat-bar');
-        
         const statHungerText = document.getElementById('stat-hunger-text');
         const statHungerBar = document.getElementById('stat-hunger-bar');
         
         const soundEffects = {};
         let backgroundMusic = null;
 
-        // --- NEW: SESSION ID GENERATION ---
-        // Generates a unique ID for this browser tab so multiple people can play at once
+        // --- SESSION MANAGEMENT (The Key to Multiplayer) ---
         let sessionId = localStorage.getItem('ws_session_id');
         if (!sessionId) {
             sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
             localStorage.setItem('ws_session_id', sessionId);
         }
-        console.log("Your Session ID:", sessionId);
+        console.log("Client Session ID:", sessionId);
 
         function loadAndPlaySound(src, loop = false) {
             try {
@@ -179,7 +173,6 @@ HTML_CONTENT = """
             actionTitle.textContent = "Actions";
             actionArea.innerHTML = '<p class="text-slate-500">Waiting for server...</p>';
             try {
-                // --- NEW: Send Session ID with response ---
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -219,8 +212,7 @@ HTML_CONTENT = """
             statHealthText.textContent = `${data.health} / ${data.max_health}`;
             statHealthBar.style.width = `${healthPercent}%`;
             
-            // Heat (New!)
-            // Defaults to 100 if undefined
+            // Heat
             const currentHeat = data.heat !== undefined ? data.heat : 100;
             const maxHeat = data.max_heat !== undefined ? data.max_heat : 100;
             const heatPercent = (currentHeat / maxHeat) * 100;
@@ -270,7 +262,7 @@ HTML_CONTENT = """
             if (isPolling) return; 
             isPolling = true;
             try {
-                // --- NEW: Send Session ID in URL params for GET request ---
+                // Pass the Session ID in the query params
                 const response = await fetch(`/get_update?session_id=${sessionId}`);
                 if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const data = await response.json();
@@ -285,14 +277,13 @@ HTML_CONTENT = """
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = setInterval(pollServer, 1000); 
         }
-        
         function stopPolling() { clearInterval(pollInterval); }
 
         async function initializeGame() {
             display.innerHTML = '';
             addMessage('Connecting to server...');
             try {
-                // --- NEW: Send Session ID when starting game ---
+                // Initialize the game session for this specific browser ID
                 await fetch('/start_game', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

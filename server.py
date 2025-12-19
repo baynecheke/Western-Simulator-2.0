@@ -3,6 +3,7 @@ import threading
 import queue
 import builtins 
 import time     
+import traceback
 from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv
 
@@ -10,23 +11,24 @@ from dotenv import load_dotenv
 load_dotenv() 
 
 # --- Import Your Game Logic ---
+# Ensure these files are in the same directory
 from AI_Control_File import AI_Control
 from Western_Sim import Player 
 import game_html 
 
-# --- Global Game Objects ---
+# --- Global Server Objects ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-12345')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-key')
 
-# --- MULTIPLAYER SESSION REGISTRY ---
-# Maps session_id -> dictionary containing queues and player object
+# --- REGISTRIES ---
+# sessions: Maps session_id (str) -> { 'outbox': Queue, 'inbox': Queue, 'player': PlayerObj }
 sessions = {} 
 
-# Maps thread_id -> AI_Control object
-# This allows 'print' to know WHICH player to send text to based on the running thread
+# thread_registry: Maps thread_id (int) -> AI_Control object
+# This allows 'print' to know WHICH player to send text to based on the running thread.
 thread_registry = {}
 
-# Save original built-ins before we patch them so the server can still log to console
+# Save original built-ins immediately so we can use them for server logs
 original_print = builtins.print
 original_input = builtins.input
 
@@ -35,83 +37,82 @@ original_input = builtins.input
 def smart_print(*args, **kwargs):
     """
     Replaces builtins.print. 
-    Checks which thread is calling it.
-    If it's a game thread, send to that player's browser via their AI_Control.
-    If it's the server (main thread), print to terminal.
+    1. Gets the current thread ID.
+    2. Checks if that thread belongs to a player (in thread_registry).
+    3. If yes, routes the text to that player's browser.
+    4. If no (it's the server), prints to the system terminal.
     """
     current_thread_id = threading.get_ident()
     
-    # Check if this thread belongs to a game session
     if current_thread_id in thread_registry:
         ai_controller = thread_registry[current_thread_id]
+        # Convert all args to a single string, similar to how print works
         message = " ".join(map(str, args))
         ai_controller.print_to_client(message)
     else:
-        # Default to terminal for system/server messages
+        # It's a server log, use the real terminal
         original_print(*args, **kwargs)
 
 def smart_input(prompt=""):
     """
     Replaces builtins.input.
-    Finds the correct player AI controller for this thread and asks them for input.
+    1. Gets the current thread ID.
+    2. Finds the correct AI Controller.
+    3. Asks that specific browser for input.
     """
     current_thread_id = threading.get_ident()
     
     if current_thread_id in thread_registry:
         ai_controller = thread_registry[current_thread_id]
-        # Use the existing AI logic to send the prompt and wait for a response
         return ai_controller.patched_input(prompt)
     else:
-        # Default to terminal input (shouldn't happen in game context)
+        # Fallback for server-side inputs (rarely used)
         return original_input(prompt)
 
 # --- APPLY PATCHES GLOBALLY ---
+# This affects ALL modules imported after this point
 builtins.print = smart_print
 builtins.input = smart_input
 
 
-# --- The Main Game Loop Function (Per Session) ---
+# --- GAME THREAD WORKER ---
 def run_game_session(session_id, ai_file):
     """ 
-    Wrapper to run the game in a unique thread for a specific session.
+    This function runs inside a unique thread for EACH player.
     """
-    # 1. Register this thread ID so smart_print knows where to send text
     thread_id = threading.get_ident()
+    
+    # 1. Register thread so smart_print finds us
     thread_registry[thread_id] = ai_file
     
     try:
-        # 2. Create the Player
-        # Note: We do NOT set Western_Sim.USE_OLLAMA globally here because 
-        # it might affect other threads. However, your Player class likely 
-        # reads from ai_file.use_ai, which is thread-safe.
+        # 2. Initialize Player
+        # We pass the ai_file directly so the player object interacts with THIS session
         player = Player(ai_file_arg=ai_file) 
         
-        # 3. Save player object to session so /get_update can poll stats
+        # 3. Store player object for stat polling
         if session_id in sessions:
             sessions[session_id]['player'] = player
 
-        # 4. Run the game logic
+        # 4. Run the Game Loop
         player.main_game_loop()
         
     except Exception as e:
-        original_print(f"[Error in Session {session_id}]: {e}")
-        import traceback
+        # Log to server console
+        original_print(f"[Session {session_id} Error]: {e}")
         original_print(traceback.format_exc())
-        
-        ai_file.print_to_client(f"CRITICAL ERROR: {e}. Please refresh.")
+        # Tell the user
+        ai_file.print_to_client(f"<span style='color:red'>CRITICAL ERROR: {e}</span>")
     
     finally:
-        # 5. Cleanup when game ends or crashes
-        # Unregister the thread so memory is freed
+        # 5. Cleanup
         if thread_id in thread_registry:
             del thread_registry[thread_id]
         
-        # We don't delete the session immediately from 'sessions' dict 
-        # so the user can still see the Game Over message.
         ai_file.print_to_client("--- GAME OVER ---")
 
 
-# --- Web Server Routes ---
+# --- FLASK ROUTES ---
 
 @app.route('/')
 def index():
@@ -123,38 +124,39 @@ def start_game():
     session_id = data.get('session_id')
     
     if not session_id:
-        return jsonify({"error": "No session ID provided"}), 400
+        return jsonify({"error": "No session ID"}), 400
 
-    original_print(f"[SERVER] Starting game for Session: {session_id}")
+    original_print(f"[SERVER] New Game Request from: {session_id}")
 
-    # Create queues specifically for THIS player
+    # 1. Create dedicated queues
     server_outbox = queue.Queue()
     player_inbox = queue.Queue()
     
-    # Create AI Controller for this session
+    # 2. Create dedicated AI Controller
     ai_file = AI_Control(server_outbox, player_inbox) 
     
-    # Store everything in the global registry keyed by session_id
+    # 3. Register Session
     sessions[session_id] = {
         'outbox': server_outbox,
         'inbox': player_inbox,
-        'player': None, # Will be filled by the thread once it starts
+        'player': None, 
         'ai': ai_file
     }
 
-    # Start the dedicated thread for this player
+    # 4. Launch Thread
     game_thread = threading.Thread(target=run_game_session, args=(session_id, ai_file))
+    game_thread.daemon = True # Kills thread if server stops
     game_thread.start()
     
     return jsonify({"status": "Game started"})
 
 @app.route('/get_update')
 def get_update():
-    # Browser sends session_id as a query parameter
+    # Retrieve the unique ID associated with the browser tab
     session_id = request.args.get('session_id')
     
     if not session_id or session_id not in sessions:
-        return jsonify({"messages": []}) # No active session found
+        return jsonify({"messages": []}) 
 
     session_data = sessions[session_id]
     outbox = session_data['outbox']
@@ -162,38 +164,36 @@ def get_update():
     
     messages = []
     
-    # --- Proactive Stat Update (Specific to this Player) ---
-    if player_object is not None:
+    # --- Stat Payload (Safe Lookup) ---
+    if player_object:
         try:
             stat_payload = {
                 'type': 'update_stats',
                 'payload': {
-                    'health': player_object.Health,
-                    'max_health': player_object.MaxHealth,
-                    # Safely get Heat stats (default to 100 if not set)
-                    'heat': getattr(player_object, 'Heat', 100), 
+                    'health': getattr(player_object, 'Health', 100),
+                    'max_health': getattr(player_object, 'MaxHealth', 100),
+                    'heat': getattr(player_object, 'Heat', 100),       # Winter Stat
                     'max_heat': getattr(player_object, 'MaxHeat', 100),
-                    'hunger': player_object.Hunger,
-                    'gold': player_object.gold,
-                    'day': player_object.Day,
-                    'time': f"{player_object.Time}:00",
-                    'location': player_object.current_town_name if player_object.invillage else "On the Trail",
-                    'difficulty': player_object.difficulty.capitalize()
+                    'hunger': getattr(player_object, 'Hunger', 0),
+                    'gold': getattr(player_object, 'gold', 0),
+                    'day': getattr(player_object, 'Day', 1),
+                    'time': f"{getattr(player_object, 'Time', 9)}:00",
+                    'location': player_object.current_town_name if getattr(player_object, 'invillage', True) else "On the Trail",
+                    'difficulty': getattr(player_object, 'difficulty', 'frontier').capitalize()
                 }
             }
             messages.append(stat_payload)
-        except Exception:
-            # If player object is in middle of init, just skip stats this tick
-            pass
+        except Exception as e:
+            original_print(f"Stat Error: {e}")
 
-    # Drain specific user's outbox
+    # --- Drain Message Queue ---
     while not outbox.empty():
         msg = outbox.get()
-        # Prevent duplicate stat updates if we just added one manually
+        # Filter duplicates for cleaner UI
         if msg.get("type") == "update_stats" and any(m.get("type") == "update_stats" for m in messages):
             continue
         messages.append(msg)
-        # If we hit an input request, stop draining so the browser handles it
+        # Don't buffer too many questions at once
         if msg.get("type") in ["ask_for_choice", "ask_for_text"]:
             break
             
@@ -206,13 +206,12 @@ def send_response():
     choice = data.get('choice')
 
     if session_id in sessions:
-        # Put the answer in THAT specific player's inbox
+        # Drop the answer into the specific player's inbox
         sessions[session_id]['inbox'].put(choice)
-        return jsonify({"status": "Response received"})
+        return jsonify({"status": "OK"})
     
-    return jsonify({"error": "Session not found"}), 404
+    return jsonify({"error": "Session invalid"}), 404
 
 if __name__ == '__main__':
-    print("Starting Multi-Session Flask server on http://localhost:5001")
-    # Debug=False is safer for threads
+    original_print(">>> Multiplayer Server Active on http://localhost:5001 <<<")
     app.run(host="0.0.0.0", port=5001, debug=False)
