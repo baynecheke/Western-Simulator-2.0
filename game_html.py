@@ -1,4 +1,4 @@
-# game_html.py - WINTER MULTIPLAYER VERSION
+# game_html.py - WINTER VERSION
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -99,6 +99,7 @@ HTML_CONTENT = """
         </section>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+            
             <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 bg-[#0f172a]">
                 <p class="text-slate-400">Connecting to server...</p>
             </div>
@@ -117,29 +118,25 @@ HTML_CONTENT = """
         const actionArea = document.getElementById('action-area');
         const actionTitle = document.getElementById('action-title');
         
-        // Stat Elements
+        // Stats
         const statLocation = document.getElementById('stat-location');
         const statDay = document.getElementById('stat-day');
         const statTime = document.getElementById('stat-time');
         const statDifficulty = document.getElementById('stat-difficulty');
         const statGold = document.getElementById('stat-gold');
+        
+        // Bars
         const statHealthText = document.getElementById('stat-health-text');
         const statHealthBar = document.getElementById('stat-health-bar');
+        
         const statHeatText = document.getElementById('stat-heat-text');
         const statHeatBar = document.getElementById('stat-heat-bar');
+        
         const statHungerText = document.getElementById('stat-hunger-text');
         const statHungerBar = document.getElementById('stat-hunger-bar');
         
         const soundEffects = {};
         let backgroundMusic = null;
-
-        // --- SESSION MANAGEMENT (The Key to Multiplayer) ---
-        let sessionId = localStorage.getItem('ws_session_id');
-        if (!sessionId) {
-            sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            localStorage.setItem('ws_session_id', sessionId);
-        }
-        console.log("Client Session ID:", sessionId);
 
         function loadAndPlaySound(src, loop = false) {
             try {
@@ -176,10 +173,7 @@ HTML_CONTENT = """
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        'choice': choice,
-                        'session_id': sessionId 
-                    })
+                    body: JSON.stringify({ 'choice': choice })
                 });
                 pollServer();
             } catch (error) { addMessage(`[Connection Error]: ${error.message}`); }
@@ -200,7 +194,6 @@ HTML_CONTENT = """
         }
         
         function updateStats(data) {
-            if (!data) return;
             statLocation.textContent = data.location;
             statDay.textContent = data.day;
             statTime.textContent = data.time;
@@ -212,7 +205,8 @@ HTML_CONTENT = """
             statHealthText.textContent = `${data.health} / ${data.max_health}`;
             statHealthBar.style.width = `${healthPercent}%`;
             
-            // Heat
+            // Heat (New!)
+            // Defaults to 100 if undefined
             const currentHeat = data.heat !== undefined ? data.heat : 100;
             const maxHeat = data.max_heat !== undefined ? data.max_heat : 100;
             const heatPercent = (currentHeat / maxHeat) * 100;
@@ -262,33 +256,25 @@ HTML_CONTENT = """
             if (isPolling) return; 
             isPolling = true;
             try {
-                // Pass the Session ID in the query params
-                const response = await fetch(`/get_update?session_id=${sessionId}`);
+                const response = await fetch('/get_update');
                 if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const data = await response.json();
                 if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
             } catch (error) {
+                addMessage(`[Connection Error] Lost connection to server. Retrying...`);
                 console.error("Poll error:", error);
             }
             isPolling = false;
         }
 
-        function startPolling() { 
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(pollServer, 1000); 
-        }
+        function startPolling() { pollInterval = setInterval(pollServer, 1000); }
         function stopPolling() { clearInterval(pollInterval); }
 
         async function initializeGame() {
             display.innerHTML = '';
             addMessage('Connecting to server...');
             try {
-                // Initialize the game session for this specific browser ID
-                await fetch('/start_game', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 'session_id': sessionId })
-                });
+                await fetch('/start_game', { method: 'POST' });
                 addMessage('Connected! Starting game...');
                 startPolling();
             } catch (error) { addMessage(`[Fatal Error] Could not connect to server: ${error.message}`); }
