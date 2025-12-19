@@ -138,6 +138,15 @@ HTML_CONTENT = """
         const soundEffects = {};
         let backgroundMusic = null;
 
+        // --- NEW: SESSION ID GENERATION ---
+        // Generates a unique ID for this browser tab so multiple people can play at once
+        let sessionId = localStorage.getItem('ws_session_id');
+        if (!sessionId) {
+            sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem('ws_session_id', sessionId);
+        }
+        console.log("Your Session ID:", sessionId);
+
         function loadAndPlaySound(src, loop = false) {
             try {
                 if (backgroundMusic && loop) {
@@ -170,10 +179,14 @@ HTML_CONTENT = """
             actionTitle.textContent = "Actions";
             actionArea.innerHTML = '<p class="text-slate-500">Waiting for server...</p>';
             try {
+                // --- NEW: Send Session ID with response ---
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 'choice': choice })
+                    body: JSON.stringify({ 
+                        'choice': choice,
+                        'session_id': sessionId 
+                    })
                 });
                 pollServer();
             } catch (error) { addMessage(`[Connection Error]: ${error.message}`); }
@@ -194,6 +207,7 @@ HTML_CONTENT = """
         }
         
         function updateStats(data) {
+            if (!data) return;
             statLocation.textContent = data.location;
             statDay.textContent = data.day;
             statTime.textContent = data.time;
@@ -256,25 +270,34 @@ HTML_CONTENT = """
             if (isPolling) return; 
             isPolling = true;
             try {
-                const response = await fetch('/get_update');
+                // --- NEW: Send Session ID in URL params for GET request ---
+                const response = await fetch(`/get_update?session_id=${sessionId}`);
                 if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const data = await response.json();
                 if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
             } catch (error) {
-                addMessage(`[Connection Error] Lost connection to server. Retrying...`);
                 console.error("Poll error:", error);
             }
             isPolling = false;
         }
 
-        function startPolling() { pollInterval = setInterval(pollServer, 1000); }
+        function startPolling() { 
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(pollServer, 1000); 
+        }
+        
         function stopPolling() { clearInterval(pollInterval); }
 
         async function initializeGame() {
             display.innerHTML = '';
             addMessage('Connecting to server...');
             try {
-                await fetch('/start_game', { method: 'POST' });
+                // --- NEW: Send Session ID when starting game ---
+                await fetch('/start_game', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 'session_id': sessionId })
+                });
                 addMessage('Connected! Starting game...');
                 startPolling();
             } catch (error) { addMessage(`[Fatal Error] Could not connect to server: ${error.message}`); }
