@@ -99,7 +99,6 @@ HTML_CONTENT = """
         </section>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-            
             <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 bg-[#0f172a]">
                 <p class="text-slate-400">Connecting to server...</p>
             </div>
@@ -118,7 +117,7 @@ HTML_CONTENT = """
         const actionArea = document.getElementById('action-area');
         const actionTitle = document.getElementById('action-title');
         
-        // Stats
+        // Stat Elements
         const statLocation = document.getElementById('stat-location');
         const statDay = document.getElementById('stat-day');
         const statTime = document.getElementById('stat-time');
@@ -194,6 +193,7 @@ HTML_CONTENT = """
         }
         
         function updateStats(data) {
+            if (!data) return;
             statLocation.textContent = data.location;
             statDay.textContent = data.day;
             statTime.textContent = data.time;
@@ -206,16 +206,18 @@ HTML_CONTENT = """
             statHealthBar.style.width = `${healthPercent}%`;
             
             // Heat (New!)
-            // Defaults to 100 if undefined
+            // Defaults to 100 if undefined, supports dynamic Max Heat
             const currentHeat = data.heat !== undefined ? data.heat : 100;
             const maxHeat = data.max_heat !== undefined ? data.max_heat : 100;
             const heatPercent = (currentHeat / maxHeat) * 100;
             statHeatText.textContent = `${currentHeat} / ${maxHeat}`;
             statHeatBar.style.width = `${heatPercent}%`;
 
-            // Hunger
-            const hungerPercent = (data.hunger / 3) * 100;
+            // Hunger (Updated to Scale of 10)
+            const maxHunger = 10; 
+            const hungerPercent = (data.hunger / maxHunger) * 100;
             statHungerText.textContent = data.hunger;
+            // Cap width at 100% just in case hunger exceeds 10 briefly
             statHungerBar.style.width = `${Math.min(hungerPercent, 100)}%`;
         }
 
@@ -261,13 +263,16 @@ HTML_CONTENT = """
                 const data = await response.json();
                 if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
             } catch (error) {
-                addMessage(`[Connection Error] Lost connection to server. Retrying...`);
+                // addMessage(`[Connection Error] Lost connection to server. Retrying...`);
                 console.error("Poll error:", error);
             }
             isPolling = false;
         }
 
-        function startPolling() { pollInterval = setInterval(pollServer, 1000); }
+        function startPolling() { 
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(pollServer, 1000); 
+        }
         function stopPolling() { clearInterval(pollInterval); }
 
         async function initializeGame() {

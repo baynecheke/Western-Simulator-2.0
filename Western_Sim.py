@@ -658,7 +658,7 @@ class Player:
             if player.Health <= 0:
                 time.sleep(2,)
                 player.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
-            player.Hunger = player.Hunger + 1
+            player.Hunger = player.Hunger + 2
             print("You feel hungrier...")
             time.sleep(2,)
             if player.Hunger >= 3:
@@ -931,13 +931,13 @@ class Player:
             if combat == False:
                 
                 if selected_item == "bread":
-                    self.Hunger = self.Hunger - 1
+                    self.Hunger = self.Hunger - 2
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
                     print(f"You eat some bread and reduce {1} hunger.")
                 elif selected_item == "salted pork":
-                    self.Hunger = max(0, self.Hunger - 2) # Reduces hunger by 2
+                    self.Hunger = self.Hunger - 4
                     self.Health = min(self.Health + 10, self.MaxHealth)
                     print("The salty meat is tough, but filling. -2 Hunger, +10 Health.")
                     self.itemsinventory[selected_item] -= 1
@@ -1149,16 +1149,6 @@ class Player:
                                 
             time.sleep(2,)
 
-    def hunger_check(self):
-        if self.Hunger >= 3:
-            return "You are ravenously hungry."
-        elif self.Hunger == 2:
-            return "You are quite hungry."
-        elif self.Hunger == 1:
-            return "You feel a bit hungry."
-        elif self.Hunger == 0:
-            return "You are well fed."
-
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
         print(f"Shadow skill: {self.shadow_skill}.")
@@ -1179,6 +1169,18 @@ class Player:
         print(self.hunger_check())
         print(f"Your health is {self.Health}.")
         self.AI_File.parse_choice(["Continue"], "Press Enter to continue:")
+
+    def hunger_check(self):
+            if self.Hunger >= 9:
+                return "You are starving to death."
+            elif self.Hunger >= 7:
+                return "You are ravenously hungry. You feel weak."
+            elif self.Hunger >= 4:
+                return "Your stomach is growling."
+            elif self.Hunger > 0:
+                return "You could eat."
+            else:
+                return "You are well fed."
 
     def TownJail(self):
         print("You walk into the town jail.")
@@ -2352,12 +2354,14 @@ class Player:
         print("You step out of your wagon and stretch.")
         time.sleep(2,)
         while self.Time < 21:
-            if self.Hunger == 3:
-                print("You feel ravenous. You need to eat something soon.")
-                if random.randint(1,3) == 1:
-                    print("You stumble and fall weakly to the ground.")
-                    print("You find the strength to get back up after half an hour.")
+            if self.Hunger >= 7:
+                print("You feel weak from hunger.")
+                if random.randint(1, 4) == 1: # Reduced chance to 25%
+                    print("You stumble from exhaustion.")
                     self.Time += 0.5
+                    self.Health -= 5
+                    if self.Health <= 0:
+                        self.Death("You have succumbed to exhaustion.")
                     continue
             self.DoAction()
             print()
