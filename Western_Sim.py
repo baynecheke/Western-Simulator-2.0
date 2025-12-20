@@ -1051,8 +1051,8 @@ class Player:
                     else:
                         print("You feel warm and ready for a fight. (+15 HP, +5 Dmg)")
 
-                self.itemsinventory[selected_item] -= 1
-                if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
 
                 elif selected_item == "steak":
                     self.Hunger = max(0, self.Hunger - 5)
