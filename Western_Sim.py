@@ -650,6 +650,10 @@ class Player:
             else:
                 player.change_music("game_theme.mp3", -1)
             player.RunDay()
+            if "drunk" in self.player_effects:
+                print("You suffer from the effects of alcohol, but it slowly wears off.")
+                self.Health -= 5
+                self.Speed += 1
             player.counter = 0
             player.Day += 1
             if player.Temporaryspdboost > 0:
@@ -903,6 +907,9 @@ class Player:
                 "pendant of recognition": "A memorandom of the vendetta ride. Grants +20 score at the end of the game.",
                 "winchester barrel": "Bring it to the blacksmith with a winchester stock to make a winchester rifle.",
                 "winchester stock": "Bring it to the blacksmith with a winchester barrel to make a winchester rifle.",
+                "whiskey": "Liquid courage. +15 HP, +5 Damage buff. Don't drink too much.",
+                "steak": "A large, fire-cooked steak. Huge meal. -5 Hunger, +30 Health.",
+                "bourbon roast": "Meat slow-cooked in whiskey. A king's meal. Fully Restores Health & Hunger.",
             }
 
             for item, qty in self.itemsinventory.items():
@@ -1030,6 +1037,37 @@ class Player:
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
 
+
+                elif selected_item == "whiskey":
+                    print("You take a long swig of the burning liquid.")
+                    self.Health = min(self.Health + 15, self.MaxHealth)
+                    self.damage_modifier += 5 # "Liquid Courage" buff for next fight
+                    self.player_effects.append("drunk")
+                    
+                    # Small chance to get "drunk" (slow)
+                    if random.randint(1, 10) == 1:
+                        print("You feel a bit woozy... -1 Speed.")
+                        self.Speed = max(1, self.Speed - 1)
+                    else:
+                        print("You feel warm and ready for a fight. (+15 HP, +5 Dmg)")
+
+                self.itemsinventory[selected_item] -= 1
+                if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
+
+                elif selected_item == "steak":
+                    self.Hunger = max(0, self.Hunger - 5)
+                    self.Health = min(self.Health + 30, self.MaxHealth)
+                    print("You devour the steak. It is delicious. (-5 Hunger, +30 Health)")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
+
+                elif selected_item == "bourbon roast":
+                    self.Hunger = 0
+                    self.Health = self.MaxHealth
+                    self.damage_modifier += 10 
+                    print("The flavor is incredible. You feel invincible! (Full Restore + Damage Buff)")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
                 else:
                     print(f"You can't use {selected_item} right now.")
     
@@ -2282,8 +2320,8 @@ class Player:
         
         # 1. Define Camp Options
         print("1. Build a Fire (Requires Firewood + Flint)")
-        print("2. Rest in Tent (Requires Canvas Tent)")
-        print("3. Cook Food")
+        print("2. Rest in Tent (Better if you have a Tent)")
+        print("3. Cook Food (requires Firewood + Flint + Meat)")
         print("4. Pack up and leave")
         
         choice = self.AI_File.parse_choice(["build fire", "rest", "cook", "leave"], "Camp Action:")
@@ -2304,6 +2342,21 @@ class Player:
                 # Small morale/health boost
                 self.Health = min(self.Health + 5, self.MaxHealth)
                 self.Time += 1
+            elif "firewood" in self.itemsinventory:
+                if random.randint(1, 2) == 1:
+                    print("You light a small fire with the wood.")
+                    self.itemsinventory["firewood"] -= 1
+                    if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                    if self.winter_mode:
+                        print("The warmth thaws your frozen limbs. Heat fully restored.")
+                        self.Heat = self.MaxHeat
+                        self.cold_penalty = 0
+                    # Small morale/health boost
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+
+                    self.Time += 1
+                else:
+                    print("You try to light the fire, but it fails. -5 health.")
             else:
                 print("You need 'Flint and Steel' AND 'Firewood' to build a fire.")
         
@@ -2314,35 +2367,91 @@ class Player:
                 print("You feel rested. +15 Health.")
                 
                 if self.winter_mode:
-                    self.Heat = min(self.Heat + 30, self.MaxHeat)
-                    print("You warm up slightly. +30 Heat.")
+                    self.Heat = min(self.Heat + 40, self.MaxHeat)
+                    print("You warm up slightly. +40 Heat.")
                     self.cold_penalty = 0
                     self.skip_freeze = True
                 self.Time += 1
             else:
-                print("You don't have a Canvas Tent.")
+                print("You curl up in your wagon.")
+                self.Health = min(self.Health + 5, self.MaxHealth)
+                print("You feel a bit better. +5 Health.")
+                if self.winter_mode:
+                    self.Heat = min(self.Heat + 15, self.MaxHeat)
+                    print("You warm up slightly. +15 Heat.")
+                    self.cold_penalty = 0
+                    self.skip_freeze = True
+                self.Time += 1
 
         elif choice == "cook":
             self.skip_freeze = True
-            # Allow converting raw meat to cooked meat if you have fire
+            
+            # Check for fire tools
             if "flint and steel" in self.itemsinventory and "firewood" in self.itemsinventory:
-                if "small meat" in self.itemsinventory or "medium meat" in self.itemsinventory:
-                    print("You cook your raw meat over a fire.")
-                    self.itemsinventory["firewood"] -= 1
-                    if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                print("\nYou light a fire. The flames crackle warmly.")
+                
+                # Consume 1 firewood for the cooking session
+                self.itemsinventory["firewood"] -= 1
+                if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                
+                # --- INTERACTIVE COOKING LOOP ---
+                cooking_session = True
+                while cooking_session:
+                    recipes = []
                     
-                    # Simple conversion: Remove raw, add salted pork (gameplay abstraction)
-                    if "small meat" in self.itemsinventory:
+                    # 1. Basic Recipes
+                    if "small meat" in self.itemsinventory: recipes.append("Grill Small Meat (-> Salted Pork)")
+                    if "medium meat" in self.itemsinventory: recipes.append("Grill Medium Meat (-> Salted Pork)")
+                    if "large meat" in self.itemsinventory: recipes.append("Seer Large Meat (-> Steak)")
+                    
+                    # 2. Combo Recipes
+                    if "large meat" in self.itemsinventory and "whiskey" in self.itemsinventory:
+                        recipes.append("Cook Bourbon Roast (Large Meat + Whiskey)")
+                    
+                    recipes.append("Stop Cooking")
+                    
+                    # Ask player
+                    print(f"\n--- Campfire Cooking (Firewood remaining: {self.itemsinventory.get('firewood', 0)}) ---")
+                    cook_choice = self.AI_File.parse_choice(recipes, "Select a recipe:")
+                    
+                    if cook_choice == "stop cooking":
+                        cooking_session = False
+                        print("You put out the fire.")
+                    
+                    # --- RECIPE LOGIC ---
+                    elif "small meat" in cook_choice:
                         self.itemsinventory["small meat"] -= 1
                         if self.itemsinventory["small meat"] <= 0: del self.itemsinventory["small meat"]
                         self.add_item("salted pork")
-                        print("You cooked Small Meat into Salted Pork!")
+                        print("You grilled the small meat into a decent meal.")
+                        
+                    elif "medium meat" in cook_choice:
+                        self.itemsinventory["medium meat"] -= 1
+                        if self.itemsinventory["medium meat"] <= 0: del self.itemsinventory["medium meat"]
+                        self.add_item("salted pork")
+                        self.add_item("salted pork")
+                        print("You grilled the medium meat into two rations.")
+
+                    elif "seer large meat" in cook_choice: # Matches the button text
+                        self.itemsinventory["large meat"] -= 1
+                        if self.itemsinventory["large meat"] <= 0: del self.itemsinventory["large meat"]
+                        self.add_item("steak")
+                        print("You sear the large meat into a juicy Steak.")
+
+                    elif "bourbon roast" in cook_choice:
+                        # Consume Meat
+                        self.itemsinventory["large meat"] -= 1
+                        if self.itemsinventory["large meat"] <= 0: del self.itemsinventory["large meat"]
+                        # Consume Whiskey
+                        self.itemsinventory["whiskey"] -= 1
+                        if self.itemsinventory["whiskey"] <= 0: del self.itemsinventory["whiskey"]
+                        
+                        self.add_item("bourbon roast")
+                        print("You slow-cook the meat in whiskey glaze. It smells heavenly.")
                     
-                    self.Time += 1
-                else:
-                    print("You have no raw meat to cook.")
+                self.Time += 1
             else:
-                print("You need fire supplies to cook.")
+                print("You need 'Flint and Steel' AND 'Firewood' to start a cooking fire.")
 
         else:
             print("You pack up and head back to the road.")
@@ -2392,7 +2501,8 @@ class Player:
                     self.cold_penalty = 0
                 else:
                     # 1. Calculate Drain Amount
-                    heat_drain = 15 # You lose 15 Heat per hour by default
+
+                    heat_drain = 10 # You lose 15 Heat per hour by default
                     
                     if "heavy coat" in self.itemsinventory:
                         heat_drain = 5 # Coat slows it down significantly
@@ -2404,13 +2514,14 @@ class Player:
                     if self.Heat <= 0:
                         self.Heat = 0
                         print(f"(!) HYPOTHERMIA. You are freezing to death. Heat: 0/{self.MaxHeat}")
-                        self.Health -= 5 # Massive damage
+                        self.Health -= 5
                         self.cold_penalty = 5 # Massive stat reduction
+                        self.Hunger += 0.25 # Shivering burns calories (Lowers food stat)
                         
                     elif self.Heat < 30:
                         print(f"(!) You are shivering violently. Heat: {self.Heat}/{self.MaxHeat}")
                         self.Health -= 2 # Chip damage
-                        self.Hunger += 0.25 # Shivering burns calories (Lowers food stat)
+                        self.Hunger += 0.1
                         self.cold_penalty = 2 # Moderate stat reduction
                     
                     else:
