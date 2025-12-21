@@ -559,20 +559,7 @@ class Player:
             
     def main_game_loop(self):
         global player # <-- FIX 1: Add this line
-        print("\nSelect a Season:")
-        print("1. Standard (Normal)")
-        print("2. The Long Winter (Hard Mode + Winter Events)")
-            
-        # This parses "1", "2", "standard", or "winter"
-        season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
-            
-        if season_choice == "winter":
-            self.winter_mode = True
-            print("You have chosen The Long Winter. Bundle up...")
-            # Optional: Force difficult setting if you want
-            # self.difficulty = 'survivalist' 
-        else:
-            self.winter_mode = False
+        
         # --- NEW CODE ---
         prompt = "Would you like to Start a New Game or Load a Save?"
         choices = ["Start New Game", "Load a Save"]
@@ -580,11 +567,24 @@ class Player:
         # This will show two buttons
         choice_str = self.AI_File.parse_choice(choices, prompt)
         # --- END NEW ---
-
         if choice_str == "load a save": # Note: parse_choice returns lowercase
             player = self # <-- FIX 2: Add this line
             player = Player.load_game() # This will still use text boxes (for now)
         else:
+            print("\nSelect a Season:")
+            print("1. Standard (Normal)")
+            print("2. The Long Winter (Hard Mode + Winter Events)")
+                
+            # This parses "1", "2", "standard", or "winter"
+            season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
+                
+            if season_choice == "winter":
+                self.winter_mode = True
+                print("You have chosen The Long Winter. Bundle up...")
+                # Optional: Force difficult setting if you want
+                # self.difficulty = 'survivalist' 
+            else:
+                self.winter_mode = False
             player = self # <-- FIX 3: Add this line
             # "Start New Game" path
             print("Would you like the instructions (Yes/No)?")
@@ -911,6 +911,7 @@ class Player:
                 "whiskey": "Liquid courage. +15 HP, +5 Damage buff. Don't drink too much.",
                 "steak": "A large, fire-cooked steak. Huge meal. -5 Hunger, +30 Health.",
                 "bourbon roast": "Meat slow-cooked in whiskey. A king's meal. Fully Restores Health & Hunger.",
+                "salted pork sandwich": "A hearty sandwich made with salted pork and bread. -2 Hunger, +15 Health.",
             }
 
             for item, qty in self.itemsinventory.items():
@@ -943,11 +944,20 @@ class Player:
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
-                    print(f"You eat some bread and reduce {1} hunger.")
+                    print(f"You eat some bread and reduce {2} hunger.")
+                
                 elif selected_item == "salted pork":
                     self.Hunger = self.Hunger - 4
-                    self.Health = min(self.Health + 10, self.MaxHealth)
-                    print("The salty meat is tough, but filling. -2 Hunger, +10 Health.")
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+                    print("The salty meat is tough, but filling. -4 Hunger, +5 Health.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+                
+                elif selected_item == "salted pork sandwich":
+                    self.Hunger = self.Hunger - 4
+                    self.Health = min(self.Health + 15, self.MaxHealth)
+                    print("The sandwich is hearty. -4 Hunger, +15 Health.")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
@@ -2451,6 +2461,8 @@ class Player:
                     # 2. Combo Recipes
                     if "large meat" in self.itemsinventory and "whiskey" in self.itemsinventory:
                         recipes.append("Cook Bourbon Roast (Large Meat + Whiskey)")
+                    if "bread" in self.itemsinventory and "salted pork" in self.itemsinventory:
+                        recipes.append("Cook Salted Pork Sandwich (Bread + Salted Pork)")
                     
                     recipes.append("Stop Cooking")
                     
@@ -2493,6 +2505,16 @@ class Player:
                         self.add_item("bourbon roast")
                         print("You slow-cook the meat in whiskey glaze. It smells heavenly.")
                     
+                    elif "salted pork sandwich" in cook_choice:
+                        # Consume Ingredients
+                        self.itemsinventory["bread"] -= 1
+                        if self.itemsinventory["bread"] <= 0: del self.itemsinventory["bread"]
+                        self.itemsinventory["salted pork"] -= 1
+                        if self.itemsinventory["salted pork"] <= 0: del self.itemsinventory["salted pork"]
+                        
+                        self.add_item("salted pork sandwich")
+                        print("You prepare a hearty Salted Pork Sandwich. It's filling.")
+                    
                 self.Time += 1
             else:
                 print("You need 'Flint and Steel' AND 'Firewood' to start a cooking fire.")
@@ -2522,7 +2544,7 @@ class Player:
             print()
             if self.Hunger < 0:
                 Heal_bonus = self.Hunger
-                Heal_bonus = Heal_bonus*10
+                Heal_bonus = Heal_bonus*2
                 self.Health -= Heal_bonus
                 self.Hunger = 0
             self.Time += 1
