@@ -670,7 +670,7 @@ class Player:
             if player.Hunger >= 10: 
                 print("You are starving! Your body is consuming itself.")
                 player.Hunger = 10
-                player.Health -= 15
+                player.Health -= 20
             elif player.Hunger >= 7:
                 print("You are very hungry. Find some food soon.")
                 player.Health -= 10
