@@ -77,6 +77,7 @@ class Player:
         self.rumors_collected = 0
         self.rumors_heard = []
         self.rebirth = False
+        self.tent_used_today = False
 
         #stuff
         self.score = 0
@@ -646,6 +647,7 @@ class Player:
 
 
         while not player.Health <= 0:
+            self.tent_used_today = False
             if player.invillage == True:
                 player.HostilityFunc()
                 player.change_music("Town.mp3", -1)
@@ -2399,8 +2401,7 @@ class Player:
                 heal = 20
                 heat = 50
                 print(f"You sleep deeply. +{heal} Health. +{heat} Heat.")
-                self.Health = min(self.Health + heal, self.MaxHealth)
-                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+
                 
             elif sleep_choice == "use small tent":
                 print("It takes some time to set up your Small Tent. +1 Hour.")
@@ -2409,16 +2410,14 @@ class Player:
                 heal = 10
                 heat = 30
                 print(f"You rest well. +{heal} Health. +{heat} Heat.")
-                self.Health = min(self.Health + heal, self.MaxHealth)
-                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+
                 
             elif sleep_choice == "use bedroll":
                 print("You unroll your Bedroll near the fire. It's better than the ground.")
                 heal = 5
                 heat = 15
                 print(f"You catch some sleep. +{heal} Health. +{heat} Heat.")
-                self.Health = min(self.Health + heal, self.MaxHealth)
-                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+
                 
             else:
                 print("You curl up in your wagon.")
@@ -2434,9 +2433,15 @@ class Player:
             if "wool blanket" in self.itemsinventory:
                 print("Your Wool Blanket provides extra warmth. (+5 Heat)")
                 if self.winter_mode: self.Heat = min(self.Heat + 5, self.MaxHeat)
-
+            
+            if not self.tent_used_today: 
+                self.Health = min(self.Health + heal, self.MaxHealth)
+            else:
+                print("You cannot heal twice with a tent today. (You can still regain heat if in winter)")
+            if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
             self.cold_penalty = 0
             self.Time += 1
+            self.tent_used_today = True
             
 
         elif choice == "cook":
