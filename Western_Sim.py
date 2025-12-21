@@ -228,7 +228,7 @@ class Player:
                 "theme": "earp",
                 "trigger": "town_event",
                 "description": "The Posse rides to Pete Spence's wood camp.",
-                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 1,
+                "condition": lambda p: "earp_vendetta" not in p.quests_done and p.Tquest == "None" and p.rumors.get("earp_rumor", 0) == 1,
                 "function": "encounter_earp_stage1"
             },
 
@@ -1279,6 +1279,7 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
+                "earp_vendetta": "I don't tell anybody this, but go to the saloon, Wyatt Earp is looking for help in the saloon.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"The sheriff murmurs: \"{rumor}\"")
@@ -1287,9 +1288,7 @@ class Player:
                 # Example: trigger a quest after hearing a rumor 2 times
                 if self.rumors[topic] == 2:
                     if topic == "earp_vendetta":
-                        print("I don't tell anybody this, but go to the saloon, Wyatt Earp is looking for help.")
-                        self.Tquest = "earp_vendetta"
-                        self.set_flag("earp_vendetta", "stage", 0) 
+                        self.rumors["earp_rumor"] = 1 # Set the flag
                         print("\n[Quest Update] You can now approach Wyatt Earp in the Saloon.")
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
                     print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
@@ -1759,7 +1758,8 @@ class Player:
             if self.Tquest == "None" and "earp_vendetta" not in self.quests_done:
                 self.encounter_earp_intro()
             else:
-                print("You decline and step aside.")
+                # Just flavor text if you already did it or have another quest
+                print("The saloon is rowdy tonight.")
 
         elif roll == 7 or roll == 8:
             self.encounter_iron_intro()
@@ -2197,9 +2197,8 @@ class Player:
                 # Instead of starting the quest, we just give the "Key" to unlock the button
                 self.rumors["railroad_job"] = 1
             elif roll <= 6:
-                self.Tquest = "earp_vendetta"
-                self.set_flag("earp_vendetta", "stage", 0) 
-                print("\nYou hear a rumor about a vendetta. You can now approach Wyatt Earp in the Saloon.")
+                print("\nYou hear whispers of a vendetta. Wyatt Earp is looking for brave souls in the Saloon.")
+                self.rumors["earp_rumor"] = 1 # Set the flag
 
             else:
                 # Fallback: Just a quiet day
