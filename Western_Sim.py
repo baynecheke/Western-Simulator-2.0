@@ -143,7 +143,7 @@ class Player:
                 "theme": "railroad",
                 "trigger": "saloon",  # This appears as a button in the Saloon
                 "description": "Talk to Railroad Men (Start Quest)",
-                "condition": lambda p: "iron_tracks" not in p.quests_done and p.Tquest == "None",
+                "condition": lambda p: "iron_tracks" not in p.quests_done and p.Tquest == "None" and p.rumors.get("railroad_job", 0) == 1,
                 "function": "encounter_iron_intro"
             },
             {
@@ -1674,7 +1674,8 @@ class Player:
             
             # --- 2. Dynamic Quest Wiring ---
             # Ask the database: "Are there any buttons for the Saloon right now?"
-            quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
+            if not self.quest_today:
+                quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
             quest_map = {}
             
             # If we got a list of quests back, add them as buttons
@@ -1784,6 +1785,7 @@ class Player:
                     rumor_topics = {
                     "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                     "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    "railroad_job": "The Railroad Foreman is in the back. He's looking for hired guns.",
                     }
                     # Fix: Initialize topic and rumor properly before use
                     topic, rumor = random.choice(list(rumor_topics.items()))
@@ -2086,7 +2088,8 @@ class Player:
     def LeaveTown(self):
         # 1. Run standard triggers (like Iron Tracks Stage 2)
         # We assume these don't block leaving, they just play a scene.
-        self.process_quest_triggers("leave_town", is_menu_option=False)
+        if not self.quest_today:
+            self.process_quest_triggers("leave_town", is_menu_option=False)
 
         # 2. Earp Vendetta Interception
         # Check if we are on Stage 4 OR if we deferred the fight earlier
@@ -2189,10 +2192,10 @@ class Player:
                 
             # 30% chance to hear the Iron Tracks rumor (Hint)
             elif roll <= 4 and "iron_tracks" not in self.quests_done:
-                # We don't force start this because the trigger is in the Saloon
                 print("\n[Rumor] You see a new poster: 'Railroad Hiring - See Foreman at Saloon'.")
-                self.Tquest = "iron_tracks"
-                self.set_flag("iron_tracks", "stage", 0) 
+                # CHANGE THESE LINES:
+                # Instead of starting the quest, we just give the "Key" to unlock the button
+                self.rumors["railroad_job"] = 1
             elif roll <= 6:
                 self.Tquest = "earp_vendetta"
                 self.set_flag("earp_vendetta", "stage", 0) 
@@ -2227,8 +2230,8 @@ class Player:
             print("Wyatt Earp nods at you as you enter town.")
             print("'Ready to finish this?' he asks.")
             print("'I will be at the saloon when you are ready.'")
-
-        event_happened = self.process_quest_triggers("arrive_town", is_menu_option=False)
+        if not self.quest_today:
+            self.process_quest_triggers("arrive_town", is_menu_option=False)
 
             
         self.town_encounter()
@@ -3120,6 +3123,7 @@ class Player:
             self.town_defense_outcome = "refused"
         time.sleep(2)
         self.Tquest = "defend_town"
+        self.quest_today = True
 
     def encounter_town_part2(self):
         if self.town_defense_outcome is None:
@@ -3159,7 +3163,7 @@ class Player:
             print("The townspeople fear and hate you.")
             self.gold += 25
             self.Hostility += 2
-
+        self.quest_today = True
         time.sleep(2)
 
     def encounter_town_part3(self):
@@ -3220,7 +3224,7 @@ class Player:
             print("You ride away, leaving the town to its fate.")
         self.Tquest = "None"
         self.quests_done.append("defend_town")
-
+        self.quest_today = True
         time.sleep(2)
 
     def wandering_trader(self):
@@ -3803,6 +3807,7 @@ class Player:
         else:
             print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
             self.Tquest = "None"
+        self.quest_today = True
 
     def encounter_earp_stage1(self):
         if self.Health < 90:
@@ -3845,6 +3850,7 @@ class Player:
             self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
         self.set_flag("earp_vendetta", "stage", 2)
+        self.quest_today = True
 
     def encounter_earp_stage2(self):
         if self.Health < 90:
@@ -3876,6 +3882,7 @@ class Player:
             self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
         self.set_flag("earp_vendetta", "stage", 3)
+        self.quest_today = True
 
     def encounter_earp_stage3(self):
         print("The posse learns the Clanton brothers are nearby.")
@@ -3926,7 +3933,7 @@ class Player:
             print("You abandon the vendetta. The posse brands you a coward.")
             self.Hostility += 1
             self.Tquest = "None"
-
+        self.quest_today = True
         self.set_flag("earp_vendetta", "stage", 4)
 
     def encounter_earp_stage4(self):
@@ -3998,6 +4005,7 @@ class Player:
             print("'You have done well today,' Wyatt says with a grin.")
             print("'Use this badge and the posse will help you once more if needed.'")
         self.quests_done.append("earp_vendetta")
+        self.quest_today = True
 
     def encounter_iron_intro(self):
         if "iron_tracks" in self.quests_done:
@@ -4019,6 +4027,7 @@ class Player:
             print("You shake your head. The railroad men mutter that you're missing an opportunity.")
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage1(self):
         print("The railroad foreman storms into town.")
@@ -4063,6 +4072,7 @@ class Player:
             self.set_flag("iron_tracks", "bonus", current_bonus - 2)
         self.set_flag("iron_tracks", "stage", 2)
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage2(self):
         print("Night falls. You hear shouting at the new train depot!")
@@ -4097,6 +4107,7 @@ class Player:
             self.Hostility += 1
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage3(self):
         bonus_used = False
@@ -4323,6 +4334,7 @@ class Player:
             self.Hostility += 2
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage4(self):
         if self.Health < 90:
@@ -4350,6 +4362,7 @@ class Player:
             self.Hostility += 2
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage5(self):
         if self.Health < 90:
@@ -4394,6 +4407,7 @@ class Player:
         self.Tquest = "None"
         self.set_flag("iron_tracks", "stage", 0)
         self.quests_done.append("iron_tracks")
+        self.quest_today = True
 
     def coyote_camp_quest(self):
         print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
@@ -4404,8 +4418,6 @@ class Player:
             print("You defeat the bandits and find some loot.")
             self.loot_drop("gold nugget")
             self.loot_drop("pistol_ammo")
-
-# In Western_Sim.py, as a new method in the Player class
 
     def run_final_mission(self):
         print("\nYou arrive at Devil's Canyon. The river roars below.")
@@ -4494,8 +4506,6 @@ class Player:
             
             # --- Part 3: The Final Minigame ---
             self.coffee_mill_showdown() # Call the final minigame function
-    
-# In Western_Sim.py, as another new method in the Player class
 
     def coffee_mill_showdown(self):
         self.change_music("The Last Stand.mp3", -1)
@@ -4655,8 +4665,6 @@ class Player:
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         print("\n--- THANKS FOR PLAYING! ---")
         exit()
-
-    #Generic Game Stuff
 
     def change_music(self, filename, loop):
         self.AI_File.change_music(filename, loop)
