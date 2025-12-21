@@ -1672,7 +1672,9 @@ class Player:
                 "Talk to the patrons",
                 "Leave the bar"
             ]
-            
+            quest_options = None
+            if not self.quest_today:
+                quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
             # --- 2. Dynamic Quest Wiring ---
             # Ask the database: "Are there any buttons for the Saloon right now?"
             if not self.quest_today:
