@@ -453,7 +453,8 @@ class Player:
             player.quest_flags = save_data.get("quest_flags", {})
             player.Heat = save_data.get("Heat", 100)
             player.MaxHeat = save_data.get("MaxHeat", 100)
-            player.cold_penalty = save_data.get("cold_penalty", 0)
+            player.cold_penalty = save_data.get("cold_penalty", 0),
+            player.winter_mode = save_data.get("winter_mode", False),
 
             # Compatibility Check
             if "iron_tracks" not in player.quest_flags:
@@ -523,7 +524,8 @@ class Player:
                 "quest_flags": self.quest_flags,
                 "Heat": self.Heat,
                 "MaxHeat": self.MaxHeat,
-                "cold_penalty": self.cold_penalty
+                "cold_penalty": self.cold_penalty,
+                "winter_mode": self.winter_mode,
             }, file)
         print(f"Game saved successfully to 'save_{self.save_name}.json'.")
 # In Western_Sim.py
@@ -665,14 +667,13 @@ class Player:
             player.Hunger = player.Hunger + 2
             print("You feel hungrier...")
             time.sleep(2,)
-            if player.Hunger >= 3:
-                print("You stagger, feeling the effects of your ravenous hunger.")
-                hunger_damage = player.Hunger*5
-                lost_health = hunger_damage
-                player.Health -= lost_health
-                print(f"You lost {lost_health} health of hunger.")
-                if player.Health <= 0:
-                    player.Death("You have succumbed to starvation in the unforgiving wild west.")
+            if player.Hunger >= 10: 
+                print("You are starving! Your body is consuming itself.")
+                player.Hunger = 10
+                player.Health -= 15
+            elif player.Hunger >= 7:
+                print("You are very hungry. Find some food soon.")
+                player.Health -= 10
                 
             if player.poisoned > 0:
                 print("You remain poisoned, feeling weak and faint.")
@@ -2240,7 +2241,10 @@ class Player:
             'flint and steel': ShopItem('flint and steel', 15, 1), # Reusable fire starter
             'firewood': ShopItem('firewood', 2, 20),        # Fuel
             'wool blanket': ShopItem('wool blanket', 25, 1), # Passive heat drain reduction
-            'canvas tent': ShopItem('canvas tent', 60, 1),   # Better night healing
+            'bedroll': ShopItem('bedroll', 15, 1), 
+            'small tent': ShopItem('small tent', 40, 1),
+            'wall tent': ShopItem('wall tent', 100, 1),      
+            'wool blanket': ShopItem('wool blanket', 25, 2),
         }
         if self.winter_mode:
             general_inventory['heavy coat'] = ShopItem('heavy coat', 50, 5)
@@ -2272,11 +2276,13 @@ class Player:
         self.change_music("stop", 0)
         self.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
+        
         time.sleep(2,)
         print(death_cause)
         if self.rebirth == True:
             print("You have already respawned once.")
             print("You feel your life slipping away, and you know this is the end.")
+            self.score = 0
         else:
             print("Your stats:")
             print(f"Days survived: {self.Day}")
@@ -2288,8 +2294,8 @@ class Player:
             self.Statcheck()
             
             # 2. Replace the yes/no prompt
-            print("You will no longer track score.")
             prompt = "You have come so far, would you like to respawn at your current position?"
+            print("You will no longer track score.")
             choice = self.AI_File.parse_YN(prompt)
             if choice == "yes":
                 self.lose_random_item(2)
@@ -2297,6 +2303,7 @@ class Player:
                 print("You feel a strange sensation, as if you are being pulled back to life...")
                 self.Health = self.MaxHealth
                 self.rebirth = True
+                self.score = 0
                 return
  
 
@@ -2361,17 +2368,46 @@ class Player:
                 print("You need 'Flint and Steel' AND 'Firewood' to build a fire.")
         
         elif choice == "rest":
-            if "canvas tent" in self.itemsinventory:
-                print("You crawl into your sturdy tent for a quick nap.")
-                self.Health = min(self.Health + 15, self.MaxHealth)
-                print("You feel rested. +15 Health.")
+            self.skip_freeze = True
+            sleep_options = ["sleep in wagon"] # Always available
+            
+            if "bedroll" in self.itemsinventory:
+                sleep_options.append("use bedroll")
+            if "small tent" in self.itemsinventory:
+                sleep_options.append("use small tent")
+            if "wall tent" in self.itemsinventory:
+                sleep_options.append("use wall tent")
+            sleep_choice = self.AI_File.parse_choice(sleep_options, "How do you want to sleep?")
+            # --- TIER CHECK ---
+            # Check from Best -> Worst
+            if sleep_choice == "use wall tent":
+                print("It takes some time to set up your Wall Tent. +2 Hours.")
+                self.Time += 2
+                print("You enter your spacious Wall Tent. It feels like a home away from home.")
+                heal = 20
+                heat = 50
+                print(f"You sleep deeply. +{heal} Health. +{heat} Heat.")
+                self.Health = min(self.Health + heal, self.MaxHealth)
+                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
                 
-                if self.winter_mode:
-                    self.Heat = min(self.Heat + 40, self.MaxHeat)
-                    print("You warm up slightly. +40 Heat.")
-                    self.cold_penalty = 0
-                    self.skip_freeze = True
+            elif sleep_choice == "use small tent":
+                print("It takes some time to set up your Small Tent. +1 Hour.")
                 self.Time += 1
+                print("You crawl into your Small Tent. It blocks the wind effectively.")
+                heal = 10
+                heat = 30
+                print(f"You rest well. +{heal} Health. +{heat} Heat.")
+                self.Health = min(self.Health + heal, self.MaxHealth)
+                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+                
+            elif sleep_choice == "use bedroll":
+                print("You unroll your Bedroll near the fire. It's better than the ground.")
+                heal = 5
+                heat = 15
+                print(f"You catch some sleep. +{heal} Health. +{heat} Heat.")
+                self.Health = min(self.Health + heal, self.MaxHealth)
+                if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+                
             else:
                 print("You curl up in your wagon.")
                 self.Health = min(self.Health + 5, self.MaxHealth)
@@ -2381,7 +2417,15 @@ class Player:
                     print("You warm up slightly. +15 Heat.")
                     self.cold_penalty = 0
                     self.skip_freeze = True
-                self.Time += 1
+            
+            # Apply Blanket Bonus (Stacks with anything)
+            if "wool blanket" in self.itemsinventory:
+                print("Your Wool Blanket provides extra warmth. (+5 Heat)")
+                if self.winter_mode: self.Heat = min(self.Heat + 5, self.MaxHeat)
+
+            self.cold_penalty = 0
+            self.Time += 1
+            
 
         elif choice == "cook":
             self.skip_freeze = True
@@ -2455,6 +2499,7 @@ class Player:
 
         else:
             print("You pack up and head back to the road.")
+        time.sleep(3,)
 
 
     #RunDay
@@ -2473,6 +2518,7 @@ class Player:
                         self.Death("You have succumbed to exhaustion.")
                     continue
             self.DoAction()
+            time.sleep(1,)
             print()
             if self.Hunger < 0:
                 Heal_bonus = self.Hunger
