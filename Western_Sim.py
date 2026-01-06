@@ -136,7 +136,7 @@ class Player:
                 "sawed-off shotgun"
             ]
         }
-        self.quest_flags = {}
+
         self.QUEST_DATABASE = [
             # --- IRON TRACKS ---
             {
@@ -261,6 +261,15 @@ class Player:
                 "description": "The final showdown with Curly Bill Brocius at Iron Springs.",
                 "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 4,
                 "function": "encounter_earp_stage4"
+            },
+            {
+                "id": "warlord_finale",
+                "theme": "finale",
+                "trigger": "arrive_town",  # Triggers when you enter a town
+                "description": "A US Marshal approaches you with an urgent mission.",
+                # Condition: You must have survived at least 20 days and have no active quest
+                "condition": lambda p: p.Day >= 20 and p.Tquest == "None", 
+                "function": "run_final_mission"
             }
             ]
 
@@ -313,7 +322,7 @@ class Player:
         self.town_actions = [
             "town jail", "doctor's office", "general store", "gunsmith's shop", 
             "bank", "saloon", "talk townspeople", "trading post", 
-            "blacksmith shop", "leave town"
+            "blacksmith shop", "leave town", "DEBUG: Set Day 20"
         ]
         
         # Actions only available WHILE traveling
@@ -454,8 +463,8 @@ class Player:
             player.quest_flags = save_data.get("quest_flags", {})
             player.Heat = save_data.get("Heat", 100)
             player.MaxHeat = save_data.get("MaxHeat", 100)
-            player.cold_penalty = save_data.get("cold_penalty", 0),
-            player.winter_mode = save_data.get("winter_mode", False),
+            player.cold_penalty = save_data.get("cold_penalty", 0)
+            player.winter_mode = save_data.get("winter_mode", False)
 
             # Compatibility Check
             if "iron_tracks" not in player.quest_flags:
@@ -869,6 +878,9 @@ class Player:
                 self.Explore()
             case "make camp":
                 self.MakeCamp()
+            case "DEBUG: Set Day 20": # <-- ADD THIS BLOCK
+                self.Day = 20
+                print("--- CHEAT ACTIVATED: Day set to 20 ---")
             case _:
                 print("That action is not currently available.")
 
