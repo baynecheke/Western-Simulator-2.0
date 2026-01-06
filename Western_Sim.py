@@ -63,7 +63,7 @@ class Player:
         self.quest_flags = {
             "iron_tracks": {"stage": 0, "bonus": 0},
             "earp_vendetta": {"stage": 0, "bonus": 0},
-            "defend_town": {"outcome": None, "bonus": 0} 
+            "defend_town": {"outcome": None, "aftermath": None, "final": None, "bonus": 0}
         }
         self.Heat = 100
         self.MaxHeat = 100
@@ -3139,6 +3139,7 @@ class Player:
         else:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
+            self.set_flag("defend_town", "outcome", self.town_defense_outcome)
         time.sleep(2)
         self.Tquest = "defend_town"
         self.quest_today = True
@@ -3181,6 +3182,7 @@ class Player:
             print("The townspeople fear and hate you.")
             self.gold += 25
             self.Hostility += 2
+        self.set_flag("defend_town", "aftermath", self.town_aftermath_outcome)
         self.quest_today = True
         time.sleep(2)
 
