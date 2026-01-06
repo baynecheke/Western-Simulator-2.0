@@ -894,6 +894,10 @@ class Player:
                 self.quests_done.append("defend_town")
                 self.Day = 20
                 print("--- CHEAT ACTIVATED: Day set to 20 ---")
+                self.loot_drop("winchester rifle")
+                self.loot_drop("ammo cartridge")
+                self.loot_drop("ammo cartridge")
+                self.loot_drop("bandage")
                 self.ArriveTown()
             case _:
                 print("That action is not currently available.")
