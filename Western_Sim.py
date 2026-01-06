@@ -891,8 +891,10 @@ class Player:
             case "make camp":
                 self.MakeCamp()
             case "DEBUG: Set Day 20": # <-- ADD THIS BLOCK
+                self.quests_done.append("defend_town")
                 self.Day = 20
                 print("--- CHEAT ACTIVATED: Day set to 20 ---")
+                self.ArriveTown()
             case _:
                 print("That action is not currently available.")
 
