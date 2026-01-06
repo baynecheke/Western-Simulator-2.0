@@ -268,7 +268,12 @@ class Player:
                 "trigger": "arrive_town",  # Triggers when you enter a town
                 "description": "A US Marshal approaches you with an urgent mission.",
                 # Condition: You must have survived at least 20 days and have no active quest
-                "condition": lambda p: p.Day >= 20 and p.Tquest == "None", 
+                "condition": lambda p: (
+                    p.Day >= 20
+                    and p.Tquest == "None"
+                    and any(q in p.quests_done for q in ("iron_tracks", "earp_vendetta", "defend_town"))
+                ),
+
                 "function": "run_final_mission"
             }
             ]
@@ -439,9 +444,9 @@ class Player:
             player.travel_bonus = save_data.get("travel_bonus", 0)
             player.trade_bonus = save_data.get("trade_bonus", 0)
             player.caravan = save_data.get("caravan", [])
-            player.town_defense_outcome = save_data.get("defense_outcome", False)
-            player.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
-            player.town_final_outcome = save_data.get("final_outcome", False)
+            player.town_defense_outcome = save_data.get("defense_outcome", None)
+            player.town_aftermath_outcome = save_data.get("aftermath_outcome", None)
+            player.town_final_outcome = save_data.get("final_outcome", None)
             player.boots_used = save_data.get("boots", False)
             player.diary_entries = save_data.get("diary_entries", [])
             player.difficulty = save_data.get("difficulty", "frontier")
@@ -471,6 +476,13 @@ class Player:
                 player.quest_flags["iron_tracks"] = {
                     "stage": save_data.get("iron_stage", 0),
                     "bonus": save_data.get("iron_bonus", 0)
+                }
+            if "defend_town" not in player.quest_flags:
+                player.quest_flags["defend_town"] = {
+                    "outcome": player.town_defense_outcome,
+                    "aftermath": player.town_aftermath_outcome,
+                    "final": player.town_final_outcome,
+                    "bonus": 0
                 }
 
             # Metadata
@@ -1777,9 +1789,9 @@ class Player:
                 # Just flavor text if you already did it or have another quest
                 print("The saloon is rowdy tonight.")
 
-        elif roll == 7 or roll == 8:
-            self.encounter_iron_intro()
-
+        elif roll == 7:
+            if self.Tquest == "None" and "iron_tracks" not in self.quests_done:
+                self.encounter_iron_intro()
 
         else:
             print("Lot's of people gather around the saloon's door and inside.")
@@ -3139,7 +3151,7 @@ class Player:
         else:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
-            self.set_flag("defend_town", "outcome", self.town_defense_outcome)
+        self.set_flag("defend_town", "outcome", self.town_defense_outcome)
         time.sleep(2)
         self.Tquest = "defend_town"
         self.quest_today = True
@@ -3242,6 +3254,7 @@ class Player:
         else:
             self.town_final_outcome = "abandoned"
             print("You ride away, leaving the town to its fate.")
+        self.set_flag("defend_town", "final", self.town_final_outcome)
         self.Tquest = "None"
         self.quests_done.append("defend_town")
         self.quest_today = True
