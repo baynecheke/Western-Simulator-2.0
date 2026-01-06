@@ -327,7 +327,7 @@ class Player:
         self.town_actions = [
             "town jail", "doctor's office", "general store", "gunsmith's shop", 
             "bank", "saloon", "talk townspeople", "trading post", 
-            "blacksmith shop", "leave town", "DEBUG: Set Day 20"
+            "blacksmith shop", "leave town"
         ]
         
         # Actions only available WHILE traveling
@@ -890,15 +890,7 @@ class Player:
                 self.Explore()
             case "make camp":
                 self.MakeCamp()
-            case "DEBUG: Set Day 20": # <-- ADD THIS BLOCK
-                self.quests_done.append("defend_town")
-                self.Day = 20
-                print("--- CHEAT ACTIVATED: Day set to 20 ---")
-                self.loot_drop("winchester rifle")
-                self.loot_drop("ammo cartridge")
-                self.loot_drop("ammo cartridge")
-                self.loot_drop("bandage")
-                self.ArriveTown()
+
             case _:
                 print("That action is not currently available.")
 
