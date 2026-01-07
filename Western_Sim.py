@@ -270,7 +270,7 @@ class Player:
                 "description": "A US Marshal approaches you with an urgent mission.",
                 # Condition: You must have survived at least 20 days and have no active quest
                 "condition": lambda p: (
-                    p.Day >= 20
+                    p.Day >= 10
                     and p.Tquest == "None"
                     and any(q in p.quests_done for q in ("iron_tracks", "earp_vendetta", "defend_town"))
                 ),
@@ -1323,9 +1323,9 @@ class Player:
                         self.rumors["earp_rumor"] = 1 # Set the flag
                         print("\n[Quest Update] You can now approach Wyatt Earp in the Saloon.")
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
+                    print("Would you like to accept this quest? (yes/no)")
                     if self.AI_File.parse_YN(": ") == "yes":
-                        self.Tquest = topic
+                        self.quest.append(topic)
                         print(f"You have accepted the quest: {topic.replace('_',' ').capitalize()}!")
                     else:
                         print("You declined the quest for now.")
