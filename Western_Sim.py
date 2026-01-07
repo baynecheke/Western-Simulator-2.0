@@ -60,6 +60,7 @@ class Player:
         self.event = []
         self.number_of_towns_visited = 0
         self.town_event_occurred = False
+        self.town_encounter_available = False
         self.quest_flags = {
             "iron_tracks": {"stage": 0, "bonus": 0},
             "earp_vendetta": {"stage": 0, "bonus": 0},
@@ -97,8 +98,8 @@ class Player:
         self.travelspeed = 3 + (self.trail_skill - 3) // 2
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
-        self.enemy_effects = []
-        self.player_effects = []
+        self.enemy_effects = {}
+        self.player_effects = {}
         self.TownUpgrades = {
             "general store": {'level':1},
             "gunsmith": {'level':1},
@@ -484,6 +485,7 @@ class Player:
                     "final": player.town_final_outcome,
                     "bonus": 0
                 }
+            player.normalize_effects()
 
             # Metadata
             player.player_name = save_data.get("player_name", "default")
@@ -675,10 +677,11 @@ class Player:
             else:
                 player.change_music("game_theme.mp3", -1)
             player.RunDay()
-            if "drunk" in self.player_effects:
+            if self.has_effect("drunk"):
                 print("You suffer from the effects of alcohol, but it slowly wears off.")
                 self.Health -= 5
                 self.Speed += 1
+            self.tick_effects()
             player.counter = 0
             player.Day += 1
             if player.Temporaryspdboost > 0:
@@ -730,7 +733,10 @@ class Player:
         """
         if self.invillage:
             # In town: Show town actions + universal actions
-            self.possibleactions = self.town_actions + self.universal_actions
+            actions = list(self.town_actions)
+            if self.town_encounter_available:
+                actions.insert(0, "town encounter")
+            self.possibleactions = actions + self.universal_actions
         else:
             # Traveling: Show travel actions + universal actions
             self.possibleactions = self.travel_actions + self.universal_actions
@@ -880,6 +886,8 @@ class Player:
                 self.TradingPost()
             case "blacksmith shop":
                 self.Blacksmith()
+            case "town encounter":
+                self.town_encounter()
             case "leave town":
                 self.LeaveTown()
             case "use item":
@@ -1077,7 +1085,7 @@ class Player:
                     print("You take a long swig of the burning liquid.")
                     self.Health = min(self.Health + 15, self.MaxHealth)
                     self.damage_modifier += 5 # "Liquid Courage" buff for next fight
-                    self.player_effects.append("drunk")
+                    self.add_effect("drunk", duration=1)
                     
                     # Small chance to get "drunk" (slow)
                     if random.randint(1, 10) == 1:
@@ -1126,7 +1134,7 @@ class Player:
                 elif selected_item == "whetstone":
                     print("You run the whetstone along your melee weapon, sharpening it to a razor edge.")
                     print("Your next melee attack will deal extra damage.")
-                    self.player_effects.append("sharpened_blade")
+                    self.add_effect("sharpened_blade")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
@@ -1155,8 +1163,8 @@ class Player:
                     if combat and enemy_combatant and enemy_combatant.get("type") == "pack":
                         print(f"You used the fire cracker! The {enemy_name}'s health is halved!")
                         print(f"They are much more disorganized.")
-                        self.enemy_effects.append("stun")
-                        self.enemy_effects.append("hphalf")
+                        self.add_effect("stun", target="enemy")
+                        self.add_effect("hphalf", target="enemy")
                         time.sleep(2,)
                         self.itemsinventory[selected_item] -= 1
                         if self.itemsinventory[selected_item] <= 0:
@@ -1201,7 +1209,7 @@ class Player:
 
                 elif selected_item == "flashbang":
                     print("You throw the stun bomb! It explodes in a flash and bang!")
-                    self.enemy_effects.append("stun")
+                    self.add_effect("stun", target="enemy")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
@@ -1209,13 +1217,13 @@ class Player:
 
                 elif selected_item == "field dressing kit":
                     print("You quickly apply a field dressing, bracing for the next attack.")
-                    self.player_effects.append("half_incoming_damage")
+                    self.add_effect("half_incoming_damage")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
                 elif selected_item == "vendetta badge":
                     print("\nYou hold the badge high. You hear the thunder of hooves and a volley of gunfire rings out!")
-                    self.player_effects.append("posse_help")
+                    self.add_effect("posse_help")
                 else:
                     print(f"You can't use {selected_item} right now.")
                     time.sleep(2,)
@@ -2207,6 +2215,8 @@ class Player:
         Handles daily events in town.
         Prioritizes active quest progression over random new quests.
         """
+        self.town_encounter_available = False
+        self.update_actions()
         if self.Tquest == "None":
             roll = random.randint(1, 10)
             
@@ -2258,8 +2268,8 @@ class Player:
         if not self.quest_today:
             self.process_quest_triggers("arrive_town", is_menu_option=False)
 
-            
-        self.town_encounter()
+        self.town_encounter_available = (self.Tquest == "None")
+        self.update_actions()
 
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
@@ -2685,23 +2695,14 @@ class Player:
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
 
-        if self.Tquest == "earp_vendetta" and not self.quest_today:
-            random_roll = random.randint(1, 10)
-            if random_roll <= 5:
-                if self.get_flag("earp_vendetta", "stage", 0) == 1:
-                    self.quest_today = True
-                    self.encounter_earp_stage1()
-                    return 
-                elif self.get_flag("earp_vendetta", "stage", 0) == 2:
-                    self.quest_today = True
-                    self.encounter_earp_stage2()
-                    return 
-                elif self.get_flag("earp_vendetta", "stage", 0) == 3:
-                    self.quest_today = True
-                    self.encounter_earp_stage3()
-                    return 
-                    
-            # --- Rumor quest handler ---
+
+        # --- On-the-trail quest handler (random chance) ---
+        if not self.quest_today and random.randint(1, 4) == 1:
+            if self.process_quest_triggers("on_the_trail", is_menu_option=False):
+                self.quest_today = True
+                return
+
+        # --- Rumor quest handler ---
         if self.quest_today == False:
             if self.quest and random.randint(1,2) == 1:
                 print("You remember a rumor you heard in town.")
@@ -3403,7 +3404,7 @@ class Player:
         if choice not in ["1", "2"]:
             print("Invalid choice. You hesitate and are caught off guard!")
             combat = Combat(self)
-            self.enemy_effects.append("+20HP")
+            self.add_effect("+20HP", target="enemy")
             combat.FindAttacker("pack of wolves")
             combat.Attack()
             if self.Health <= 0:
@@ -3416,7 +3417,7 @@ class Player:
             time.sleep(1)
             print("Suddenly, a pack of wolves emerges from the shadows!")
             time.sleep(1)
-            self.enemy_effects.append("stunned")
+            self.add_effect("stun", target="enemy")
             print("You ready your weapon and prepare to fight.")
             print("The wolves are surprised by your readiness.")
             combat = Combat(self)
@@ -4458,7 +4459,7 @@ class Player:
         # --- Part 1: The Canyon Battle ---
         print("\nThe Marshal's men give you covering fire. You move up to take out the warlord's lieutenants.")
         self.damage_modifier += 15
-        self.player_effects.append("Steel Wall")
+        self.add_effect("Steel Wall")
         combat = Combat(self)
         combat.FindAttacker("warlord_lieutenant")
         combat.Attack()
@@ -5170,6 +5171,117 @@ class Player:
         if quest_id not in self.quest_flags:
             self.quest_flags[quest_id] = {}
         self.quest_flags[quest_id][key] = value
+
+    def _normalize_effect_store(self, store):
+        if isinstance(store, dict):
+            normalized = {}
+            for name, value in store.items():
+                if isinstance(value, dict):
+                    stacks = int(value.get("stacks", 1) or 1)
+                    duration = value.get("duration", None)
+                    meta = value.get("meta", {})
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    normalized[name] = {"stacks": stacks, "duration": duration, "meta": meta}
+                elif isinstance(value, int):
+                    normalized[name] = {"stacks": value, "duration": None, "meta": {}}
+                else:
+                    normalized[name] = {"stacks": 1, "duration": None, "meta": {}}
+            return normalized
+        if isinstance(store, list):
+            normalized = {}
+            for name in store:
+                if not isinstance(name, str):
+                    continue
+                entry = normalized.get(name, {"stacks": 0, "duration": None, "meta": {}})
+                entry["stacks"] += 1
+                normalized[name] = entry
+            return normalized
+        return {}
+
+    def normalize_effects(self):
+        self.player_effects = self._normalize_effect_store(self.player_effects)
+        self.enemy_effects = self._normalize_effect_store(self.enemy_effects)
+
+    def _get_effect_store(self, target):
+        if target == "enemy":
+            return self.enemy_effects
+        return self.player_effects
+
+    def _set_effect_store(self, target, store):
+        if target == "enemy":
+            self.enemy_effects = store
+        else:
+            self.player_effects = store
+
+    def add_effect(self, name, target="player", stacks=1, duration=None, meta=None):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name, {"stacks": 0, "duration": duration, "meta": {}})
+        entry["stacks"] += stacks
+        if duration is not None:
+            if entry["duration"] is None:
+                entry["duration"] = duration
+            else:
+                entry["duration"] = max(entry["duration"], duration)
+        if meta:
+            meta_store = entry.get("meta")
+            if not isinstance(meta_store, dict):
+                meta_store = {}
+            meta_store.update(meta)
+            entry["meta"] = meta_store
+        store[name] = entry
+
+    def has_effect(self, name, target="player"):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name)
+        return bool(entry) and entry.get("stacks", 0) > 0
+
+    def consume_effect(self, name, target="player", stacks=1):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name)
+        if not entry:
+            return False
+        entry["stacks"] -= stacks
+        if entry["stacks"] <= 0:
+            del store[name]
+        else:
+            store[name] = entry
+        return True
+
+    def remove_effect(self, name, target="player"):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        if name in store:
+            del store[name]
+
+    def tick_effects(self, target="player", ticks=1):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        expired = []
+        for name, entry in store.items():
+            duration = entry.get("duration", None)
+            if duration is None:
+                continue
+            entry["duration"] = duration - ticks
+            if entry["duration"] <= 0:
+                expired.append(name)
+            else:
+                store[name] = entry
+        for name in expired:
+            del store[name]
         
 class Combat:
     def __init__(self, player):
@@ -5300,12 +5412,12 @@ class Combat:
                 if turn == "player":
                     player_turn_complete = False
                     while not player_turn_complete:
-                        if "posse_help" in self.player.player_effects:
+                        if self.player.has_effect("posse_help"):
                             print("The Earp posse comes in, guns blazing!")
                             posse_damage = random.randint(70, 90)
                             print(f"They deal {posse_damage} damage to the {self.Enemy}!")
                             enemy_health -= posse_damage
-                            del self.player.player_effects["posse_help"]
+                            self.player.consume_effect("posse_help")
                         print("\n--- Your Turn ---")
                         available_choices = ["Attack", "Use Item", "Retreat"]
                         prompt = "What will you do?"
@@ -5370,10 +5482,10 @@ class Combat:
                                                     print(f"You fire the {weapon}. Ammo left: {ammo_left}")
                                                     player.weapon_sound(weapon)
                                             else:
-                                                if "sharpened_blade" in self.player.player_effects:
+                                                if self.player.has_effect("sharpened_blade"):
                                                     print(f"Your blade is extra sharp, +10 damage!")
                                                     player.damage_modifier += 10
-                                                    del self.player.player_effects["sharpened_blade"]
+                                                    self.player.consume_effect("sharpened_blade")
                                                 player.play_sound("knife.mp3")
                                                 player.weapon_ability(weapon)
 
@@ -5450,15 +5562,15 @@ class Combat:
                     print(f"\n--- {self.Enemy.capitalize()}'s Turn ---")
                     
                     # --- Status Effect Checks (EXISTING) ---
-                    if "stun" in self.player.enemy_effects:
+                    if self.player.has_effect("stun", target="enemy"):
                         stunned = True
-                        self.player.enemy_effects.remove("stun")
-                    if "hphalf" in self.player.enemy_effects:
+                        self.player.consume_effect("stun", target="enemy")
+                    if self.player.has_effect("hphalf", target="enemy"):
                         enemy_health -= enemy_health/2
-                        self.player.enemy_effects.remove("hphalf")
-                    if "+20HP" in self.player.enemy_effects:
+                        self.player.consume_effect("hphalf", target="enemy")
+                    if self.player.has_effect("+20HP", target="enemy"):
                         enemy_health += 20
-                        self.player.enemy_effects.remove("+20HP")
+                        self.player.consume_effect("+20HP", target="enemy")
                     if stunned == True and self.EnemyCombatant.get("special", None) != "alert":
                         print("The enemy is dazed, unable to attack.")
                         stunned = False
@@ -5565,7 +5677,7 @@ class Combat:
                         
                     # Apply damage using the (potentially modified) current_turn_damage
                     Nenemy_damage = current_turn_damage * self.player.Armor_Boost
-                    if "half_incoming_damage" in self.player.player_effects:
+                    if self.player.has_effect("half_incoming_damage"):
                         Nenemy_damage = Nenemy_damage / 2
                     self.player.Health -= Nenemy_damage
                     print(f"The {self.Enemy} strikes you for {Nenemy_damage} damage!")
