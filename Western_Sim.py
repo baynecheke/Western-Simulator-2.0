@@ -947,6 +947,7 @@ class Player:
                 "steak": "A large, fire-cooked steak. Huge meal. -5 Hunger, +30 Health.",
                 "bourbon roast": "Meat slow-cooked in whiskey. A king's meal. Fully Restores Health & Hunger.",
                 "salted pork sandwich": "A hearty sandwich made with salted pork and bread. -2 Hunger, +15 Health.",
+                "pemmican": "A high-energy food made from dried meat and fat. Hunger set to 0, +20 Health.",
             }
 
             for item, qty in self.itemsinventory.items():
@@ -4558,24 +4559,40 @@ class Player:
             extra_damage += 5
         if self.perform_stat_check(self.shadow_skill, base_target=15):
             print("You search the deck and find some extra ammo for the Coffee Mill!")
-            ammo += 20
+            ammo += 30
         if self.perform_stat_check(self.strength_skill, base_target=15):
             print("You manage to jury-rig a cooling system to prevent overheating!")
             gun_overheat_ever = False
 
         print("\n--- FINAL SHOWDOWN ---")
         turn = "player"
+        heal = 50
+        crew = 20
+        support = 20
+        if self.Health < self.MaxHealth:
+            self.Health = min(self.Health + heal, self.MaxHealth)
+            print(f"You take a deep breath and steel yourself. +{heal} Health.")
+
         while boss_health > 0 and self.Health > 0 and ship_integrity > 0:
             if turn == "player":
                 print("\n--- YOUR TURN ---")
                 print(f"Your Health: {self.Health} | Warlord: {boss_health} | Ship Integrity: {ship_integrity}")
                 print(f"Coffee Mill Ammo: {ammo}")
+
+                if support >= 16:
+                    support_bonus = 5
+                elif support >= 11:
+                    support_bonus = 2
+                else:
+                    support_bonus = 0
+                ammo += support_bonus
                 if ammo < 1:
                     self.play_sound("no_ammo_coffee")
                     print("You're out of ammo! You must reload.")
                     ammo += 50
                     print(f"Coffee Mill Ammo: {ammo}")
                     time.sleep(4,)
+                    turn = 'enemy'
                     continue
                 if gun_overheated:
                     print("The gun is overheated! You must let it cool or take cover!")
@@ -4596,6 +4613,8 @@ class Player:
                     print("1) Fire a long burst at the Warlord (High Damage, risks overheat)")
                     print("2) Fire a short, accurate burst (Low Damage, safe)")
                     print("3) Spray the deck to clear out his guards (Damages ship)")
+                    if "bandage" in self.itemsinventory:
+                        print("4) Use a bandage to heal yourself (+25 Health)")
                 
                 choice = input("Action: ").strip()
 
@@ -4637,39 +4656,129 @@ class Player:
                     turn = 'enemy'
                     time.sleep(4,)
                     continue
+                elif choice == "4":
+                    self.Health = min(self.MaxHealth, self.Health + 25)
+                    self.itemsinventory["bandage"] -= 1
+                    print("You duck and apply a bandage. +25 Health.")
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
 
             else:
                 
                 # --- Boss Turn ---
                 if boss_health <= 0:
                     break # Player wins
-
-                print("\n--- WARLORD'S TURN ---")
+                
                 boss_action = random.randint(1, 3)
-                
-                if boss_action == 1:
-                    dmg = random.randint(15, 20)
-                    self.Health -= dmg
-                    print(f"The Warlord snipes you from the cabin! -{dmg} Health.")
-                    turn = 'player'
-                    time.sleep(2,)
-
-                
-                elif boss_action == 2:
-                    print("The Warlord orders his men to fire a cannon at the cliff!")
-                    print("The Marshal and his men are forced to take cover!")
-                    turn = 'player'
-                    time.sleep(2,)
+                print("\n--- WARLORD'S TURN ---")
+                if crew >= 16:
+                    if boss_action == 1:
+                        dmg = random.randint(15, 25)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
 
                     
-                elif boss_action == 3:
-                    print("The Warlord yells, 'Scuttle the ship! Blow it all to hell!'")
-                    ship_integrity -= 20
-                    print("Explosions rock the boat! -20 Ship Integrity.")
-                    turn = 'player'
-                    time.sleep(2,)
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 5)
+                        turn = 'player'
+                        time.sleep(2,)
 
+                        
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 20
+                        print("Explosions rock the boat! -20 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
 
+                elif crew >= 11:
+                    if boss_action == 1:
+                        dmg = random.randint(15, 20)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        turn = 'player'
+                        support = max(0, support - 3)
+                        time.sleep(2,)
+
+                        
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 10
+                        print("Explosions rock the boat! -10 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                elif crew >= 6:
+                    if boss_action == 1:
+                        dmg = random.randint(10, 15)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 1)
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 1)
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 5
+                        print("Explosions rock the boat! -10 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
+                else:
+                    rn = random.randint(1, 2)
+                    if rn == 1:
+                        print("Warloard is demoralized! He hesitates this turn.")
+                    else:
+                        if boss_action == 1:
+                            dmg = random.randint(10, 15)
+                            self.Health -= dmg
+                            print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 2:
+                            print("The Warlord orders his men to fire a cannon at the cliff!")
+                            print("The Marshal and his men are forced to take cover!")
+                            support = max(0, support - 1)
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 2:
+                            print("The Warlord orders his men to fire a cannon at the cliff!")
+                            print("The Marshal and his men are forced to take cover!")
+                            support = max(0, support - 1)
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 3:
+                            print("The Warlord yells, 'Scuttle the ship!'")
+                            ship_integrity -= 5
+                            print("Explosions rock the boat! -10 Ship Integrity.")
+                            turn = 'player'
 
             # --- Check Lose Conditions ---
             if self.Health <= 0:
