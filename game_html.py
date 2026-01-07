@@ -287,6 +287,50 @@ HTML_CONTENT = """
 
         initializeGame();
     </script>
+
+    <div class="fixed bottom-0 right-0 p-4 flex gap-2 bg-slate-900 border-t border-slate-700 z-50">
+        <input type="text" id="saveName" placeholder="Save Name" class="bg-slate-800 text-white p-2 border border-slate-600 rounded">
+        <button onclick="saveGame()" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded">Save</button>
+        <button onclick="loadGame()" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded">Load</button>
+    </div>
+
+    <script>
+        async function saveGame() {
+            const name = document.getElementById('saveName').value;
+            if (!name) return alert("Please enter a name to save.");
+            
+            try {
+                const res = await fetch('/save_game', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: name})
+                });
+                const data = await res.json();
+                alert(data.status);
+            } catch (e) {
+                alert("Connection error: " + e);
+            }
+        }
+
+        async function loadGame() {
+            const name = document.getElementById('saveName').value;
+            if (!name) return alert("Please enter a name to load.");
+            
+            try {
+                const res = await fetch('/load_game', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: name})
+                });
+                const data = await res.json();
+                alert(data.status);
+                // Force an immediate update to show loaded stats
+                pollServer(); 
+            } catch (e) {
+                alert("Connection error: " + e);
+            }
+        }
+    </script>
 </body>
 </html>
 """

@@ -5,7 +5,22 @@ import builtins
 import time     
 import traceback
 from flask import Flask, render_template_string, request, jsonify
-from dotenv import load_dotenv
+from dotenv import load_dotenv 
+import boto3
+from botocore.exceptions import ClientError
+dynamodb = None
+table = None
+try:
+    dynamodb = boto3.resource(
+        'dynamodb',
+        region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+    )
+    table = dynamodb.Table('WesternSimSaves')
+    print("[SERVER] AWS DynamoDB connection initialized.")
+except Exception as e:
+    print(f"[SERVER] Warning: AWS DynamoDB setup failed. Saving disabled. Error: {e}")
 
 # --- Load Environment Variables ---
 load_dotenv() 
@@ -148,6 +163,54 @@ def send_response():
     data = request.json
     player_inbox.put(data['choice'])
     return jsonify({"status": "Response received"})
+@app.route('/save_game', methods=['POST'])
+def save_game():
+    global player_object, table
+    if not table or not player_object:
+        return jsonify({"status": "Error: Database not connected or game not running."})
+    
+    data = request.json
+    username = data.get("username", "default_player").strip()
+    if not username: return jsonify({"status": "Error: Invalid name."})
+    
+    # Get data from player and add the username key
+    save_data = player_object.to_dict()
+    save_data['username'] = username 
+    
+    try:
+        table.put_item(Item=save_data)
+        return jsonify({"status": f"Game saved successfully for {username}!"})
+    except ClientError as e:
+        return jsonify({"status": f"Save failed: {e.response['Error']['Message']}"})
+
+@app.route('/load_game', methods=['POST'])
+def load_game():
+    global player_object, table
+    if not table:
+        return jsonify({"status": "Error: Database not connected."})
+        
+    data = request.json
+    username = data.get("username", "default_player").strip()
+    
+    try:
+        response = table.get_item(Key={'username': username})
+        if 'Item' in response:
+            # Start a new game thread if one isn't running
+            if player_object is None:
+                start_game() 
+                time.sleep(1.0) # Wait a second for the thread to create the object
+            
+            if player_object:
+                player_object.load_from_dict(response['Item'])
+                # Force an update to the client
+                ai_file.update_stats_display(player_object)
+                return jsonify({"status": f"Welcome back, {username}. Game loaded!"})
+            else:
+                return jsonify({"status": "Error: Game thread failed to start."})
+        else:
+            return jsonify({"status": "No save file found for that name."})
+    except ClientError as e:
+        return jsonify({"status": f"Load failed: {e.response['Error']['Message']}"})
 
 if __name__ == '__main__':
     print("Starting Flask server on http://localhost:5001")

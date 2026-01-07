@@ -348,328 +348,223 @@ class Player:
         self.current_town_name = "Dustbowl"
         self.update_actions()
 
-    @classmethod
+# --- PASTE THIS INSIDE THE PLAYER CLASS IN Western_Sim.py ---
 
-    def load_game(cls):
-        global player
-        print("\n--- Load Game ---")
-        save_folder = 'saves'
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-
-        # 1. Get existing save files on the server
-        save_files = [f for f in os.listdir(save_folder) if f.endswith('.json')]
-        save_names = [f.replace('save_', '').replace('.json', '') for f in save_files]
-
-        # 2. Add the "Upload" option
-        upload_option = "Upload Save File (Paste Data)"
-        menu_choices = save_names + [upload_option]
-
-        if not menu_choices:
-            # If no files and no menu generated (unlikely with upload option), just start new
-            print("No save files found. Starting a new game.")
-            return player 
-
-        # 3. Ask the user
-        choice = player.AI_File.parse_choice(
-            menu_choices,
-            "Choose a save slot or Upload a file:"
-        )
-
-        save_data = None
-
-        # --- PATH A: UPLOAD (PASTE) LOGIC ---
-        if choice == upload_option.lower():
-            print("\n--- Upload Save ---")
-            print("Open the .json save file on your computer with Notepad.")
-            print("Copy ALL the text inside and paste it here.")
+    def to_dict(self):
+        """Converts ALL player state to a dictionary for AWS saving."""
+        return {
+            # --- Core Stats ---
+            "player_name": self.player_name,
+            "Day": self.Day,
+            "Time": self.Time,
+            "Health": self.Health,
+            "MaxHealth": self.MaxHealth,
+            "gold": self.gold,
+            "Hunger": self.Hunger,
+            "Hostility": self.Hostility,
+            "score": self.score,
             
-            # Use patched_input to get the raw string
-            try:
-                # We check if ask_free_text exists (it should if you added it previously)
-                if hasattr(player.AI_File, 'ask_free_text'):
-                    save_string = player.AI_File.ask_free_text("Paste JSON data here:")
-                else:
-                    save_string = player.AI_File.patched_input("Paste JSON data here:")
-
-                # convert string to dictionary
-                save_data = json.loads(save_string)
-                print("Save data recognized!")
-                
-                # Save it to the server temp disk so it persists for this session
-                # This prevents you from having to re-upload if you reload within the same session
-                temp_name = save_data.get("save_name", "uploaded")
-                with open(os.path.join(save_folder, f"save_{temp_name}.json"), 'w') as f:
-                    json.dump(save_data, f)
-
-            except json.JSONDecodeError:
-                print("Error: The text you pasted is not valid JSON. Starting new game.")
-                return player
-            except Exception as e:
-                print(f"Error reading upload: {e}")
-                return player
-
-        # --- PATH B: LOAD LOCAL FILE LOGIC ---
-        else:
-            # Find the original case-sensitive name
-            original_cased_name = None
-            for name in save_names:
-                if name.lower() == choice:
-                    original_cased_name = name
-                    break
+            # --- Location & Travel ---
+            "invillage": self.invillage,
+            "current_town_name": self.current_town_name,
+            "distancenext": self.distancenext,
+            "travel_bonus": self.travel_bonus,
+            "trade_bonus": self.trade_bonus,
+            "boots_used": self.boots_used,
+            "number_of_towns_visited": self.number_of_towns_visited,
+            "winter_mode": self.winter_mode,
+            "cold_penalty": self.cold_penalty,
             
-            if original_cased_name is None:
-                print("Invalid choice. Starting a new game.")
-                return player 
-
-            save_file = f"save_{original_cased_name}.json"
-            filepath = os.path.join(save_folder, save_file)
+            # --- Inventory & Skills ---
+            "itemsinventory": self.itemsinventory,
+            "caravan": self.caravan,
+            "shadow_skill": self.shadow_skill,
+            "trail_skill": self.trail_skill,
+            "strength_skill": self.strength_skill,
             
-            try:
-                with open(filepath, 'r') as f:
-                    save_data = json.load(f)
-            except Exception as e:
-                print(f"Error loading file: {e}")
-                return player
-
-        # --- APPLY DATA TO PLAYER (Runs for both paths) ---
-        if save_data:
-            player.rebirth = save_data.get("rebirth", False)
-            player.gold = save_data.get("gold", 0)
-            player.itemsinventory = save_data.get("itemsinventory", {})
-            player.distancenext = save_data.get("distancenext", 0)
-            player.Day = save_data.get("Day", 1)
-            player.Time = save_data.get("Time", 9)
-            player.Health = save_data.get("Health", 100)
-            player.Hunger = save_data.get("Hunger", 0)
-            player.Hostility = save_data.get("Hostility", 0)
-            player.score = save_data.get("score", 0)
-            player.invillage = save_data.get("invillage", True)
-            player.travel_bonus = save_data.get("travel_bonus", 0)
-            player.trade_bonus = save_data.get("trade_bonus", 0)
-            player.caravan = save_data.get("caravan", [])
-            player.town_defense_outcome = save_data.get("defense_outcome", None)
-            player.town_aftermath_outcome = save_data.get("aftermath_outcome", None)
-            player.town_final_outcome = save_data.get("final_outcome", None)
-            player.boots_used = save_data.get("boots", False)
-            player.diary_entries = save_data.get("diary_entries", [])
-            player.difficulty = save_data.get("difficulty", "frontier")
-            player.MaxHealth = save_data.get("MaxHealth", 100)
-            player.TownUpgrades = save_data.get("TownUpgrades", {})
-            player.Tquest = save_data.get("Tquest", "None")
-            player.quest = save_data.get("quest", [])
-            player.rumors = save_data.get("rumors", {})
-            player.diary_bonuses = save_data.get("diary_bonuses", [])
-            player.rumors_heard = save_data.get("rumors_heard", [])
-            player.enemy_effects = save_data.get("enemy_effects", [])
-            player.player_effects = save_data.get("player_effects", [])
-            player.shadow_skill = save_data.get("shadow_skill", 3)
-            player.trail_skill = save_data.get("trail_skill", 3)
-            player.strength_skill = save_data.get("strength_skill", 3)
-            player.quests_done = save_data.get("quests_done", [])
-            player.event = save_data.get("event", [])
-            player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
-            player.quest_flags = save_data.get("quest_flags", {})
-            player.Heat = save_data.get("Heat", 100)
-            player.MaxHeat = save_data.get("MaxHeat", 100)
-            player.cold_penalty = save_data.get("cold_penalty", 0)
-            player.winter_mode = save_data.get("winter_mode", False)
-
-            # Compatibility Check
-            if "iron_tracks" not in player.quest_flags:
-                player.quest_flags["iron_tracks"] = {
-                    "stage": save_data.get("iron_stage", 0),
-                    "bonus": save_data.get("iron_bonus", 0)
-                }
-            if "defend_town" not in player.quest_flags:
-                player.quest_flags["defend_town"] = {
-                    "outcome": player.town_defense_outcome,
-                    "aftermath": player.town_aftermath_outcome,
-                    "final": player.town_final_outcome,
-                    "bonus": 0
-                }
-            player.normalize_effects()
-
-            # Metadata
-            player.player_name = save_data.get("player_name", "default")
-            player.current_town_name = save_data.get("current_town_name", "Dustbowl")
-            player.save_name = save_data.get("save_name", "uploaded")
-
-            print(f"Game loaded successfully!")
-            player.update_actions()
-            return player
-
-        return player
-
-    def save_game(self):
-        if not self.save_name:
-            self.save_name = input("Enter a name for your save file: ").strip().replace(" ", "_")
-        save_folder = 'saves'
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-        save_path = os.path.join(save_folder, f"save_{self.save_name}.json")
-        with open(save_path, "w") as file:
-            json.dump({
-                "gold": self.gold,
-                "itemsinventory": self.itemsinventory,
-                "distancenext": self.distancenext,
-                "Day": self.Day,
-                "Time": self.Time,
-                "Health": self.Health,
-                "Hunger": self.Hunger,
-                "Hostility": self.Hostility,
-                "score": self.score,
-                "invillage": self.invillage,
-                "travel_bonus": self.travel_bonus,
-                "trade_bonus": self.trade_bonus,
-                "caravan": self.caravan,
-                "defense_outcome": self.town_defense_outcome,
-                "aftermath_outcome": self.town_aftermath_outcome,
-                "final_outcome": self.town_final_outcome,
-                "boots": self.boots_used,
-                "diary_entries": self.diary_entries,
-                "difficulty": self.difficulty,
-                "MaxHealth": self.MaxHealth,
-                "save_name": self.save_name,
-                "TownUpgrades": self.TownUpgrades,
-                "Tquest": self.Tquest,
-                "quest": self.quest,
-                "rumors": self.rumors,
-                "diary_bonuses": self.diary_bonuses,
-                "rumors_heard": self.rumors_heard,
-                "enemy_effects": self.enemy_effects,
-                "player_effects": self.player_effects,
-                "rebirth": self.rebirth,
-                "shadow_skill": self.shadow_skill,
-                "trail_skill": self.trail_skill,
-                "strength_skill": self.strength_skill,
-                "quests_done": self.quests_done,
-                "event": self.event,
-                "number_of_towns_visited": self.number_of_towns_visited,
-                "player_name": self.player_name,
-                "current_town_name": self.current_town_name,
-                "quest_flags": self.quest_flags,
-                "Heat": self.Heat,
-                "MaxHeat": self.MaxHeat,
-                "cold_penalty": self.cold_penalty,
-                "winter_mode": self.winter_mode,
-            }, file)
-        print(f"Game saved successfully to 'save_{self.save_name}.json'.")
-# In Western_Sim.py
-    def export_save(self):
-            """Prints the raw save data so the user can copy-paste it to their PC."""
-            if not self.save_name:
-                print("You haven't saved the game yet.")
-                return
-
-            save_file = f"save_{self.save_name}.json"
-            save_path = os.path.join('saves', save_file)
+            # --- Quests & Events ---
+            "Tquest": self.Tquest,
+            "quest": self.quest,
+            "quests_done": self.quests_done,
+            "quest_flags": self.quest_flags,
+            "event": self.event,
+            "difficulty": self.difficulty,
+            "rebirth": self.rebirth,
             
-            if not os.path.exists(save_path):
-                print(f"No save file found for '{self.save_name}'.")
-                return
-
-            print("\n--- SAVE DATA EXPORT ---")
-            print("INSTRUCTIONS: Copy everything between the START and END lines below.")
-            print("Create a new text file on your computer, paste the text in, and name it 'save_YourName.json'.")
-            print("-" * 20)
-            print("--- START SAVE DATA ---")
+            # --- Town Defense / Outcomes ---
+            "town_defense_outcome": self.town_defense_outcome,
+            "town_aftermath_outcome": self.town_aftermath_outcome,
+            "town_final_outcome": self.town_final_outcome,
+            "TownUpgrades": self.TownUpgrades,
             
-            with open(save_path, 'r') as f:
-                # Read the file and print it raw
-                print(f.read())
-                
-            print("--- END SAVE DATA ---")
-            print("-" * 20)
-            # Pause so the user can copy it
-            self.AI_File.parse_choice(["Done"], "Press 'Done' once you have copied the text.")
+            # --- Story & Lore ---
+            "diary_entries": self.diary_entries,
+            "diary_bonuses": self.diary_bonuses,
+            "rumors": self.rumors,
+            "rumors_heard": self.rumors_heard,
+            
+            # --- Status Effects ---
+            "enemy_effects": self.enemy_effects,
+            "player_effects": self.player_effects,
+            "Heat": getattr(self, 'Heat', 100),       # Safe check if variable is missing
+            "MaxHeat": getattr(self, 'MaxHeat', 100)
+        }
+
+    def load_from_dict(self, data):
+        """Restores ALL player state from the dictionary."""
+        # --- Core Stats ---
+        self.player_name = data.get("player_name", "Stranger")
+        self.Day = int(data.get("Day", 1))
+        self.Time = int(data.get("Time", 8))
+        self.Health = float(data.get("Health", 100))
+        self.MaxHealth = float(data.get("MaxHealth", 100))
+        self.gold = float(data.get("gold", 0))
+        self.Hunger = float(data.get("Hunger", 0))
+        self.Hostility = int(data.get("Hostility", 0))
+        self.score = int(data.get("score", 0))
+        
+        # --- Location & Travel ---
+        self.invillage = data.get("invillage", False)
+        self.current_town_name = data.get("current_town_name", "Rust Ridge")
+        self.distancenext = int(data.get("distancenext", 0))
+        self.travel_bonus = int(data.get("travel_bonus", 0))
+        self.trade_bonus = int(data.get("trade_bonus", 0))
+        self.boots_used = data.get("boots_used", False)
+        self.number_of_towns_visited = int(data.get("number_of_towns_visited", 0))
+        self.winter_mode = data.get("winter_mode", False)
+        self.cold_penalty = int(data.get("cold_penalty", 0))
+        
+        # --- Inventory & Skills ---
+        self.itemsinventory = data.get("itemsinventory", {})
+        self.caravan = data.get("caravan", [])
+        self.shadow_skill = int(data.get("shadow_skill", 3))
+        self.trail_skill = int(data.get("trail_skill", 3))
+        self.strength_skill = int(data.get("strength_skill", 3))
+        
+        # --- Quests & Events ---
+        self.Tquest = data.get("Tquest", "None")
+        self.quest = data.get("quest", [])
+        self.quests_done = data.get("quests_done", [])
+        self.quest_flags = data.get("quest_flags", {})
+        self.event = data.get("event", [])
+        self.difficulty = data.get("difficulty", "frontier")
+        self.rebirth = data.get("rebirth", False)
+        
+        # --- Town Defense / Outcomes ---
+        self.town_defense_outcome = data.get("town_defense_outcome", None)
+        self.town_aftermath_outcome = data.get("town_aftermath_outcome", None)
+        self.town_final_outcome = data.get("town_final_outcome", None)
+        self.TownUpgrades = data.get("TownUpgrades", {})
+        
+        # --- Story & Lore ---
+        self.diary_entries = data.get("diary_entries", [])
+        self.diary_bonuses = data.get("diary_bonuses", [])
+        self.rumors = data.get("rumors", {})
+        self.rumors_heard = data.get("rumors_heard", [])
+        
+        # --- Status Effects ---
+        self.enemy_effects = data.get("enemy_effects", [])
+        self.player_effects = data.get("player_effects", [])
+        self.Heat = data.get("Heat", 100)
+        self.MaxHeat = data.get("MaxHeat", 100)
+        
+        # --- Compatibility Checks (From your old code) ---
+        # If loading an old save that missed these flags, we add them now so the game doesn't crash.
+        if "iron_tracks" not in self.quest_flags:
+            self.quest_flags["iron_tracks"] = {
+                "stage": data.get("iron_stage", 0), 
+                "bonus": data.get("iron_bonus", 0)
+            }
+        
+        if "defend_town" not in self.quest_flags:
+            self.quest_flags["defend_town"] = {
+                "outcome": self.town_defense_outcome,
+                "aftermath": self.town_aftermath_outcome,
+                "final": self.town_final_outcome,
+                "bonus": 0
+            }
+
+        # Normalize effects just in case
+        if hasattr(self, 'normalize_effects'):
+            self.normalize_effects()
             
     def main_game_loop(self):
         global player # <-- FIX 1: Add this line
         
         # --- NEW CODE ---
-        prompt = "Would you like to Start a New Game or Load a Save?"
-        choices = ["Start New Game", "Load a Save"]
-        
-        # This will show two buttons
-        choice_str = self.AI_File.parse_choice(choices, prompt)
-        # --- END NEW ---
-        if choice_str == "load a save": # Note: parse_choice returns lowercase
-            player = self # <-- FIX 2: Add this line
-            player = Player.load_game() # This will still use text boxes (for now)
-        else:
-            print("\nSelect a Season:")
-            print("1. Standard (Normal)")
-            print("2. The Long Winter (Hard Mode + Winter Events)")
-                
-            # This parses "1", "2", "standard", or "winter"
-            season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
-                
-            if season_choice == "winter":
-                self.winter_mode = True
-                print("You have chosen The Long Winter. Bundle up...")
-                # Optional: Force difficult setting if you want
-                # self.difficulty = 'survivalist' 
-            else:
-                self.winter_mode = False
-            player = self # <-- FIX 3: Add this line
-            # "Start New Game" path
-            print("Would you like the instructions (Yes/No)?")
-            Choice = self.AI_File.parse_YN(": ")
-            if Choice == "yes":
-                print("Welcome to Western Simulator!")
-                time.sleep(2,)
-                print("In this game you will try and survive the western life and complete quests.")
-                time.sleep(2,)
-                print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
-                time.sleep(2,)
-                
-                # --- MODIFICATION START ---
-                available_choices = ["adventure", "frontier", "savage"]
-                prompt = "Choose a difficulty:"
-                
 
-                choice = self.AI_File.parse_choice(available_choices, prompt)
-                # 'choice' will be "adventure", "frontier", or "savage"
-                
-                if choice == "adventure": # <-- Changed from "1"
-                    self.difficulty = 'adventure'
-                elif choice == "savage": # <-- Changed from "3"
-                    self.difficulty = 'savage'
-                else: # <-- This now correctly defaults to "frontier"
-                    self.difficulty = 'frontier'
-                time.sleep(2,)
-                print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
-                time.sleep(2,)
-                print("Others like the knife and armor have unlimited uses.")
-                time.sleep(2,)
-                print("Now let's start your journey.")
-                print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
-                time.sleep(1,)
-                Location = ["Dustbowl, a tough town in the South Dakota territory.", 
-                            "Rust Ridge, a thriving town in the eastern half of Colorado.", 
-                            "Quarry Town, a large mining town on the banks of the Missouri River."]
-                print("You wake up in the town of " + Location[random.randint(0,2)])
-                print("The people greet you with nods as you walk down the mainstreet.")
-                time.sleep(4,)
-                self.change_music("Town.mp3", -1)
-                self.add_item("diary")
-                
-            else:
-                self.change_music("Town.mp3", -1)
-                self.add_item("diary")
-                available_choices = ["adventure", "frontier", "savage"]
-                prompt = "Choose a difficulty:"
-                
-                choice = self.AI_File.parse_choice(available_choices, prompt)
-                # 'choice' will be "adventure", "frontier", or "savage"
-                
-                if choice == "adventure": # <-- Changed from "1"
-                    self.difficulty = 'adventure'
-                elif choice == "savage": # <-- Changed from "3"
-                    self.difficulty = 'savage'
-                else: # <-- This now correctly defaults to "frontier"
-                    self.difficulty = 'frontier'
+        print("\nSelect a Season:")
+        print("1. Standard (Normal)")
+        print("2. The Long Winter (Hard Mode + Winter Events)")
+            
+        # This parses "1", "2", "standard", or "winter"
+        season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
+            
+        if season_choice == "winter":
+            self.winter_mode = True
+            print("You have chosen The Long Winter. Bundle up...")
+            # Optional: Force difficult setting if you want
+            # self.difficulty = 'survivalist' 
+        else:
+            self.winter_mode = False
+        player = self # <-- FIX 3: Add this line
+        # "Start New Game" path
+        print("Would you like the instructions (Yes/No)?")
+        Choice = self.AI_File.parse_YN(": ")
+        if Choice == "yes":
+            print("Welcome to Western Simulator!")
+            time.sleep(2,)
+            print("In this game you will try and survive the western life and complete quests.")
+            time.sleep(2,)
+            print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
+            time.sleep(2,)
+            
+            # --- MODIFICATION START ---
+            available_choices = ["adventure", "frontier", "savage"]
+            prompt = "Choose a difficulty:"
+            
+
+            choice = self.AI_File.parse_choice(available_choices, prompt)
+            # 'choice' will be "adventure", "frontier", or "savage"
+            
+            if choice == "adventure": # <-- Changed from "1"
+                self.difficulty = 'adventure'
+            elif choice == "savage": # <-- Changed from "3"
+                self.difficulty = 'savage'
+            else: # <-- This now correctly defaults to "frontier"
+                self.difficulty = 'frontier'
+            time.sleep(2,)
+            print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
+            time.sleep(2,)
+            print("Others like the knife and armor have unlimited uses.")
+            time.sleep(2,)
+            print("Now let's start your journey.")
+            print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
+            time.sleep(1,)
+            Location = ["Dustbowl, a tough town in the South Dakota territory.", 
+                        "Rust Ridge, a thriving town in the eastern half of Colorado.", 
+                        "Quarry Town, a large mining town on the banks of the Missouri River."]
+            print("You wake up in the town of " + Location[random.randint(0,2)])
+            print("The people greet you with nods as you walk down the mainstreet.")
+            time.sleep(4,)
+            self.change_music("Town.mp3", -1)
+            self.add_item("diary")
+            
+        else:
+            self.change_music("Town.mp3", -1)
+            self.add_item("diary")
+            available_choices = ["adventure", "frontier", "savage"]
+            prompt = "Choose a difficulty:"
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt)
+            # 'choice' will be "adventure", "frontier", or "savage"
+            
+            if choice == "adventure": # <-- Changed from "1"
+                self.difficulty = 'adventure'
+            elif choice == "savage": # <-- Changed from "3"
+                self.difficulty = 'savage'
+            else: # <-- This now correctly defaults to "frontier"
+                self.difficulty = 'frontier'
 
 
         while not player.Health <= 0:
@@ -709,24 +604,10 @@ class Player:
                 time.sleep(2,)
 
             print(f"Your health is: {player.Health}.")
-            if player.Health <= 0:
-                break
-            player.save_game()
-            print("Game Saved.")
-            prompt = "What would you like to do?"
-            choices = ["Continue Playing", "Export Save Data", "Quit"]
-            decision = player.AI_File.parse_choice(choices, prompt)
-            if decision == "export save data":
-                player.export_save()
-                print("Continuing your adventure...")
-                time.sleep(2)
-                
-            elif decision == "quit":
-                print("Thanks for playing! See you next time.")
-                exit()
-            else:
-                print("Continuing your adventure...")
-                time.sleep(4)
+            print("The day ends. You prepare for tomorrow...")
+            print("(Use the Save button below if you wish to save your progress.)")
+            print("Continuing your adventure...")
+            time.sleep(4)
 
     def update_actions(self):
         """

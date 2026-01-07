@@ -4,3 +4,4 @@ groq
 PyYAML
 gunicorn
 python-dotenv
+boto3
