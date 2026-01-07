@@ -17,7 +17,7 @@ try:
         aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
         aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
     )
-    table = dynamodb.Table('WesternSimSaves')
+    table = dynamodb.Table('WesternSim')
     print("[SERVER] AWS DynamoDB connection initialized.")
 except Exception as e:
     print(f"[SERVER] Warning: AWS DynamoDB setup failed. Saving disabled. Error: {e}")
