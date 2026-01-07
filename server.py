@@ -6,6 +6,7 @@ import time
 import traceback
 from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv 
+from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
 dynamodb = None
@@ -173,12 +174,26 @@ def save_game():
     username = data.get("username", "default_player").strip()
     if not username: return jsonify({"status": "Error: Invalid name."})
     
-    # Get data from player and add the username key
-    save_data = player_object.to_dict()
-    save_data['username'] = username 
+    # 1. Get the raw data
+    raw_data = player_object.to_dict()
+    raw_data['username'] = username 
+    
+    # 2. HELPER FUNCTION: Convert all floats to Decimals recursively
+    # DynamoDB crashes if it sees a float, so we must sanitize the data.
+    def convert_floats_to_decimal(obj):
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        elif isinstance(obj, dict):
+            return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_floats_to_decimal(i) for i in obj]
+        return obj
+
+    # 3. Apply the conversion
+    final_save_data = convert_floats_to_decimal(raw_data)
     
     try:
-        table.put_item(Item=save_data)
+        table.put_item(Item=final_save_data)
         return jsonify({"status": f"Game saved successfully for {username}!"})
     except ClientError as e:
         return jsonify({"status": f"Save failed: {e.response['Error']['Message']}"})
