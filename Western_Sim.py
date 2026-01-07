@@ -220,7 +220,10 @@ class Player:
                 "trigger": "saloon",
                 "description": "Approach the table where Wyatt Earp sits.",
                 # Condition: Tquest is Earp, but stage is 0 (Waiting)
-                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 0,
+                "condition": lambda p: "earp_vendetta" not in p.quests_done and (
+                    (p.Tquest == "None" and p.rumors.get("earp_rumor", 0) == 1) or 
+                    (p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage", 0) == 0)
+                ),
                 "function": "encounter_earp_intro" 
             },
             
