@@ -195,6 +195,7 @@ HTML_CONTENT = """
                     case 'game_over': addMessage(msg.text); stopPolling(); break;
                 }
             });
+
         }
         
         function updateStats(data) {

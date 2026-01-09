@@ -338,8 +338,4 @@ def load_game():
 if __name__ == '__main__':
     print("Starting Flask server on http://localhost:5001")
     app.run(host="0.0.0.0", port=5001, debug=False)
-    if session.stop_requested:
-        return jsonify({"messages": [{
-            "type": "game_message",
-            "text": "Session ended. Refresh to start a new game."
-        }]})
+
