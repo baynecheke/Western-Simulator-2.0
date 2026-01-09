@@ -136,6 +136,7 @@ HTML_CONTENT = """
         
         const soundEffects = {};
         let backgroundMusic = null;
+        let sessionId = null;
 
         function loadAndPlaySound(src, loop = false) {
             try {
@@ -172,7 +173,7 @@ HTML_CONTENT = """
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 'choice': choice })
+                    body: JSON.stringify({ 'choice': choice, 'session_id': sessionId })
                 });
                 pollServer();
             } catch (error) { addMessage(`[Connection Error]: ${error.message}`); }
@@ -258,7 +259,8 @@ HTML_CONTENT = """
             if (isPolling) return; 
             isPolling = true;
             try {
-                const response = await fetch('/get_update');
+                const url = sessionId ? `/get_update?session_id=${encodeURIComponent(sessionId)}` : '/get_update';
+                const response = await fetch(url);
                 if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const data = await response.json();
                 if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
@@ -279,7 +281,9 @@ HTML_CONTENT = """
             display.innerHTML = '';
             addMessage('Connecting to server...');
             try {
-                await fetch('/start_game', { method: 'POST' });
+                const response = await fetch('/start_game', { method: 'POST' });
+                const data = await response.json();
+                sessionId = data.session_id;
                 addMessage('Connected! Starting game...');
                 startPolling();
             } catch (error) { addMessage(`[Fatal Error] Could not connect to server: ${error.message}`); }
@@ -303,7 +307,7 @@ HTML_CONTENT = """
                 const res = await fetch('/save_game', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: name})
+                    body: JSON.stringify({username: name, session_id: sessionId})
                 });
                 const data = await res.json();
                 alert(data.status);
@@ -320,7 +324,7 @@ HTML_CONTENT = """
                 const res = await fetch('/load_game', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: name})
+                    body: JSON.stringify({username: name, session_id: sessionId})
                 });
                 const data = await res.json();
                 alert(data.status);

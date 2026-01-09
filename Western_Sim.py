@@ -2244,7 +2244,7 @@ class Player:
         time.sleep(1,)
         print("Music/audio effects: Freesound.com")
         time.sleep(1,)
-        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
+        print("Playtesters: Deric R Cheke, Dax Cheke!!!, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
         time.sleep(1,)
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         time.sleep(1,)

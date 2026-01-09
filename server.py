@@ -4,6 +4,9 @@ import queue
 import builtins 
 import time     
 import traceback
+import uuid
+from dataclasses import dataclass, field
+from typing import Optional
 from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv 
 from decimal import Decimal
@@ -35,58 +38,101 @@ import game_html
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-key')
 
-server_outbox = queue.Queue()
-player_inbox = queue.Queue()
+@dataclass
+class GameSession:
+    session_id: str
+    server_outbox: queue.Queue
+    player_inbox: queue.Queue
+    ai_file: AI_Control
+    player_thread: Optional[threading.Thread] = None
+    player_object: Optional[Player] = None
+    created_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)
 
-ai_file = AI_Control(server_outbox, player_inbox) 
-player_thread = None
-player_object = None 
+sessions = {}
+sessions_lock = threading.Lock()
+
+thread_local = threading.local()
+original_print = builtins.print
+original_input = builtins.input
+
+def thread_print(*args, **kwargs):
+    handler = getattr(thread_local, "print_fn", None)
+    if handler:
+        return handler(*args, **kwargs)
+    return original_print(*args, **kwargs)
+
+def thread_input(prompt=""):
+    handler = getattr(thread_local, "input_fn", None)
+    if handler:
+        return handler(prompt)
+    return original_input(prompt)
+
+builtins.print = thread_print
+builtins.input = thread_input
+
+def create_session():
+    session_id = uuid.uuid4().hex
+    server_outbox = queue.Queue()
+    player_inbox = queue.Queue()
+    ai_file = AI_Control(server_outbox, player_inbox)
+    session = GameSession(
+        session_id=session_id,
+        server_outbox=server_outbox,
+        player_inbox=player_inbox,
+        ai_file=ai_file
+    )
+    with sessions_lock:
+        sessions[session_id] = session
+    return session
+
+def get_session(session_id):
+    if not session_id:
+        return None
+    with sessions_lock:
+        session = sessions.get(session_id)
+    if session:
+        session.last_seen = time.time()
+    return session
+
+def start_session_game(session):
+    if session.player_thread is not None and session.player_thread.is_alive():
+        return
+    session.player_thread = threading.Thread(target=run_game_loop, args=(session,))
+    session.player_thread.start()
 
 # --- The Main Game Loop Function ---
-def run_game_loop(ai_file):
-    global player_object
-    
-    # --- Store original built-in functions ---
-    original_print = builtins.print
-    original_input = builtins.input
-    original_sleep = time.sleep
-
+def run_game_loop(session):
     try:
-        # --- PATCH BUILT-IN FUNCTIONS ---
-        builtins.print = ai_file.print_to_client
-        builtins.input = ai_file.patched_input
-        # We don't patch time.sleep globally to avoid breaking server timing, 
-        # but the AI class has a reference if needed.
+        thread_local.print_fn = session.ai_file.print_to_client
+        thread_local.input_fn = session.ai_file.patched_input
         
         # 1. Create the Player *inside the thread*
-        player_object = Player(ai_file_arg=ai_file) 
+        session.player_object = Player(ai_file_arg=session.ai_file) 
 
         # 2. Set the AI flag
         # We import here to ensure we are modifying the module that Player uses
         import Western_Sim
-        Western_Sim.USE_OLLAMA = ai_file.use_ai
+        Western_Sim.USE_OLLAMA = session.ai_file.use_ai
 
         # 3. Run the game
-        player_object.main_game_loop()
+        session.player_object.main_game_loop()
         
     except Exception as e:
-        # Use the *original* print to log to the terminal
         original_print(f"--- A CRITICAL ERROR OCCURRED ---")
         original_print(traceback.format_exc())
         
         # Send a fatal error to the client
-        server_outbox.put({
+        session.server_outbox.put({
             "type": "game_message",
             "text": f"--- A CRITICAL ERROR OCCURRED: {e} ---<br>The game must restart. Please refresh the page."
         })
     
     finally:
-        # --- CRITICAL: Restore original functions ---
-        builtins.print = original_print
-        builtins.input = original_input
-        time.sleep = original_sleep
+        thread_local.print_fn = None
+        thread_local.input_fn = None
     
-    server_outbox.put({"type": "game_over", "text": "--- GAME OVER ---<br>Refresh the page to play again."})
+    session.server_outbox.put({"type": "game_over", "text": "--- GAME OVER ---<br>Refresh the page to play again."})
 
 # --- Web Server Routes ---
 @app.route('/')
@@ -95,59 +141,50 @@ def index():
 
 @app.route('/start_game', methods=['POST'])
 def start_game():
-    global player_thread, server_outbox, player_inbox, ai_file, player_object
-
-    # 1. Log if an old thread is being orphaned
-    if player_thread is not None and player_thread.is_alive():
-        print("[SERVER] WARNING: Old game thread was still alive. It is now orphaned.")
-            
-    # 2. Create NEW queues for this new game session
-    server_outbox = queue.Queue()
-    player_inbox = queue.Queue()
-    
-    # 3. Create a NEW AI_Control object using the NEW queues
-    ai_file = AI_Control(server_outbox, player_inbox) 
-    
-    # 4. Reset the player object reference
-    player_object = None 
-
-    # 5. Start the new game thread
-    player_thread = threading.Thread(target=run_game_loop, args=(ai_file,))
-    player_thread.start()
-    return jsonify({"status": "Game started"})
+    session = create_session()
+    start_session_game(session)
+    return jsonify({"status": "Game started", "session_id": session.session_id})
 
 @app.route('/get_update')
 def get_update():
+    session_id = request.args.get("session_id")
+    session = get_session(session_id)
+    if not session:
+        return jsonify({"messages": [{
+            "type": "game_message",
+            "text": "Session not found. Please refresh to start a new game."
+        }]})
+
     messages = []
     
     # --- Proactive Stat Update ---
-    if player_object is not None:
+    if session.player_object is not None:
         try:
             # Use getattr to safely get values, defaulting to reasonable numbers if not set yet
-            current_heat = getattr(player_object, 'Heat', 100)
-            max_heat = getattr(player_object, 'MaxHeat', 100)
+            current_heat = getattr(session.player_object, 'Heat', 100)
+            max_heat = getattr(session.player_object, 'MaxHeat', 100)
             
             stat_payload = {
                 'type': 'update_stats',
                 'payload': {
-                    'health': player_object.Health,
-                    'max_health': player_object.MaxHealth,
+                    'health': session.player_object.Health,
+                    'max_health': session.player_object.MaxHealth,
                     'heat': current_heat, 
                     'max_heat': max_heat,
-                    'hunger': player_object.Hunger,
-                    'gold': player_object.gold,
-                    'day': player_object.Day,
-                    'time': f"{player_object.Time}:00",
-                    'location': player_object.current_town_name if player_object.invillage else "On the Trail",
-                    'difficulty': player_object.difficulty.capitalize()
+                    'hunger': session.player_object.Hunger,
+                    'gold': session.player_object.gold,
+                    'day': session.player_object.Day,
+                    'time': f"{session.player_object.Time}:00",
+                    'location': session.player_object.current_town_name if session.player_object.invillage else "On the Trail",
+                    'difficulty': session.player_object.difficulty.capitalize()
                 }
             }
             messages.append(stat_payload)
         except Exception as e:
             print(f"[Stat Poll Error]: {e}")
     
-    while not server_outbox.empty():
-        msg = server_outbox.get()
+    while not session.server_outbox.empty():
+        msg = session.server_outbox.get()
         
         # Prevent duplicate stat messages to save bandwidth
         if msg.get("type") == "update_stats" and any(m.get("type") == "update_stats" for m in messages):
@@ -162,20 +199,26 @@ def get_update():
 @app.route('/send_response', methods=['POST'])
 def send_response():
     data = request.json
-    player_inbox.put(data['choice'])
+    session_id = data.get("session_id")
+    session = get_session(session_id)
+    if not session:
+        return jsonify({"status": "Error: Session not found."})
+    session.player_inbox.put(data['choice'])
     return jsonify({"status": "Response received"})
 @app.route('/save_game', methods=['POST'])
 def save_game():
-    global player_object, table
-    if not table or not player_object:
+    global table
+    data = request.json
+    session_id = data.get("session_id")
+    session = get_session(session_id)
+    if not table or not session or not session.player_object:
         return jsonify({"status": "Error: Database not connected or game not running."})
     
-    data = request.json
     username = data.get("username", "default_player").strip()
     if not username: return jsonify({"status": "Error: Invalid name."})
     
     # 1. Get the raw data
-    raw_data = player_object.to_dict()
+    raw_data = session.player_object.to_dict()
     raw_data['username'] = username 
     
     # 2. HELPER FUNCTION: Convert all floats to Decimals recursively
@@ -200,25 +243,29 @@ def save_game():
 
 @app.route('/load_game', methods=['POST'])
 def load_game():
-    global player_object, table
+    global table
     if not table:
         return jsonify({"status": "Error: Database not connected."})
         
     data = request.json
+    session_id = data.get("session_id")
+    session = get_session(session_id)
+    if not session:
+        return jsonify({"status": "Error: Session not found. Start a new game first."})
     username = data.get("username", "default_player").strip()
     
     try:
         response = table.get_item(Key={'username': username})
         if 'Item' in response:
             # Start a new game thread if one isn't running
-            if player_object is None:
-                start_game() 
+            if session.player_object is None:
+                start_session_game(session)
                 time.sleep(1.0) # Wait a second for the thread to create the object
             
-            if player_object:
-                player_object.load_from_dict(response['Item'])
+            if session.player_object:
+                session.player_object.load_from_dict(response['Item'])
                 # Force an update to the client
-                ai_file.update_stats_display(player_object)
+                session.ai_file.update_stats_display(session.player_object)
                 return jsonify({"status": f"Welcome back, {username}. Game loaded!"})
             else:
                 return jsonify({"status": "Error: Game thread failed to start."})
