@@ -489,7 +489,6 @@ class Player:
             self.normalize_effects()
             
     def main_game_loop(self):
-        global player # <-- FIX 1: Add this line
         
         # --- NEW CODE ---
 
@@ -507,7 +506,6 @@ class Player:
             # self.difficulty = 'survivalist' 
         else:
             self.winter_mode = False
-        player = self # <-- FIX 3: Add this line
         # "Start New Game" path
         print("Would you like the instructions (Yes/No)?")
         Choice = self.AI_File.parse_YN(": ")
@@ -567,43 +565,43 @@ class Player:
                 self.difficulty = 'frontier'
 
 
-        while not player.Health <= 0:
+        while not self.Health <= 0:
             self.tent_used_today = False
-            if player.invillage == True:
-                player.HostilityFunc()
-                player.change_music("Town.mp3", -1)
+            if self.invillage == True:
+                self.HostilityFunc()
+                self.change_music("Town.mp3", -1)
             else:
-                player.change_music("game_theme.mp3", -1)
-            player.RunDay()
+                self.change_music("game_theme.mp3", -1)
+            self.RunDay()
             if self.has_effect("drunk"):
                 print("You suffer from the effects of alcohol, but it slowly wears off.")
                 self.Health -= 5
                 self.Speed += 1
             self.tick_effects()
-            player.counter = 0
-            player.Day += 1
-            if player.Temporaryspdboost > 0:
-                player.Speed -= player.Temporaryspdboost
-                player.Temporaryspdboost = 0
-            if player.Health <= 0:
+            self.counter = 0
+            self.Day += 1
+            if self.Temporaryspdboost > 0:
+                self.Speed -= self.Temporaryspdboost
+                self.Temporaryspdboost = 0
+            if self.Health <= 0:
                 time.sleep(2,)
-                player.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
-            player.Hunger = player.Hunger + 2
+                self.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
+            self.Hunger = self.Hunger + 2
             print("You feel hungrier...")
             time.sleep(2,)
-            if player.Hunger >= 10: 
+            if self.Hunger >= 10: 
                 print("You are starving! Your body is consuming itself.")
-                player.Hunger = 10
-                player.Health -= 20
-            elif player.Hunger >= 7:
+                self.Hunger = 10
+                self.Health -= 20
+            elif self.Hunger >= 7:
                 print("You are very hungry. Find some food soon.")
-                player.Health -= 10
+                self.Health -= 10
                 
-            if player.poisoned > 0:
+            if self.poisoned > 0:
                 print("You remain poisoned, feeling weak and faint.")
                 time.sleep(2,)
 
-            print(f"Your health is: {player.Health}.")
+            print(f"Your health is: {self.Health}.")
             print("The day ends. You prepare for tomorrow...")
             print("(Use the Save button below if you wish to save your progress.)")
             print("Continuing your adventure...")
@@ -5326,10 +5324,10 @@ class Combat:
             "large": ["large hide", "large meat", "horn"],
             "bandit": ["revolver", "pistol_ammo", "bread", "rifle"],
             "townsperson": ["whiskey", "knife", "antivenom"],
-            "common": [random.choice(player.common_loot)],
-            "uncommon": [random.choice(player.uncommon_loot)],
-            "rare": [random.choice(player.rare_loot)],
-            "ultra_rare": [random.choice(player.ultra_rare_loot)],
+            "common": [random.choice(self.player.common_loot)],
+            "uncommon": [random.choice(self.player.uncommon_loot)],
+            "rare": [random.choice(self.player.rare_loot)],
+            "ultra_rare": [random.choice(self.player.ultra_rare_loot)],
         }
 
     def FindAttacker(self, RandomT):
@@ -5344,7 +5342,7 @@ class Combat:
 
     def Attack(self):
         escape = False
-        player.change_music("combat.mp3", -1)
+        self.player.change_music("combat.mp3", -1)
         self.player.day_memory["encounter"] = f"a {self.Enemy}"
         if "ammo belt" in self.player.itemsinventory:
             ability_auto_ammo_belt = True
@@ -5375,16 +5373,16 @@ class Combat:
 
         print(f"\nYou face off against a {self.Enemy.capitalize()}!")
         print(f"Enemy stats — Health: {enemy_health}, Damage: {enemy_damage}, Speed: {enemy_speed}")
-        player.enemy_sound(self.Enemy)
+        self.player.enemy_sound(self.Enemy)
         if self.EnemyCombatant.get("passive") == True:
             print(f"The {self.Enemy} appears to be passive.")
             print("You have the option to leave it alone, will you? Yes/No")
             Choice = input(": ").capitalize().strip()
             if Choice.lower() == "yes":
-                if player.invillage == True:
-                    player.change_music("Town.mp3", -1)
+                if self.player.invillage == True:
+                    self.player.change_music("Town.mp3", -1)
                 else:
-                    player.change_music("game_theme.mp3", -1)
+                    self.player.change_music("game_theme.mp3", -1)
                     print(f"You slowly back away from the {self.Enemy}.")
                 return
             else:
@@ -5425,7 +5423,7 @@ class Combat:
                             if not owned_weapons:
                                 print("You don't have any weapons, so you fight with your fists!")
                                 player_attack = random.randint(2, 5)
-                                player.play_sound("punch.mp3")
+                                self.player.play_sound("punch.mp3")
                             else:
                                 while True:
                                     print("Choose a weapon:")
@@ -5453,7 +5451,7 @@ class Combat:
                                         if weapon_choice == "fists":
                                             player_attack = random.randint(2, 5)
                                             print("You swing your fists!")
-                                            player.play_sound("punch.mp3")
+                                            self.player.play_sound("punch.mp3")
                                             break # Exit the 'while True' loop
                                         elif weapon_choice in owned_weapons:
                                             weapon = weapon_choice # The choice *is* the weapon name
@@ -5463,7 +5461,7 @@ class Combat:
                                             if ammo_type != 'none':
                                                 if self.player.itemsinventory.get(ammo_type, 0) < 1:
                                                     print(f"You're out of {ammo_type}! Choose another weapon.")
-                                                    player.play_sound("blank_click.mp3")
+                                                    self.player.play_sound("blank_click.mp3")
                                                     time.sleep(1)
                                                     continue # Stay in the 'while True' loop
                                                 else:
@@ -5471,36 +5469,36 @@ class Combat:
                                                     if self.player.itemsinventory[ammo_type] <= 0:
                                                         del self.player.itemsinventory[ammo_type]
                                                     ammo_left = self.player.itemsinventory.get(ammo_type, 0)
-                                                    player.weapon_ability(weapon)
+                                                    self.player.weapon_ability(weapon)
                                                     print(f"You fire the {weapon}. Ammo left: {ammo_left}")
-                                                    player.weapon_sound(weapon)
+                                                    self.player.weapon_sound(weapon)
                                             else:
                                                 if self.player.has_effect("sharpened_blade"):
                                                     print(f"Your blade is extra sharp, +10 damage!")
-                                                    player.damage_modifier += 10
+                                                    self.player.damage_modifier += 10
                                                     self.player.consume_effect("sharpened_blade")
-                                                player.play_sound("knife.mp3")
-                                                player.weapon_ability(weapon)
+                                                self.player.play_sound("knife.mp3")
+                                                self.player.weapon_ability(weapon)
 
                                             # roll damage
                                             dmg_range = info['damage']
                                             player_attack = random.randint(*dmg_range)
-                                            player_attack = player_attack * player.dmg_modifier_multiply
+                                            player_attack = player_attack * self.player.dmg_modifier_multiply
 
                                             break
                                         else:
                                             print("Invalid selection.")
                                     except ValueError:
                                         print("Please enter a valid number.")
-                            player_attack += player.damage_modifier
+                            player_attack += self.player.damage_modifier
                             if self.EnemyCombatant.get("special") == "ghostly_form":
                                 if random.randint(1, 2) == 1:
                                     print("Your attack passes harmlessly through the Phantom Gunslinger!")
                                     continue
                             enemy_health -= player_attack
                             print(f"You hit the {self.Enemy} for {player_attack} damage!")
-                            player.damage_modifier = 0
-                            player.dmg_modifier_multiply = 1
+                            self.player.damage_modifier = 0
+                            self.player.dmg_modifier_multiply = 1
                             print(f"Your health is {self.player.Health}.")
                             print(f"Enemy health is {enemy_health}.")
 
@@ -5520,11 +5518,11 @@ class Combat:
                                 escape_boost = 0
                                 self.player.Health = round(self.player.Health)
                                 self.player.Armor_Boost = 1
-                                player.dmg_modifier_multiply = 1
-                                if player.invillage == True:
-                                    player.change_music("Town.mp3", -1)
+                                self.player.dmg_modifier_multiply = 1
+                                if self.player.invillage == True:
+                                    self.player.change_music("Town.mp3", -1)
                                 else:
-                                    player.change_music("game_theme.mp3", -1)
+                                    self.player.change_music("game_theme.mp3", -1)
                                     
                                 return escape
                             else:
@@ -5542,12 +5540,12 @@ class Combat:
                     self.player.Health = round(self.player.Health)
                     self.player.Armor_Boost = 1
 
-                    player.dmg_modifier_multiply = 1
+                    self.player.dmg_modifier_multiply = 1
                     time.sleep(2,)
-                    if player.invillage == True:
-                        player.change_music("Town.mp3", -1)
+                    if self.player.invillage == True:
+                        self.player.change_music("Town.mp3", -1)
                     else:
-                        player.change_music("game_theme.mp3", -1)
+                        self.player.change_music("game_theme.mp3", -1)
                     return escape
                 # Enemy's turn
                 elif turn == "enemy":
@@ -5690,11 +5688,11 @@ class Combat:
                 self.player.Health = round(self.player.Health)
                 self.player.Armor_Boost = 1
 
-                player.dmg_modifier_multiply = 1
+                self.player.dmg_modifier_multiply = 1
                 time.sleep(2,)
-                if player.invillage == True:
-                    player.change_music("Town.mp3", -1)
+                if self.player.invillage == True:
+                    self.player.change_music("Town.mp3", -1)
                 else:
-                    player.change_music("game_theme.mp3", -1)
+                    self.player.change_music("game_theme.mp3", -1)
                 return escape
 
