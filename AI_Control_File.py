@@ -5,6 +5,10 @@ from textwrap import dedent
 from groq import Groq 
 from groq.types.chat import ChatCompletionMessageParam # <-- ADD THIS LINE
 
+class SessionEnded(Exception):
+    """Raised when the server ends a session and input is unblocked."""
+    pass
+
 class AI_Control:
     def __init__(self, outbox_queue, inbox_queue):
         self.action = None
@@ -126,6 +130,8 @@ class AI_Control:
         # The game thread will sleep here until the /send_response route
         # puts an item in the inbox.
         response = self.inbox.get() 
+        if isinstance(response, dict) and response.get("_session_end"):
+            raise SessionEnded("Session ended by server.")
         
         return response
 

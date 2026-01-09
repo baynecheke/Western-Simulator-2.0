@@ -5,6 +5,7 @@ import builtins
 import time     
 import traceback
 import uuid
+import json
 from dataclasses import dataclass, field
 from typing import Optional
 from flask import Flask, render_template_string, request, jsonify
@@ -30,7 +31,7 @@ except Exception as e:
 load_dotenv() 
 
 # --- Import Your Game Logic ---
-from AI_Control_File import AI_Control
+from AI_Control_File import AI_Control, SessionEnded
 from Western_Sim import Player 
 import game_html 
 
@@ -48,9 +49,12 @@ class GameSession:
     player_object: Optional[Player] = None
     created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
+    stop_requested: bool = False
+    stop_reason: str = ""
 
 sessions = {}
 sessions_lock = threading.Lock()
+SESSION_TIMEOUT_SECONDS = 120
 
 thread_local = threading.local()
 original_print = builtins.print
@@ -95,6 +99,43 @@ def get_session(session_id):
         session.last_seen = time.time()
     return session
 
+def request_session_stop(session, reason=""):
+    if session.stop_requested:
+        return
+    session.stop_requested = True
+    session.stop_reason = reason
+    try:
+        session.player_inbox.put({"_session_end": True})
+    except Exception:
+        pass
+    try:
+        session.server_outbox.put({
+            "type": "game_message",
+            "text": "Session ended. Refresh to start a new game."
+        })
+    except Exception:
+        pass
+
+def cleanup_sessions_loop():
+    while True:
+        time.sleep(10)
+        now = time.time()
+        with sessions_lock:
+            session_ids = list(sessions.keys())
+        for session_id in session_ids:
+            with sessions_lock:
+                session = sessions.get(session_id)
+            if not session:
+                continue
+            if not session.stop_requested and (now - session.last_seen) > SESSION_TIMEOUT_SECONDS:
+                request_session_stop(session, reason="timeout")
+            if session.stop_requested and session.player_thread and not session.player_thread.is_alive():
+                with sessions_lock:
+                    sessions.pop(session_id, None)
+
+cleanup_thread = threading.Thread(target=cleanup_sessions_loop, daemon=True)
+cleanup_thread.start()
+
 def start_session_game(session):
     if session.player_thread is not None and session.player_thread.is_alive():
         return
@@ -118,6 +159,8 @@ def run_game_loop(session):
         # 3. Run the game
         session.player_object.main_game_loop()
         
+    except SessionEnded:
+        pass
     except Exception as e:
         original_print(f"--- A CRITICAL ERROR OCCURRED ---")
         original_print(traceback.format_exc())
@@ -132,7 +175,8 @@ def run_game_loop(session):
         thread_local.print_fn = None
         thread_local.input_fn = None
     
-    session.server_outbox.put({"type": "game_over", "text": "--- GAME OVER ---<br>Refresh the page to play again."})
+    if not session.stop_requested:
+        session.server_outbox.put({"type": "game_over", "text": "--- GAME OVER ---<br>Refresh the page to play again."})
 
 # --- Web Server Routes ---
 @app.route('/')
@@ -203,8 +247,25 @@ def send_response():
     session = get_session(session_id)
     if not session:
         return jsonify({"status": "Error: Session not found."})
+    if session.stop_requested:
+        return jsonify({"status": "Error: Session ended."})
     session.player_inbox.put(data['choice'])
     return jsonify({"status": "Response received"})
+
+@app.route('/end_session', methods=['POST'])
+def end_session():
+    data = request.get_json(silent=True) or {}
+    if not data and request.data:
+        try:
+            data = json.loads(request.data.decode("utf-8"))
+        except Exception:
+            data = {}
+    session_id = data.get("session_id")
+    session = get_session(session_id)
+    if not session:
+        return jsonify({"status": "Session not found."})
+    request_session_stop(session, reason="client_closed")
+    return jsonify({"status": "Session ended."})
 @app.route('/save_game', methods=['POST'])
 def save_game():
     global table
@@ -277,3 +338,8 @@ def load_game():
 if __name__ == '__main__':
     print("Starting Flask server on http://localhost:5001")
     app.run(host="0.0.0.0", port=5001, debug=False)
+    if session.stop_requested:
+        return jsonify({"messages": [{
+            "type": "game_message",
+            "text": "Session ended. Refresh to start a new game."
+        }]})

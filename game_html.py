@@ -170,6 +170,10 @@ HTML_CONTENT = """
             actionTitle.textContent = "Actions";
             actionArea.innerHTML = '<p class="text-slate-500">Waiting for server...</p>';
             try {
+                if (!sessionId) {
+                    addMessage("[Session Error]: No active session. Refresh to start again.");
+                    return;
+                }
                 await fetch('/send_response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -290,6 +294,17 @@ HTML_CONTENT = """
         }
 
         initializeGame();
+    </script>
+    <script>
+        function endSession() {
+            if (!sessionId || !navigator.sendBeacon) return;
+            const payload = JSON.stringify({ session_id: sessionId });
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon('/end_session', blob);
+        }
+
+        window.addEventListener('pagehide', endSession);
+        window.addEventListener('beforeunload', endSession);
     </script>
 
     <div class="fixed bottom-0 right-0 p-4 flex gap-2 bg-slate-900 border-t border-slate-700 z-50">
