@@ -1462,65 +1462,114 @@ class Player:
         GunsmithStore.run_buy_session()
 
     def Bank(self):
-            print("You walk into the Bank. The air smells of leather and dust.")
-            print("What town building would you like to invest in?")
+        print("You walk into the Bank. The air smells of leather and dust.")
+        
+        # 1. Anti-Exploit: Check if the bank was already hit
+        if "bank_robbed" in self.event:
+            print("The bank doors are locked tight, and armed guards are patrolling outside!")
+            print("You can't do business here right now.")
+            return
 
-            # 1. Define buildings and their upgrade prices in a dictionary
+        # 2. Top-Level Bank Menu
+        available_choices = ["invest in town", "rob the bank", "leave"]
+        print("\n--- The Bank ---")
+        print("Invest in town")
+        print("Rob the bank")
+        print("Leave")
+        
+        choice = self.AI_File.parse_choice(available_choices, "What would you like to do? ")
+
+        if choice == "leave":
+            print("You tip your hat and leave the bank.")
+            return
+
+        elif choice == "rob the bank":
+            # Lock the bank down for the rest of the stay and advance time
+            self.event.append("bank_robbed")
+            self.Time += 1 
+            
+            print("\nYou pull your bandana over your face and draw your weapon...")
+            print("You slide up to the teller and demand the vault be opened.")
+            time.sleep(2)
+
+            # High difficulty Shadow check to do it cleanly
+            if self.perform_stat_check(self.shadow_skill, base_target=17):
+                print("You swiftly intimidate the teller and crack the vault before anyone outside notices!")
+                payout = random.randint(150, 300)
+                self.gold += payout
+                print(f"You stuff your bags with {payout} gold!")
+                self.loot_drop("gold bar")
+                print("You slip out the back alley before the law arrives.")
+                self.Hostility += 1 # Minor suspicion since you weren't caught red-handed
+            else:
+                print("You fumble with your gun, and the teller panics, hitting a hidden alarm bell!")
+                print("The Sheriff bursts through the front doors, weapon drawn!")
+                self.Hostility += 3 # You are officially a menace
+                
+                print("'Drop the iron, outlander!' the Sheriff yells.")
+                print("Will you surrender? (yes/no)")
+                surrender_choice = self.AI_File.parse_YN(": ")
+                
+                if surrender_choice == "yes":
+                    print("You drop your weapon and raise your hands.")
+                    self.jail_penalty()
+                else:
+                    print("You fan the hammer and open fire!")
+                    combat = Combat(self)
+                    combat.FindAttacker("sheriff")
+                    combat.Attack()
+                    
+                    if self.Health > 0:
+                        counter_cash = random.randint(20, 50)
+                        self.gold += counter_cash
+                        print(f"\nYou step over the Sheriff and grab {counter_cash} gold from the counter.")
+                        print("You flee the bank, but the whole town is out for your blood!")
+                        self.Hostility += 2 # They really hate you now
+            return
+
+        elif choice == "invest in town":
+            # Your existing investment logic
+            print("\nWhat town building would you like to invest in?")
+
             buildings_to_upgrade = {
                 "general store": self.TownUpgrades["general store"]["level"] * 10,
                 "blacksmith": self.TownUpgrades["blacksmith"]["level"] * 10,
                 "gunsmith": self.TownUpgrades["gunsmith"]["level"] * 10,
             }
 
-            # 2. Create the list of valid choices for the parser
-            # We add "leave" so the parser knows it's a valid option.
-            available_choices = list(buildings_to_upgrade.keys()) + ["leave"]
+            invest_choices = list(buildings_to_upgrade.keys()) + ["leave"]
 
-            # 3. Display the options to the user
-            # The parse_choice function will handle numbering if USE_OLLAMA is False
             print("\n--- Town Investments ---")
             for building, price in buildings_to_upgrade.items():
                 current_level = self.TownUpgrades[building]['level']
-                # This text will be shown in both modes
                 print(f"{building.capitalize()} (Level {current_level}) - Price to upgrade: {price} gold.")
-            
 
-            # Pass the full list, including "leave", to the parser
-            choice = self.AI_File.parse_choice(available_choices, "Choice: ")
+            invest_choice = self.AI_File.parse_choice(invest_choices, "Choice: ")
 
-            # Pass the full list, including "leave", to the parser
-            choice = self.AI_File.parse_choice(available_choices, "Choice: ")
-
-            # 5. Handle the parsed choice
-            if choice == "leave":
+            if invest_choice == "leave":
                 print("You decide not to invest right now and leave the bank.")
                 return
 
-            # Check if the choice is a valid building (it should be, if not 'leave')
-            if choice in buildings_to_upgrade:
-                price_to_pay = buildings_to_upgrade[choice]
+            if invest_choice in buildings_to_upgrade:
+                price_to_pay = buildings_to_upgrade[invest_choice]
 
-                # Check affordability
                 if self.gold < price_to_pay:
                     print("You check your coin purse. You cannot afford that investment.")
                     return
                 
-                # Process the upgrade
                 self.gold -= price_to_pay
-                self.TownUpgrades[choice]["level"] += 1
+                self.TownUpgrades[invest_choice]["level"] += 1
                 
-                # Get new level for confirmation message
-                new_level = self.TownUpgrades[choice]["level"]
-                new_price = new_level * 10 # Calculate the *next* price
+                new_level = self.TownUpgrades[invest_choice]["level"]
+                new_price = new_level * 10 
                 
                 print(f"\nYou paid {price_to_pay} gold.")
-                print(f"The {choice.capitalize()} has been upgraded to Level {new_level}!")
+                print(f"The {invest_choice.capitalize()} has been upgraded to Level {new_level}!")
                 print(f"(The next upgrade will cost {new_price} gold.)")
-            
-            else:
-                # This case should rarely happen if parse_choice is working, but it's safe
-                print(f"Invalid choice '{choice}'. Leaving the bank.")
-                return
+        
+        else:
+            print("Invalid choice. You step back outside.")
+            return
 
     def Armory(self):
         print("You enter the Armory, a shattered house on the edge of town.")
@@ -2048,6 +2097,8 @@ class Player:
             self.event.remove("coin")
         if "drink" in self.event:
             self.event.remove("drink")
+        if "bank_robbed" in self.event:         # <--- ADD THIS
+            self.event.remove("bank_robbed")
 
         # 4. Actual Leaving Logic
         self.counter = 0
@@ -4742,11 +4793,12 @@ class Player:
                     print("You fire multiple shots")
                     # Note: The main combat loop already consumed 1 ammo. This consumes 2 *additional* ammo.
                     if self.itemsinventory.get("pistol_ammo", 0) >= 2:
-                        Random = random.randint(0, 2)
-                        self.itemsinventory["pistol_ammo"] -= 2
+                        Random = random.randint(0, 3)
+                        
                         for i in range(Random):
                             self.play_sound("revolver_shot.mp3")
-                            self.damage_modifier += 15
+                            self.itemsinventory["pistol_ammo"] -= 1 # Consume extra ammo for each additional shot
+                            self.damage_modifier += 20
                             time.sleep(1,)
                     else:
                         print("You do not have enough ammo.")
