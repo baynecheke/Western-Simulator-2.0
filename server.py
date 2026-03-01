@@ -327,9 +327,11 @@ def load_game():
                 session.player_object.load_from_dict(response['Item'])
                 # Force an update to the client
                 session.ai_file.update_stats_display(session.player_object)
+                
+                # --- ADD THIS LINE TO BREAK THE GAME OUT OF ITS WAITING STATE ---
+                session.player_inbox.put("_LOAD_GAME_")
+                
                 return jsonify({"status": f"Welcome back, {username}. Game loaded!"})
-            else:
-                return jsonify({"status": "Error: Game thread failed to start."})
         else:
             return jsonify({"status": "No save file found for that name."})
     except ClientError as e:

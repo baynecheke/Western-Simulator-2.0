@@ -9,6 +9,10 @@ class SessionEnded(Exception):
     """Raised when the server ends a session and input is unblocked."""
     pass
 
+class GameLoadedException(Exception): # <--- ADD THIS CLASS
+    """Raised to break the current input loop and reload the game state."""
+    pass
+
 class AI_Control:
     def __init__(self, outbox_queue, inbox_queue):
         self.action = None
@@ -132,7 +136,8 @@ class AI_Control:
         response = self.inbox.get() 
         if isinstance(response, dict) and response.get("_session_end"):
             raise SessionEnded("Session ended by server.")
-        
+        if response == "_LOAD_GAME_":
+            raise GameLoadedException("Game loaded from save.")
         return response
 
     def _call_groq(self, system_prompt, user_prompt, is_json=True):

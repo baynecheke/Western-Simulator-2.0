@@ -10,7 +10,7 @@ USE_OLLAMA = True
 import builtins
 import sys
 
-
+from AI_Control_File import GameLoadedException
 
 
 
@@ -489,124 +489,131 @@ class Player:
             self.normalize_effects()
             
     def main_game_loop(self):
+        self.loaded_game_flag = False # Track if we are booting from a save
         
-        # --- NEW CODE ---
+        while True:
+            try:
+                # 1. SKIP THE INTRO IF WE JUST LOADED A SAVE
+                if not getattr(self, 'loaded_game_flag', False):
+                    print("\nSelect a Season:")
+                    print("1. Standard (Normal)")
+                    print("2. The Long Winter (Hard Mode + Winter Events)")
+                        
+                    season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
+                        
+                    if season_choice == "winter":
+                        self.winter_mode = True
+                        print("You have chosen The Long Winter. Bundle up...")
+                    else:
+                        self.winter_mode = False
+                        
+                    print("Would you like the instructions (Yes/No)?")
+                    Choice = self.AI_File.parse_YN(": ")
+                    if Choice == "yes":
+                        print("Welcome to Western Simulator!")
+                        time.sleep(2)
+                        print("In this game you will try and survive the western life and complete quests.")
+                        time.sleep(2)
+                        print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
+                        time.sleep(2)
+                        
+                        available_choices = ["adventure", "frontier", "savage"]
+                        prompt = "Choose a difficulty:"
+                        choice = self.AI_File.parse_choice(available_choices, prompt)
+                        if choice == "adventure": self.difficulty = 'adventure'
+                        elif choice == "savage": self.difficulty = 'savage'
+                        else: self.difficulty = 'frontier'
+                        
+                        time.sleep(2)
+                        print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
+                        time.sleep(2)
+                        print("Others like the knife and armor have unlimited uses.")
+                        time.sleep(2)
+                        print("Now let's start your journey.")
+                        print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
+                        time.sleep(1)
+                        Location = ["Dustbowl, a tough town in the South Dakota territory.", 
+                                    "Rust Ridge, a thriving town in the eastern half of Colorado.", 
+                                    "Quarry Town, a large mining town on the banks of the Missouri River."]
+                        print("You wake up in the town of " + random.choice(Location))
+                        print("The people greet you with nods as you walk down the mainstreet.")
+                        time.sleep(4)
+                        self.change_music("Town.mp3", -1)
+                        self.add_item("diary")
+                        
+                    else:
+                        self.change_music("Town.mp3", -1)
+                        self.add_item("diary")
+                        available_choices = ["adventure", "frontier", "savage"]
+                        prompt = "Choose a difficulty:"
+                        choice = self.AI_File.parse_choice(available_choices, prompt)
+                        if choice == "adventure": self.difficulty = 'adventure'
+                        elif choice == "savage": self.difficulty = 'savage'
+                        else: self.difficulty = 'frontier'
 
-        print("\nSelect a Season:")
-        print("1. Standard (Normal)")
-        print("2. The Long Winter (Hard Mode + Winter Events)")
-            
-        # This parses "1", "2", "standard", or "winter"
-        season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
-            
-        if season_choice == "winter":
-            self.winter_mode = True
-            print("You have chosen The Long Winter. Bundle up...")
-            # Optional: Force difficult setting if you want
-            # self.difficulty = 'survivalist' 
-        else:
-            self.winter_mode = False
-        # "Start New Game" path
-        print("Would you like the instructions (Yes/No)?")
-        Choice = self.AI_File.parse_YN(": ")
-        if Choice == "yes":
-            print("Welcome to Western Simulator!")
-            time.sleep(2,)
-            print("In this game you will try and survive the western life and complete quests.")
-            time.sleep(2,)
-            print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
-            time.sleep(2,)
-            
-            # --- MODIFICATION START ---
-            available_choices = ["adventure", "frontier", "savage"]
-            prompt = "Choose a difficulty:"
-            
+                # Reset the flag so if they die and restart normally, the intro plays
+                self.loaded_game_flag = False
 
-            choice = self.AI_File.parse_choice(available_choices, prompt)
-            # 'choice' will be "adventure", "frontier", or "savage"
-            
-            if choice == "adventure": # <-- Changed from "1"
-                self.difficulty = 'adventure'
-            elif choice == "savage": # <-- Changed from "3"
-                self.difficulty = 'savage'
-            else: # <-- This now correctly defaults to "frontier"
-                self.difficulty = 'frontier'
-            time.sleep(2,)
-            print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
-            time.sleep(2,)
-            print("Others like the knife and armor have unlimited uses.")
-            time.sleep(2,)
-            print("Now let's start your journey.")
-            print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
-            time.sleep(1,)
-            Location = ["Dustbowl, a tough town in the South Dakota territory.", 
-                        "Rust Ridge, a thriving town in the eastern half of Colorado.", 
-                        "Quarry Town, a large mining town on the banks of the Missouri River."]
-            print("You wake up in the town of " + Location[random.randint(0,2)])
-            print("The people greet you with nods as you walk down the mainstreet.")
-            time.sleep(4,)
-            self.change_music("Town.mp3", -1)
-            self.add_item("diary")
-            
-        else:
-            self.change_music("Town.mp3", -1)
-            self.add_item("diary")
-            available_choices = ["adventure", "frontier", "savage"]
-            prompt = "Choose a difficulty:"
-            
-            choice = self.AI_File.parse_choice(available_choices, prompt)
-            # 'choice' will be "adventure", "frontier", or "savage"
-            
-            if choice == "adventure": # <-- Changed from "1"
-                self.difficulty = 'adventure'
-            elif choice == "savage": # <-- Changed from "3"
-                self.difficulty = 'savage'
-            else: # <-- This now correctly defaults to "frontier"
-                self.difficulty = 'frontier'
+                # 2. THE MAIN SURVIVAL LOOP
+                while not self.Health <= 0:
+                    self.tent_used_today = False
+                    if self.invillage == True:
+                        self.HostilityFunc()
+                        self.change_music("Town.mp3", -1)
+                    else:
+                        self.change_music("game_theme.mp3", -1)
+                        
+                    self.RunDay()
+                    
+                    if self.has_effect("drunk"):
+                        print("You suffer from the effects of alcohol, but it slowly wears off.")
+                        self.Health -= 5
+                        self.Speed += 1
+                    self.tick_effects()
+                    self.counter = 0
+                    self.Day += 1
+                    
+                    if self.Temporaryspdboost > 0:
+                        self.Speed -= self.Temporaryspdboost
+                        self.Temporaryspdboost = 0
+                        
+                    if self.Health <= 0:
+                        time.sleep(2)
+                        self.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
+                        
+                    self.Hunger = self.Hunger + 2
+                    print("You feel hungrier...")
+                    time.sleep(2)
+                    if self.Hunger >= 10: 
+                        print("You are starving! Your body is consuming itself.")
+                        self.Hunger = 10
+                        self.Health -= 20
+                    elif self.Hunger >= 7:
+                        print("You are very hungry. Find some food soon.")
+                        self.Health -= 10
+                        
+                    if self.poisoned > 0:
+                        print("You remain poisoned, feeling weak and faint.")
+                        time.sleep(2)
 
-
-        while not self.Health <= 0:
-            self.tent_used_today = False
-            if self.invillage == True:
-                self.HostilityFunc()
-                self.change_music("Town.mp3", -1)
-            else:
-                self.change_music("game_theme.mp3", -1)
-            self.RunDay()
-            if self.has_effect("drunk"):
-                print("You suffer from the effects of alcohol, but it slowly wears off.")
-                self.Health -= 5
-                self.Speed += 1
-            self.tick_effects()
-            self.counter = 0
-            self.Day += 1
-            if self.Temporaryspdboost > 0:
-                self.Speed -= self.Temporaryspdboost
-                self.Temporaryspdboost = 0
-            if self.Health <= 0:
-                time.sleep(2,)
-                self.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
-            self.Hunger = self.Hunger + 2
-            print("You feel hungrier...")
-            time.sleep(2,)
-            if self.Hunger >= 10: 
-                print("You are starving! Your body is consuming itself.")
-                self.Hunger = 10
-                self.Health -= 20
-            elif self.Hunger >= 7:
-                print("You are very hungry. Find some food soon.")
-                self.Health -= 10
+                    print(f"Your health is: {self.Health}.")
+                    print("The day ends. You prepare for tomorrow...")
+                    print("(Use the Save button below if you wish to save your progress.)")
+                    print("Continuing your adventure...")
+                    time.sleep(4)
+                    
+            # 3. THE LOAD INTERRUPTION CATCH
+            except GameLoadedException:
+                print("\n\n--- GAME LOADED SUCCESSFULLY ---")
+                print("Resuming your adventure...\n")
                 
-            if self.poisoned > 0:
-                print("You remain poisoned, feeling weak and faint.")
-                time.sleep(2,)
-
-            print(f"Your health is: {self.Health}.")
-            print("The day ends. You prepare for tomorrow...")
-            print("(Use the Save button below if you wish to save your progress.)")
-            print("Continuing your adventure...")
-            time.sleep(4)
-
+                # Flag that we are loaded so we skip the intro sequence
+                self.loaded_game_flag = True
+                self.update_actions()
+                
+                # Continue forces Python back to the top of the 'while True' loop!
+                continue
+            
     def update_actions(self):
         """
         Builds the self.possibleactions list based on
