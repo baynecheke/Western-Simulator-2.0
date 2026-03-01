@@ -603,17 +603,22 @@ class Player:
                     time.sleep(4)
                     
             # 3. THE LOAD INTERRUPTION CATCH
-            except GameLoadedException:
-                print("\n\n--- GAME LOADED SUCCESSFULLY ---")
-                print("Resuming your adventure...\n")
-                
-                # Flag that we are loaded so we skip the intro sequence
-                self.loaded_game_flag = True
-                self.update_actions()
-                
-                # Continue forces Python back to the top of the 'while True' loop!
-                continue
-            
+            except BaseException as e:
+                # Check the exception name as a string to prevent ImportErrors
+                if type(e).__name__ == "GameLoadedException":
+                    # Send text directly to the web UI so the player knows it worked
+                    self.AI_File.print_to_client("<br><br><b>--- GAME LOADED SUCCESSFULLY ---</b>")
+                    self.AI_File.print_to_client("<b>Resuming your adventure...</b><br><br>")
+                    
+                    # Flag that we are loaded so we skip the intro sequence
+                    self.loaded_game_flag = True
+                    
+                    # Continue forces Python back to the top of the 'while True' loop!
+                    continue 
+                else:
+                    # If the game crashes for a real reason, let it crash so we can see the error!
+                    raise e
+
     def update_actions(self):
         """
         Builds the self.possibleactions list based on

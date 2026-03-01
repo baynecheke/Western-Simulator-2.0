@@ -8,8 +8,7 @@ from groq.types.chat import ChatCompletionMessageParam # <-- ADD THIS LINE
 class SessionEnded(Exception):
     """Raised when the server ends a session and input is unblocked."""
     pass
-
-class GameLoadedException(Exception): # <--- ADD THIS CLASS
+class GameLoadedException(BaseException): # <--- Changed from Exception
     """Raised to break the current input loop and reload the game state."""
     pass
 

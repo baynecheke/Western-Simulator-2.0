@@ -327,6 +327,11 @@ def load_game():
                 session.player_object.load_from_dict(response['Item'])
                 # Force an update to the client
                 session.ai_file.update_stats_display(session.player_object)
+                while not session.player_inbox.empty():
+                    try:
+                        session.player_inbox.get_nowait()
+                    except queue.Empty:
+                        break
                 
                 # --- ADD THIS LINE TO BREAK THE GAME OUT OF ITS WAITING STATE ---
                 session.player_inbox.put("_LOAD_GAME_")
