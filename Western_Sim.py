@@ -487,6 +487,7 @@ class Player:
         # Normalize effects just in case
         if hasattr(self, 'normalize_effects'):
             self.normalize_effects()
+        self.update_actions()
             
     def main_game_loop(self):
         self.loaded_game_flag = False # Track if we are booting from a save
