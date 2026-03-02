@@ -5483,20 +5483,41 @@ class Combat:
 
                         if choice == "attack":
                             player_turn_complete = True
-                            # Get list of owned weapons (weapons with known names)
-                            owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
-                            if not owned_weapons:
+                            
+                            # --- 1. DYNAMIC STRING SCANNER ---
+                            owned_weapon_strings = []
+                            for inv_item in self.player.itemsinventory:
+                                for base_weapon in weapons_data:
+                                    if base_weapon in inv_item:
+                                        owned_weapon_strings.append(inv_item)
+                                        break # Found the base weapon, move to next item
+                                        
+                            if not owned_weapon_strings:
                                 print("You don't have any weapons, so you fight with your fists!")
                                 player_attack = random.randint(2, 5)
                                 self.player.play_sound("punch.mp3")
+                                
+                                # Apply fist damage directly
+                                player_attack += self.player.damage_modifier
+                                enemy_health -= player_attack
+                                print(f"You hit the {self.Enemy} for {player_attack} damage!")
+                                self.player.damage_modifier = 0
+                                self.player.dmg_modifier_multiply = 1
+                                print(f"Your health is {self.player.Health}.")
+                                print(f"Enemy health is {enemy_health}.")
+                                
                             else:
                                 while True:
                                     print("Choose a weapon:")
-                                    for weapon in owned_weapons:
-                                        info = weapons_data[weapon]
-                                        dmg = info['damage']
-                                        ammo_type = info['ammo']
-                                        ammo_info = ""
+                                    
+                                    # Create the button choices directly from the inventory strings
+                                    button_choices = owned_weapon_strings + ["fists"]
+                                    
+                                    # Display weapons with their dynamic ammo
+                                    for exact_name in owned_weapon_strings:
+                                        temp_base = next(b for b in weapons_data if b in exact_name)
+                                        ammo_type = weapons_data[temp_base]['ammo']
+                                        
                                         if ammo_type != 'none':
                                             if ability_auto_ammo_belt:
                                                 self.player.itemsinventory[ammo_type] = self.player.itemsinventory.get(ammo_type, 0) + 1
@@ -5504,25 +5525,34 @@ class Combat:
                                                 ability_auto_ammo_belt = False
                                             ammo_count = self.player.itemsinventory.get(ammo_type, 0)
                                             ammo_info = f" | Ammo: {ammo_count}"
-                                        print(f"{weapon.capitalize()} (Damage: {dmg}){ammo_info}")
-                                    print(f"Fists (No weapon)")
+                                        else:
+                                            ammo_info = ""
+                                            
+                                        # Use .title() so "rusty revolver" becomes "Rusty Revolver"
+                                        print(f"{exact_name.title()} (Base Dmg: {weapons_data[temp_base]['damage']}){ammo_info}")
+                                        
+                                    print("Fists (No weapon)")
 
                                     try:
-                                        button_choices = owned_weapons + ["fists"]
                                         weapon_choice = self.player.AI_File.parse_choice(
-                                        button_choices, 
-                                        "Choose a weapon:"
+                                            button_choices, 
+                                            "Choose a weapon:"
                                         )
+                                        
                                         if weapon_choice == "fists":
                                             player_attack = random.randint(2, 5)
                                             print("You swing your fists!")
                                             self.player.play_sound("punch.mp3")
-                                            break # Exit the 'while True' loop
-                                        elif weapon_choice in owned_weapons:
-                                            weapon = weapon_choice # The choice *is* the weapon name
-                                            info = weapons_data[weapon]
+                                            
+                                        elif weapon_choice in owned_weapon_strings:
+                                            exact_name = weapon_choice
+                                            
+                                            # Parse the string to find the base weapon for the rulebook
+                                            base_weapon = next(b for b in weapons_data if b in exact_name)
+                                            info = weapons_data[base_weapon]
                                             ammo_type = info['ammo']
-                                            # check ammo
+                                            
+                                            # --- 2. AMMO CHECK ---
                                             if ammo_type != 'none':
                                                 if self.player.itemsinventory.get(ammo_type, 0) < 1:
                                                     print(f"You're out of {ammo_type}! Choose another weapon.")
@@ -5534,38 +5564,94 @@ class Combat:
                                                     if self.player.itemsinventory[ammo_type] <= 0:
                                                         del self.player.itemsinventory[ammo_type]
                                                     ammo_left = self.player.itemsinventory.get(ammo_type, 0)
-                                                    self.player.weapon_ability(weapon)
-                                                    print(f"You fire the {weapon}. Ammo left: {ammo_left}")
-                                                    self.player.weapon_sound(weapon)
+                                                    
+                                                    self.player.weapon_ability(base_weapon)
+                                                    print(f"You fire the {exact_name.title()}. Ammo left: {ammo_left}")
+                                                    self.player.weapon_sound(base_weapon)
                                             else:
+                                                # Melee Weapon Handling
                                                 if self.player.has_effect("sharpened_blade"):
                                                     print(f"Your blade is extra sharp, +10 damage!")
                                                     self.player.damage_modifier += 10
                                                     self.player.consume_effect("sharpened_blade")
                                                 self.player.play_sound("knife.mp3")
-                                                self.player.weapon_ability(weapon)
+                                                self.player.weapon_ability(base_weapon)
 
-                                            # roll damage
+                                            # --- 3. THE 2-SLOT MODIFIER LOGIC ---
+                                            condition_mult = 1.0
+                                            trait_mult = 1.0
+                                            applied_mods = []
+                                            
+                                            # Slot 1: Conditions (Max 1)
+                                            weapon_conditions = {
+                                                "rusty ": 0.75, 
+                                                "beat-up ": 0.90, 
+                                                "well-oiled ": 1.15, 
+                                                "masterwork ": 1.50
+                                            }
+                                            for cond, mult in weapon_conditions.items():
+                                                if cond in exact_name:
+                                                    condition_mult = mult
+                                                    applied_mods.append(cond.strip())
+                                                    break # Apply the first condition found, then stop
+                                            
+                                            # Slot 2: Traits (Max 1)
+                                            weapon_traits = {
+                                                "cursed ": 2.0, 
+                                                "outlaw's ": 1.20, 
+                                                "engraved ": 1.0
+                                            }
+                                            for trait, mult in weapon_traits.items():
+                                                if trait in exact_name:
+                                                    trait_mult = mult
+                                                    applied_mods.append(trait.strip())
+                                                    
+                                                    # Specific Trait Gameplay Effects!
+                                                    if "cursed" in trait:
+                                                        print("The cursed weapon drains your life force as you attack! -5 Health.")
+                                                        self.player.Health -= 5
+                                                    
+                                                    break # Apply the first trait found, then stop
+
+                                            # Combine the multipliers and display them
+                                            total_mult = condition_mult * trait_mult
+                                            if applied_mods:
+                                                print(f"Weapon modifiers active ({', '.join(applied_mods)}): Damage x{total_mult:.2f}")
+
+                                            # Roll base damage
                                             dmg_range = info['damage']
-                                            player_attack = random.randint(*dmg_range)
-                                            player_attack = player_attack * self.player.dmg_modifier_multiply
+                                            base_roll = random.randint(*dmg_range)
+                                            
+                                            # Calculate final attack (Base * Modifiers * Temporary Buffs)
+                                            player_attack = int(base_roll * total_mult * self.player.dmg_modifier_multiply)
 
-                                            break
                                         else:
                                             print("Invalid selection.")
+                                            continue
+                                            
                                     except ValueError:
-                                        print("Please enter a valid number.")
-                            player_attack += self.player.damage_modifier
-                            if self.EnemyCombatant.get("special") == "ghostly_form":
-                                if random.randint(1, 2) == 1:
-                                    print("Your attack passes harmlessly through the Phantom Gunslinger!")
-                                    continue
-                            enemy_health -= player_attack
-                            print(f"You hit the {self.Enemy} for {player_attack} damage!")
-                            self.player.damage_modifier = 0
-                            self.player.dmg_modifier_multiply = 1
-                            print(f"Your health is {self.player.Health}.")
-                            print(f"Enemy health is {enemy_health}.")
+                                        print("Please enter a valid choice.")
+                                        continue
+                                        
+                                    # --- 4. APPLY DAMAGE TO ENEMY ---
+                                    player_attack += self.player.damage_modifier
+                                    
+                                    # Check Ghostly form
+                                    if self.EnemyCombatant.get("special") == "ghostly_form":
+                                        if random.randint(1, 2) == 1:
+                                            print("Your attack passes harmlessly through the Phantom Gunslinger!")
+                                            player_attack = 0 # Negate damage this turn
+                                            
+                                    if player_attack > 0:
+                                        enemy_health -= player_attack
+                                        print(f"You hit the {self.Enemy} for {player_attack} damage!")
+                                        
+                                    self.player.damage_modifier = 0
+                                    self.player.dmg_modifier_multiply = 1
+                                    print(f"Your health is {self.player.Health}.")
+                                    print(f"Enemy health is {enemy_health}.")
+                                    
+                                    break # Exit the 'while True' weapon selection loop
 
                         elif choice == "use item":
                             self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
