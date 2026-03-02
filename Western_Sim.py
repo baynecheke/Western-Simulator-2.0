@@ -1497,47 +1497,86 @@ class Player:
             return
 
         elif choice == "rob the bank":
-            # Lock the bank down for the rest of the stay and advance time
+            # 1. Weapon Check: Scan inventory for anything containing a base weapon string
+            available_weapons = []
+            for inv_item in self.itemsinventory:
+                for base_weapon in weapons_data:
+                    if base_weapon in inv_item:
+                        available_weapons.append(inv_item)
+                        break
+
+            if not available_weapons:
+                print("\nYou reach for a weapon, but your holster is empty!")
+                print("You can't rob a bank with your bare hands. You leave before you look suspicious.")
+                return
+
+            # 2. Select the tool for the job
+            print("\nYou duck into an alley and pull a bandana over your face.")
+            print("Which weapon will you use for the heist?")
+            heist_weapon = self.AI_File.parse_choice(available_weapons, "Select weapon: ")
+            
+            # Lock the bank and advance time
             self.event.append("bank_robbed")
             self.Time += 1 
-            
-            print("\nYou pull your bandana over your face and draw your weapon...")
-            print("You slide up to the teller and demand the vault be opened.")
+
+            print(f"\nYou stride into the bank, leveling your {heist_weapon.title()} at the ceiling.")
+            print("'EVERYBODY ON THE GROUND!' you bark.")
             time.sleep(2)
 
-            # High difficulty Shadow check to do it cleanly
-            if self.perform_stat_check(self.shadow_skill, base_target=17):
-                print("You swiftly intimidate the teller and crack the vault before anyone outside notices!")
-                payout = random.randint(150, 300)
+            # 3. Robust Skill Check
+            # High difficulty Shadow check. 
+            # We use 17 as the target, but maybe 'Masterwork' weapons make people more intimidated?
+            target = 17
+            if "masterwork" in heist_weapon:
+                print("The craftsmanship of your weapon cows the crowd instantly.")
+                target -= 2
+            elif "rusty" in heist_weapon:
+                print("The teller notices the rust on your iron and looks less than impressed.")
+                target += 1
+
+            if self.perform_stat_check(self.shadow_skill, base_target=target):
+                print("\nYou swiftly intimidate the teller. They fumble with the keys and crack the vault.")
+                print("You work in total silence; no one outside even looks toward the window.")
+                
+                payout = random.randint(50, 150)
                 self.gold += payout
                 print(f"You stuff your bags with {payout} gold!")
                 self.loot_drop("gold bar")
-                print("You slip out the back alley before the law arrives.")
-                self.Hostility += 1 # Minor suspicion since you weren't caught red-handed
-            else:
-                print("You fumble with your gun, and the teller panics, hitting a hidden alarm bell!")
-                print("The Sheriff bursts through the front doors, weapon drawn!")
-                self.Hostility += 3 # You are officially a menace
                 
-                print("'Drop the iron, outlander!' the Sheriff yells.")
+                print("You slip out the back alley and blend into the street crowds.")
+                self.Hostility += 2 # Minor suspicion
+            
+            else:
+                # FAILURE BRANCH
+                print("\nYou fumble with your bandana, and the teller catches a glimpse of your face!")
+                print("They panic and kick a hidden lever—a bell begins clanging wildly!")
+                time.sleep(1)
+                print("\nThe Sheriff bursts through the front doors, weapon drawn!")
+                self.Hostility += 3 
+                
+                print(f"'Drop that {heist_weapon.split()[-1]}, outlander!' the Sheriff yells.")
                 print("Will you surrender? (yes/no)")
                 surrender_choice = self.AI_File.parse_YN(": ")
                 
                 if surrender_choice == "yes":
-                    print("You drop your weapon and raise your hands.")
+                    print("You drop your iron and raise your hands.")
                     self.jail_penalty()
                 else:
                     print("You fan the hammer and open fire!")
+                    # Initiate combat using the Sheriff template
                     combat = Combat(self)
                     combat.FindAttacker("sheriff")
-                    combat.Attack()
-                    
+                    # Pass 'escape' flag check
+                    if combat.Attack(): 
+                        return # They escaped combat
+
+                    # Post-combat looting if they won
                     if self.Health > 0:
                         counter_cash = random.randint(20, 50)
                         self.gold += counter_cash
                         print(f"\nYou step over the Sheriff and grab {counter_cash} gold from the counter.")
                         print("You flee the bank, but the whole town is out for your blood!")
-                        self.Hostility += 2 # They really hate you now
+                        self.Hostility += 4
             return
 
         elif choice == "invest in town":
