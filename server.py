@@ -343,6 +343,9 @@ def load_game():
         return jsonify({"status": f"Load failed: {e.response['Error']['Message']}"})
 
 if __name__ == '__main__':
-    print("Starting Flask server on http://localhost:5001")
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    # Render provides a PORT environment variable. If it's not there, use 5001 for local dev.
+    port = int(os.environ.get("PORT", 5001))
+    print(f"Starting Flask server on http://0.0.0.0:{port}")
+    # You must use 0.0.0.0 to be visible to the network on Render
+    app.run(host="0.0.0.0", port=port, debug=False)
 
