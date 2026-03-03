@@ -505,8 +505,10 @@ class Player:
                     if season_choice == "winter":
                         self.winter_mode = True
                         print("You have chosen The Long Winter. Bundle up...")
+                        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'winter'})
                     else:
                         self.winter_mode = False
+                        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'default'})
                         
                     print("Would you like the instructions (Yes/No)?")
                     Choice = self.AI_File.parse_YN(": ")

@@ -97,7 +97,23 @@ class AI_Control:
             print(f"[Stat Update Error]: {e}") 
 
     # --- CORE I/O (Input) FUNCTIONS ---
+    def set_theme(self, theme_name):
+            """ Tells the browser to swap the CSS theme ('default', 'winter', 'night', 'rain'). """
+            self.outbox.put({
+                'type': 'set_theme',
+                'theme': theme_name
+            })
 
+    def update_statuses(self, status_list):
+        """ 
+        Tells the browser to show status pills. 
+        Expects a list of dictionaries, e.g.:
+        [{'id': 'poison', 'text': 'Poisoned', 'type': 'negative'}]
+        """
+        self.outbox.put({
+            'type': 'update_statuses',
+            'statuses': status_list
+        })
     def patched_input(self, prompt=""):
         """
         This replaces builtins.input.
