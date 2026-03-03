@@ -5523,14 +5523,13 @@ class Combat:
                         if choice == "attack":
                             player_turn_complete = True
                             
-                            # --- 1. DYNAMIC STRING SCANNER ---
-                            # Link inventory items to base weapon templates
+
                             owned_weapon_info = [] # List of dicts: {"display": "Rusty Revolver", "raw": "rusty revolver", "base": "revolver"}
                             for inv_item in self.player.itemsinventory:
                                 # Find the best matching base weapon (longest match first to avoid 'revolver' matching 'colt revolver')
                                 possible_bases = [b for b in weapons_data if b in inv_item]
                                 if possible_bases:
-                                    best_base = max(possible_bases, key=len)
+                                    best_base = max(possible_bases, key=len) # Get the most specific match
                                     owned_weapon_info.append({
                                         "display": inv_item.title(),
                                         "raw": inv_item,
@@ -5571,15 +5570,19 @@ class Combat:
                                         
                                         # --- 2. AMMO & ABILITY CHECK ---
                                         if ammo_type != 'none':
-                                            if self.player.itemsinventory.get(ammo_type, 0) < 1:
-                                                print(f"No {ammo_type} left! Pick another weapon.")
+                                            current_ammo = self.player.itemsinventory.get(ammo_type, 0)
+                                            if current_ammo < 1:
+                                                print(f"(!) You're out of {ammo_type.replace('_',' ')}! You can't fire the {exact_name.title()}.")
                                                 self.player.play_sound("blank_click.mp3")
+                                                # This continue is crucial; it prevents damage calculation and loops back to selection
                                                 continue 
                                             else:
+                                                # Deduct ammo and proceed
                                                 self.player.itemsinventory[ammo_type] -= 1
                                                 if self.player.itemsinventory[ammo_type] <= 0:
                                                     del self.player.itemsinventory[ammo_type]
                                                 
+                                                # Ability and sound triggers
                                                 self.player.weapon_ability(base_weapon)
                                                 self.player.weapon_sound(base_weapon)
                                         else:
