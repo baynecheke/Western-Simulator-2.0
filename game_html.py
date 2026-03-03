@@ -167,7 +167,7 @@ HTML_CONTENT = """
                     </div>
                 </div>
 
-                <div class="flex flex-col">
+                <div id="heat-container" class="flex flex-col">
                     <div class="flex justify-between font-bold text-sm themed-text">
                         <span>Heat:</span>
                         <span id="stat-heat-text">100 / 100</span>
@@ -243,7 +243,18 @@ HTML_CONTENT = """
 
         // --- NEW HELPER FUNCTIONS FOR IMMERSION ---
         function setTheme(themeName) {
+            // 1. Change the background and colors
             document.body.className = `theme-${themeName} flex items-center justify-center min-h-screen p-4`;
+            
+            // 2. Hide or Show the Heat bar
+            const heatContainer = document.getElementById('heat-container');
+            if (heatContainer) {
+                if (themeName === 'winter') {
+                    heatContainer.classList.remove('hidden'); // Show it
+                } else {
+                    heatContainer.classList.add('hidden');    // Hide it
+                }
+            }
         }
 
         function updateStatuses(activeStatuses) {
