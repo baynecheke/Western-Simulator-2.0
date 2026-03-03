@@ -5210,6 +5210,61 @@ class Player:
 
         time.sleep(2)
 
+    def get_inventory_matches(self, category):
+            """
+            A master helper to find items by category or keyword.
+            Categories: 'weapons', 'melee', 'firearms', or any specific string like 'rope'.
+            """
+            matches = []
+            
+            # 1. Weapon Categories
+            if category in ["weapons", "firearms", "melee"]:
+                # Combine all weapon types from your internal weapons dict
+                all_base_firearms = self.weapons["revolver"] + self.weapons["rifle"] + self.weapons["shotgun"]
+                all_base_melee = self.weapons["melee"]
+                
+                target_list = []
+                if category == "weapons": target_list = all_base_firearms + all_base_melee
+                elif category == "firearms": target_list = all_base_firearms
+                elif category == "melee": target_list = all_base_melee
+                
+                for inv_item in self.itemsinventory:
+                    # STRICT FILTER: Immediately skip any item that is ammo
+                    if "ammo" in inv_item.lower():
+                        continue
+                        
+                    # Find the best matching base weapon
+                    possible_bases = [b for b in target_list if b in inv_item]
+                    
+                    if possible_bases:
+                        best_base = max(possible_bases, key=len) # Grab the most specific match
+                        
+                        # Melee weapons don't need ammo; always add them
+                        if best_base in all_base_melee:
+                            matches.append(inv_item)
+                            
+                        # Firearms must pass the ammo check
+                        elif best_base in all_base_firearms:
+                            info = weapons_data.get(best_base)
+                            if info:
+                                ammo_type = info['ammo']
+                                # Only add the firearm to the list if ammo is 1 or greater
+                                if self.itemsinventory.get(ammo_type, 0) > 0:
+                                    matches.append(inv_item)
+            
+            # 2. Specific Keyword (e.g., 'rope', 'rifle', 'bread')
+            else:
+                for inv_item in self.itemsinventory:
+                    if category.lower() in inv_item.lower():
+                        # If the player is searching for "rifle", don't return "rifle_ammo"
+                        # But if they specifically search for "ammo", let it through.
+                        if "ammo" not in category.lower() and "ammo" in inv_item.lower():
+                            continue
+                            
+                        matches.append(inv_item)
+                        
+            return matches
+
     def process_quest_triggers(self, trigger_location, is_menu_option=False):
         """
         The Master Quest Handler.
