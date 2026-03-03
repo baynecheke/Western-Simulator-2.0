@@ -4805,124 +4805,123 @@ class Player:
         if name == "rattlesnake":
             self.AI_File.play_sound("rattle_snake.mp3")
 
-    def weapon_ability(self, weapon):
-        # Get the weapon's data from the loaded weapons_data
-        weapon_info = weapons_data.get(weapon)
-
-        # Exit if the weapon doesn't exist or has no defined ability
-        if not weapon_info:
-            return
-        
+    def weapon_ability(self, base_weapon, exact_name): # <-- Added exact_name parameter
+        weapon_info = weapons_data.get(base_weapon)
+        if not weapon_info: return
         ability = weapon_info.get('ability', 'none')
-        
-        if ability == 'none':
-            return
+        if ability == 'none': return
 
-        # Use a match statement to handle the different abilities
         match ability:
             case "dual wield":
-                # Logic for revolver, colt pistol
-                if self.itemsinventory[weapon] >= 2:
-                    if self.itemsinventory.get("pistol_ammo", 0) > 1:
-                        print(f"You pull out both {weapon}s and fire!")
-                        self.itemsinventory["pistol_ammo"] -= 1 # Only consumes 1 extra ammo for the 2nd gun
+                # Count ALL items that contain the base weapon string (e.g., all revolvers)
+                total_owned = sum(qty for item, qty in self.itemsinventory.items() if base_weapon in item)
+                
+                if total_owned >= 2:
+                    # Remember: 1 ammo was already used by the main attack
+                    if self.itemsinventory.get("pistol_ammo", 0) >= 1:
+                        print(f"You pull out a second {base_weapon} and fire!")
+                        self.itemsinventory["pistol_ammo"] -= 1
+                        if self.itemsinventory["pistol_ammo"] <= 0:
+                            del self.itemsinventory["pistol_ammo"]
+                            
                         self.dmg_modifier_multiply = 2
                         self.play_sound("revolver_shot.mp3")
-                        time.sleep(1,)
+                        time.sleep(1)
 
             case "steady aim":
-                # Logic for winchester rifle, henry rifle
                 print("You steady your aim...")
                 if random.randint(1, 4) == 1:
                     print("A solid hit!")
                     self.dmg_modifier_multiply = 1.5
 
             case "multi-shot":
-                # Logic for remington pistol, derringer pistol
-                print("Would you like to fire multiple shots? yes/no")
-                choice = self.AI_File.parse_YN(": ")
-                if choice == "yes":
-                    print("You fire multiple shots")
-                    # Note: The main combat loop already consumed 1 ammo. This consumes 2 *additional* ammo.
-                    if self.itemsinventory.get("pistol_ammo", 0) >= 2:
-                        Random = random.randint(0, 3)
+                current_ammo = self.itemsinventory.get("pistol_ammo", 0)
+                # Only ask if they actually have extra ammo left
+                if current_ammo >= 1: 
+                    print("Would you like to fan the hammer for multiple shots? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
+                    if choice == "yes":
+                        # Determine extra shots, capped by remaining ammo
+                        extra_shots = random.randint(1, 3)
+                        actual_shots = min(extra_shots, current_ammo)
                         
-                        for i in range(Random):
+                        print(f"You fire {actual_shots} extra shots!")
+                        for _ in range(actual_shots):
                             self.play_sound("revolver_shot.mp3")
-                            self.itemsinventory["pistol_ammo"] -= 1 # Consume extra ammo for each additional shot
+                            self.itemsinventory["pistol_ammo"] -= 1
                             self.damage_modifier += 20
-                            time.sleep(1,)
-                    else:
-                        print("You do not have enough ammo.")
-                        time.sleep(2,)
+                            time.sleep(0.5)
+                            
+                        # Cleanup dictionary if empty
+                        if self.itemsinventory["pistol_ammo"] <= 0:
+                            del self.itemsinventory["pistol_ammo"]
 
             case "double barrel":
-                # Logic for double barrel shotgun
-                print("Double Barrel! Fire both barrels? (yes/no)")
-                choice = self.AI_File.parse_YN(": ")
-                # Note: The main combat loop already consumed 1 ammo. This consumes 1 *additional* ammo.
-                if choice == "yes" and self.itemsinventory.get("shotgun_ammo", 0) >= 1:
-                    self.itemsinventory["shotgun_ammo"] -= 1 # Consume the second barrel's shell
-                    print("You fire both barrels in a devastating volley!")
-                    self.dmg_modifier_multiply = 2
-                    self.play_sound("shotgun.mp3")
-                    time.sleep(1,)
-                    print("The kickback bruises your arm.")
-                    self.Health -= 5
-                else:
+                current_ammo = self.itemsinventory.get("shotgun_ammo", 0)
+                if current_ammo >= 1:
+                    print("Double Barrel! Fire both barrels? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
                     if choice == "yes":
-                        print("You don't have enough ammo for a double shot.")
-                    else:
-                        print("You decide not to use the double shot.")
+                        self.itemsinventory["shotgun_ammo"] -= 1
+                        if self.itemsinventory["shotgun_ammo"] <= 0:
+                            del self.itemsinventory["shotgun_ammo"]
+                            
+                        print("You fire both barrels in a devastating volley!")
+                        self.dmg_modifier_multiply = 2
+                        self.play_sound("shotgun.mp3")
+                        time.sleep(1)
+                        print("The kickback bruises your arm. -5 Health.")
+                        self.Health -= 5
 
             case "throw":
-                # Logic for tomahawk
-                print("Throw your tomahawk for extra damage? (yes/no)")
+                print(f"Throw your {exact_name} for extra damage? (It will be lost!) (yes/no)")
                 choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
-                    if self.itemsinventory.get("tomahawk", 0) > 0:
-                        self.itemsinventory["tomahawk"] -= 1
-                        if self.itemsinventory["tomahawk"] <= 0:
-                            del self.itemsinventory["tomahawk"]
-                        print("You hurl your tomahawk—deadly accuracy!")
+                    # Deletes the EXACT item they have equipped (e.g., "rusty tomahawk")
+                    if self.itemsinventory.get(exact_name, 0) > 0:
+                        self.itemsinventory[exact_name] -= 1
+                        if self.itemsinventory[exact_name] <= 0:
+                            del self.itemsinventory[exact_name]
+                            
+                        print(f"You hurl your {exact_name}—deadly accuracy!")
                         self.play_sound("tomahawk.mp3")
                         self.dmg_modifier_multiply = 2
                     else:
-                        print("No tomahawks left!")
+                        print("You fumble and can't find it to throw!")
                 else:
-                    print("You keep your tomahawk ready for melee.")
+                    print(f"You keep your {exact_name} ready for melee.")
+
             case "quick draw":
-                print("Would you like to attempt a quick draw follow-up shot? (yes/no)")
-                choice = self.AI_File.parse_YN(": ")
-                if choice == "yes":
-                    if self.itemsinventory.get("rifle_ammo", 0) >= 1:
-                        if random.randint(1, 2) == 1: # 50% chance for a bonus hit
+                current_ammo = self.itemsinventory.get("rifle_ammo", 0)
+                if current_ammo >= 1:
+                    print("Would you like to attempt a quick draw follow-up shot? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
+                    if choice == "yes":
+                        self.itemsinventory["rifle_ammo"] -= 1
+                        if self.itemsinventory["rifle_ammo"] <= 0:
+                            del self.itemsinventory["rifle_ammo"]
+                            
+                        if random.randint(1, 2) == 1:
                             self.dmg_modifier_multiply += 0.75 
                             self.play_sound("rifle_shot.mp3")
                             print("The quick draw is successful! The follow-up shot hit for 75% damage.")
                         else:
                             print("The follow-up shot misses!")
-                        self.itemsinventory["rifle_ammo"] -= 1 # Consume extra ammo
-                        if self.itemsinventory["rifle_ammo"] <= 0:
-                            del self.itemsinventory["rifle_ammo"]
-                    else:
-                        print("You don't have enough rifle ammo for a quick draw.")
-                return
 
             case "precision shot":
-                # Logic for sharps rifle
                 print("You take a steady breath for a precision shot…")
                 if random.randint(1, 4) == 1:
                     print("Bullseye! Your shot hits extra savage.")
                     self.dmg_modifier_multiply = 2
 
             case "precise strike":
-                # Logic for cavalry saber
-                print("You slash with your saber, aiming for weak points.")
+                print("You slash with your weapon, aiming for weak points.")
                 self.dmg_modifier_multiply = 1.5
-            
+
             case _:
-                # Fallback for any other defined ability
                 pass
 
     def donate_supplies(self):
@@ -5527,7 +5526,7 @@ class Combat:
                             owned_weapon_info = [] # List of dicts: {"display": "Rusty Revolver", "raw": "rusty revolver", "base": "revolver"}
                             for inv_item in self.player.itemsinventory:
                                 # Find the best matching base weapon (longest match first to avoid 'revolver' matching 'colt revolver')
-                                possible_bases = [b for b in weapons_data if b in inv_item]
+                                possible_bases = [b for b in weapons_data if b in inv_item and "ammo" not in inv_item]
                                 if possible_bases:
                                     best_base = max(possible_bases, key=len) # Get the most specific match
                                     owned_weapon_info.append({
@@ -5583,7 +5582,7 @@ class Combat:
                                                     del self.player.itemsinventory[ammo_type]
                                                 
                                                 # Ability and sound triggers
-                                                self.player.weapon_ability(base_weapon)
+                                                self.player.weapon_ability(base_weapon, exact_name)
                                                 self.player.weapon_sound(base_weapon)
                                         else:
                                             # Melee logic
@@ -5592,7 +5591,7 @@ class Combat:
                                                 self.player.damage_modifier += 10
                                                 self.player.consume_effect("sharpened_blade")
                                             self.player.play_sound("knife.mp3")
-                                            self.player.weapon_ability(base_weapon)
+                                            self.player.weapon_ability(base_weapon, exact_name)
 
                                         # --- 3. MODIFIER MATH ---
                                         condition_mult = 1.0
