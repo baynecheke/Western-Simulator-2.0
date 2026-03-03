@@ -1,4 +1,4 @@
-# game_html.py - WINTER VERSION
+# game_html.py - WINTER VERSION WITH DYNAMIC THEMES & STATUSES
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -12,101 +12,201 @@ HTML_CONTENT = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
-        /* WINTER THEME BACKGROUND */
+        /* --- 1. CSS VARIABLES FOR DYNAMIC THEMES --- */
+        :root, body.theme-default {
+            --bg-body: #3a2e25;
+            --bg-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+            --bg-panel: #fdf6e3;
+            --bg-header: #8b4513;
+            --border-main: #8b4513;
+            --border-sub: #5a2d0c;
+            --border-inner: #d2b48c;
+            --text-main: #333333;
+            --text-header: #ffffff;
+            --text-muted: #6b7280;
+            --btn-bg: #8b4513;
+            --btn-hover: #a0522d;
+            --btn-text: #ffffff;
+            --progress-bg: #c7a78b;
+        }
+
+        body.theme-winter {
+            --bg-body: #0f172a;
+            --bg-image: url('https://www.transparenttextures.com/patterns/snow.png');
+            --bg-panel: #1e293b;
+            --bg-header: #0f172a;
+            --border-main: #475569;
+            --border-sub: #334155;
+            --border-inner: #334155;
+            --text-main: #e2e8f0;
+            --text-header: #dbeafe; 
+            --text-muted: #94a3b8;
+            --btn-bg: #1e293b;
+            --btn-hover: #334155;
+            --btn-text: #f1f5f9;
+            --progress-bg: #334155;
+        }
+
+        body.theme-night {
+            --bg-body: #050505;
+            --bg-image: url('https://www.transparenttextures.com/patterns/stardust.png');
+            --bg-panel: #1a1512;
+            --bg-header: #0a0807;
+            --border-main: #3d2b1f;
+            --border-sub: #261b14;
+            --border-inner: #3d2b1f;
+            --text-main: #d1c5b4;
+            --text-header: #e8dcc8;
+            --text-muted: #8c7b6b;
+            --btn-bg: #2a1f18;
+            --btn-hover: #3d2b1f;
+            --btn-text: #d1c5b4;
+            --progress-bg: #261b14;
+        }
+
+        body.theme-rain {
+            --bg-body: #2c3539;
+            --bg-image: url('https://www.transparenttextures.com/patterns/pinstriped-suit.png');
+            --bg-panel: #3b444b;
+            --bg-header: #232b2b;
+            --border-main: #536872;
+            --border-sub: #36454f;
+            --border-inner: #536872;
+            --text-main: #e0e5e5;
+            --text-header: #ffffff;
+            --text-muted: #9ba4a5;
+            --btn-bg: #4a5d66;
+            --btn-hover: #5c737e;
+            --btn-text: #ffffff;
+            --progress-bg: #36454f;
+        }
+
+        /* --- 2. BASE STYLING USING VARIABLES --- */
         body {
             font-family: 'Merriweather', serif;
-            background-color: #0f172a; /* Slate 900 */
-            color: #e2e8f0; /* Slate 200 */
-            background-image: url('https://www.transparenttextures.com/patterns/snow.png');
+            background-color: var(--bg-body);
+            background-image: var(--bg-image);
+            color: var(--text-main);
+            transition: background-color 0.5s ease, color 0.5s ease;
         }
 
-        /* Custom Scrollbar (Icy Blue) */
-        #game-display::-webkit-scrollbar { width: 8px; }
-        #game-display::-webkit-scrollbar-track { background: #1e293b; }
-        #game-display::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .themed-panel { background-color: var(--bg-panel); border-color: var(--border-main); }
+        .themed-header { background-color: var(--bg-header); border-color: var(--border-sub); color: var(--text-header); }
+        .themed-section { background-color: var(--bg-panel); border-color: var(--border-inner); }
+        .themed-text { color: var(--text-main); }
+        .themed-text-header { color: var(--text-header); }
+        .themed-muted { color: var(--text-muted); }
 
-        /* Button Styling (Cold Steel) */
+        /* Custom Scrollbars */
+        #game-display::-webkit-scrollbar { width: 8px; }
+        #game-display::-webkit-scrollbar-track { background: var(--bg-panel); }
+        #game-display::-webkit-scrollbar-thumb { background: var(--border-main); border-radius: 4px; }
+
+        /* Button Styling */
         .game-button {
             transition: all 0.15s ease-in-out;
-            border: 1px solid #475569; /* Slate border */
-            background-color: #1e293b; 
-            color: #f1f5f9;
+            border: 1px solid var(--border-main);
+            background-color: var(--btn-bg);
+            color: var(--btn-text);
         }
         .game-button:hover {
-            background-color: #334155; 
-            border-color: #94a3b8; 
+            background-color: var(--btn-hover);
+            border-color: var(--text-muted);
             transform: translateY(-2px);
-            box-shadow: 0 0 10px rgba(148, 163, 184, 0.3); /* Icy glow */
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
         }
         
         .progress-bar-bg {
-            background-color: #334155; 
-            border: 1px solid #64748b;
+            background-color: var(--progress-bg);
+            border: 1px solid var(--border-sub);
         }
         .progress-bar-fill {
             transition: width 0.5s ease-in-out;
         }
+
+        /* --- 3. ZERO CLOG STATUS PILLS --- */
+        .status-pill {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .status-negative { background-color: #991b1b; border: 1px solid #7f1d1d; } /* Deep Red */
+        .status-positive { background-color: #166534; border: 1px solid #14532d; } /* Deep Green */
+        .status-neutral { background-color: #ca8a04; border: 1px solid #a16207; } /* Deep Yellow/Orange */
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-6xl bg-[#1e293b] shadow-2xl rounded-lg border-2 border-[#475569] overflow-hidden" style="box-shadow: 0 10px 25px rgba(0,0,0,0.8); height: 90vh; display: flex; flex-direction: column;">
+<body class="theme-winter flex items-center justify-center min-h-screen p-4">
+
+    <div class="themed-panel w-full max-w-6xl shadow-2xl rounded-lg border-2 overflow-hidden flex flex-col" style="box-shadow: 0 10px 25px rgba(0,0,0,0.8); height: 90vh;">
         
-        <header class="p-4 bg-[#0f172a] text-blue-100 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b-2 border-[#334155]">
-            <div><strong>Location:</strong> <span id="stat-location" class="text-blue-200">Starting...</span></div>
-            <div><strong>Day:</strong> <span id="stat-day" class="text-blue-200">1</span></div>
-            <div><strong>Time:</strong> <span id="stat-time" class="text-blue-200">9:00</span></div>
-            <div><strong>Difficulty:</strong> <span id="stat-difficulty" class="text-blue-200">Frontier</span></div>
+        <header class="themed-header p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b-2">
+            <div><strong>Location:</strong> <span id="stat-location" class="themed-text-header">Starting...</span></div>
+            <div><strong>Day:</strong> <span id="stat-day" class="themed-text-header">1</span></div>
+            <div><strong>Time:</strong> <span id="stat-time" class="themed-text-header">9:00</span></div>
+            <div><strong>Difficulty:</strong> <span id="stat-difficulty" class="themed-text-header">Frontier</span></div>
         </header>
 
-        <section class="p-4 grid grid-cols-1 sm:grid-cols-4 gap-4 border-b-2 border-[#334155] bg-[#1e293b]">
-            
-            <div class="flex flex-col">
-                <div class="flex justify-between font-bold text-sm text-slate-300">
-                    <span>Health:</span>
-                    <span id="stat-health-text">100 / 100</span>
+        <section class="themed-section p-4 border-b-2">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                
+                <div class="flex flex-col">
+                    <div class="flex justify-between font-bold text-sm themed-text">
+                        <span>Health:</span>
+                        <span id="stat-health-text">100 / 100</span>
+                    </div>
+                    <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
+                        <div id="stat-health-bar" class="progress-bar-fill bg-red-600 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+                    </div>
                 </div>
-                <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-health-bar" class="progress-bar-fill bg-red-600 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+
+                <div class="flex flex-col">
+                    <div class="flex justify-between font-bold text-sm themed-text">
+                        <span>Heat:</span>
+                        <span id="stat-heat-text">100 / 100</span>
+                    </div>
+                    <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
+                        <div id="stat-heat-bar" class="progress-bar-fill bg-orange-500 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col">
+                    <div class="flex justify-between font-bold text-sm themed-text">
+                        <span>Hunger:</span>
+                        <span id="stat-hunger-text">0</span>
+                    </div>
+                    <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
+                        <div id="stat-hunger-bar" class="progress-bar-fill bg-emerald-600 h-full" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col justify-center">
+                    <div class="text-lg font-bold themed-text">
+                        Gold: $<span id="stat-gold" class="text-yellow-400">50</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex flex-col">
-                <div class="flex justify-between font-bold text-sm text-slate-300">
-                    <span>Heat:</span>
-                    <span id="stat-heat-text">100 / 100</span>
+            <div id="status-area" class="mt-3 flex flex-wrap gap-2 empty:hidden">
                 </div>
-                <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-heat-bar" class="progress-bar-fill bg-orange-500 h-full text-white text-xs text-center leading-6" style="width: 100%;"></div>
-                </div>
-            </div>
-
-            <div class="flex flex-col">
-                <div class="flex justify-between font-bold text-sm text-slate-300">
-                    <span>Hunger:</span>
-                    <span id="stat-hunger-text">0</span>
-                </div>
-                <div class="w-full progress-bar-bg rounded overflow-hidden mt-1 h-6">
-                    <div id="stat-hunger-bar" class="progress-bar-fill bg-emerald-600 h-full" style="width: 0%;"></div>
-                </div>
-            </div>
-
-            <div class="flex flex-col justify-center">
-                <div class="text-lg font-bold text-slate-200">
-                    Gold: $<span id="stat-gold" class="text-yellow-400">50</span>
-                </div>
-            </div>
         </section>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-            <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 bg-[#0f172a]">
-                <p class="text-slate-400">Connecting to server...</p>
+            <div id="game-display" class="w-full md:w-2/3 p-6 overflow-y-auto space-y-3 themed-header">
+                <p class="themed-muted">Connecting to server...</p>
             </div>
 
-            <div class="w-full md:w-1/3 p-6 bg-[#1e293b] border-t-2 md:border-t-0 md:border-l-2 border-[#334155] overflow-y-auto">
-                <h3 id="action-title" class="text-xl font-bold mb-4 border-b-2 border-slate-600 pb-2 text-blue-100">Actions</h3>
+            <div class="w-full md:w-1/3 p-6 themed-panel border-t-2 md:border-t-0 md:border-l-2 border-[var(--border-inner)] overflow-y-auto">
+                <h3 id="action-title" class="text-xl font-bold mb-4 border-b-2 border-[var(--border-sub)] pb-2 themed-text-header">Actions</h3>
                 <div id="action-area" class="flex flex-col space-y-2">
-                    <p class="text-slate-500">Waiting for game to start...</p>
+                    <p class="themed-muted">Waiting for game to start...</p>
                 </div>
             </div>
         </div>
@@ -133,10 +233,34 @@ HTML_CONTENT = """
         
         const statHungerText = document.getElementById('stat-hunger-text');
         const statHungerBar = document.getElementById('stat-hunger-bar');
+
+        // Status Area
+        const statusArea = document.getElementById('status-area');
         
         const soundEffects = {};
         let backgroundMusic = null;
         let sessionId = null;
+
+        // --- NEW HELPER FUNCTIONS FOR IMMERSION ---
+        function setTheme(themeName) {
+            document.body.className = `theme-${themeName} flex items-center justify-center min-h-screen p-4`;
+        }
+
+        function updateStatuses(activeStatuses) {
+            // activeStatuses should be an array of objects: [{id: 'poison', text: 'Poisoned', type: 'negative'}, ...]
+            statusArea.innerHTML = ''; // Clear old statuses
+            
+            if (!activeStatuses || activeStatuses.length === 0) return;
+
+            activeStatuses.forEach(status => {
+                const pill = document.createElement('span');
+                pill.textContent = status.text;
+                pill.className = `status-pill status-${status.type}`;
+                pill.id = `status-${status.id}`;
+                statusArea.appendChild(pill);
+            });
+        }
+        // ------------------------------------------
 
         function loadAndPlaySound(src, loop = false) {
             try {
@@ -158,7 +282,7 @@ HTML_CONTENT = """
         function addMessage(text) {
             const p = document.createElement('p');
             p.innerHTML = text.replace(/(\\n|\\r\\n|\\r)/gm, '<br>');
-            p.className = "text-slate-300"; 
+            p.className = "themed-text"; 
             display.appendChild(p);
             display.scrollTop = display.scrollHeight; 
         }
@@ -168,7 +292,7 @@ HTML_CONTENT = """
         async function sendResponse(choice) {
             clearActions();
             actionTitle.textContent = "Actions";
-            actionArea.innerHTML = '<p class="text-slate-500">Waiting for server...</p>';
+            actionArea.innerHTML = '<p class="themed-muted">Waiting for server...</p>';
             try {
                 if (!sessionId) {
                     addMessage("[Session Error]: No active session. Refresh to start again.");
@@ -193,9 +317,12 @@ HTML_CONTENT = """
                     case 'ask_for_choice': showChoices(msg.prompt, msg.choices); break;
                     case 'ask_for_text': showTextInput(msg.prompt); break;
                     case 'game_over': addMessage(msg.text); stopPolling(); break;
+                    
+                    // NEW COMMANDS FOR YOU TO WIRE UP LATER
+                    case 'set_theme': setTheme(msg.theme); break;
+                    case 'update_statuses': updateStatuses(msg.statuses); break;
                 }
             });
-
         }
         
         function updateStats(data) {
@@ -211,19 +338,17 @@ HTML_CONTENT = """
             statHealthText.textContent = `${data.health} / ${data.max_health}`;
             statHealthBar.style.width = `${healthPercent}%`;
             
-            // Heat (New!)
-            // Defaults to 100 if undefined, supports dynamic Max Heat
+            // Heat
             const currentHeat = data.heat !== undefined ? data.heat : 100;
             const maxHeat = data.max_heat !== undefined ? data.max_heat : 100;
             const heatPercent = (currentHeat / maxHeat) * 100;
             statHeatText.textContent = `${currentHeat} / ${maxHeat}`;
             statHeatBar.style.width = `${heatPercent}%`;
 
-            // Hunger (Updated to Scale of 10)
+            // Hunger (Scale of 10)
             const maxHunger = 10; 
             const hungerPercent = (data.hunger / maxHunger) * 100;
             statHungerText.textContent = data.hunger;
-            // Cap width at 100% just in case hunger exceeds 10 briefly
             statHungerBar.style.width = `${Math.min(hungerPercent, 100)}%`;
         }
 
@@ -234,7 +359,7 @@ HTML_CONTENT = """
                 choices.forEach(choice => {
                     const button = document.createElement('button');
                     button.textContent = choice.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    button.className = "game-button w-full text-left p-3 rounded shadow-md text-blue-100 hover:text-white";
+                    button.className = "game-button w-full text-left p-3 rounded shadow-md";
                     button.onclick = () => sendResponse(choice); 
                     actionArea.appendChild(button);
                 });
@@ -246,10 +371,10 @@ HTML_CONTENT = """
             actionTitle.textContent = prompt || "Enter a value:";
             const input = document.createElement('input');
             input.type = "text";
-            input.className = "w-full p-2 border-2 border-slate-600 bg-slate-900 text-white rounded focus:border-blue-400 outline-none";
+            input.className = "w-full p-2 border-2 border-[var(--border-main)] bg-[var(--bg-body)] text-[var(--text-main)] rounded outline-none";
             const submit = document.createElement('button');
             submit.textContent = "Submit";
-            submit.className = "game-button w-full p-2 text-white rounded shadow-md mt-2";
+            submit.className = "game-button w-full p-2 rounded shadow-md mt-2";
             submit.onclick = () => sendResponse(input.value);
             input.onkeydown = (e) => { if (e.key === 'Enter') sendResponse(input.value); };
             actionArea.appendChild(input);
@@ -270,7 +395,6 @@ HTML_CONTENT = """
                 const data = await response.json();
                 if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
             } catch (error) {
-                // addMessage(`[Connection Error] Lost connection to server. Retrying...`);
                 console.error("Poll error:", error);
             }
             isPolling = false;
@@ -308,10 +432,10 @@ HTML_CONTENT = """
         window.addEventListener('beforeunload', endSession);
     </script>
 
-    <div class="fixed bottom-0 right-0 p-4 flex gap-2 bg-slate-900 border-t border-slate-700 z-50">
-        <input type="text" id="saveName" placeholder="Save Name" class="bg-slate-800 text-white p-2 border border-slate-600 rounded">
-        <button onclick="saveGame()" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded">Save</button>
-        <button onclick="loadGame()" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded">Load</button>
+    <div class="fixed bottom-0 right-0 p-4 flex gap-2 bg-[var(--bg-header)] border-t border-[var(--border-sub)] z-50">
+        <input type="text" id="saveName" placeholder="Save Name" class="bg-[var(--bg-body)] text-[var(--text-main)] p-2 border border-[var(--border-main)] rounded outline-none">
+        <button onclick="saveGame()" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded border border-green-900 shadow">Save</button>
+        <button onclick="loadGame()" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded border border-blue-900 shadow">Load</button>
     </div>
 
     <script>
