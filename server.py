@@ -13,19 +13,25 @@ from dotenv import load_dotenv
 from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
+aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
 dynamodb = None
 table = None
-try:
-    dynamodb = boto3.resource(
-        'dynamodb',
-        region_name=os.environ.get('AWS_REGION', 'us-east-1'),
-        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
-    )
-    table = dynamodb.Table('WesternSim')
-    print("[SERVER] AWS DynamoDB connection initialized.")
-except Exception as e:
-    print(f"[SERVER] Warning: AWS DynamoDB setup failed. Saving disabled. Error: {e}")
+
+if aws_access_key and aws_secret_key:
+    try:
+        dynamodb = boto3.resource(
+            'dynamodb',
+            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key
+        )
+        table = dynamodb.Table('WesternSim')
+        print("[SERVER] AWS DynamoDB connection initialized.")
+    except Exception as e:
+        print(f"[SERVER] Warning: AWS DynamoDB setup failed. Saving disabled. Error: {e}")
+else:
+    print("[SERVER] Warning: AWS credentials missing from environment. DynamoDB disabled.")
 
 # --- Load Environment Variables ---
 load_dotenv() 
