@@ -15,14 +15,14 @@ HTML_CONTENT = """
         /* --- 1. CSS VARIABLES FOR DYNAMIC THEMES --- */
         :root, body.theme-default {
             --bg-body: #3a2e25;
-            --bg-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
-            --bg-panel: #fdf6e3;
-            --bg-header: #8b4513;
+            --bg-image: url('/static/background_default.png');
+            --bg-panel: #fff2ce;
+            --bg-header: #f1d9ac;
             --border-main: #8b4513;
             --border-sub: #5a2d0c;
             --border-inner: #d2b48c;
             --text-main: #333333;
-            --text-header: #ffffff;
+            --text-header: #000000;
             --text-muted: #6b7280;
             --btn-bg: #8b4513;
             --btn-hover: #a0522d;
