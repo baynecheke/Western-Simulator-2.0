@@ -9,7 +9,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Optional
 from flask import Flask, render_template_string, request, jsonify
-from dotenv import load_dotenv 
+from flask_socketio import SocketIO, emit, join_room
+from dotenv import load_dotenv
 from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
@@ -44,7 +45,7 @@ import game_html
 # --- Global Game Objects ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-key')
-
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 @dataclass
 class GameSession:
     session_id: str
@@ -189,86 +190,26 @@ def run_game_loop(session):
 def index():
     return render_template_string(game_html.HTML_CONTENT)
 
-@app.route('/start_game', methods=['POST'])
-def start_game():
+@socketio.on('start_game')
+def handle_start_game():
     session = create_session()
+    join_room(session.session_id) # Put the player in a private socket room
     start_session_game(session)
-    return jsonify({"status": "Game started", "session_id": session.session_id})
-
-@app.route('/get_update')
-def get_update():
-    session_id = request.args.get("session_id")
-    session = get_session(session_id)
-    if not session:
-        return jsonify({"messages": [{
-            "type": "game_message",
-            "text": "Session not found. Please refresh to start a new game."
-        }]})
-
-    messages = []
     
-    # --- Proactive Stat Update ---
-    if session.player_object is not None:
-        try:
-            # Use getattr to safely get values, defaulting to reasonable numbers if not set yet
-            current_heat = getattr(session.player_object, 'Heat', 100)
-            max_heat = getattr(session.player_object, 'MaxHeat', 100)
-            
-            stat_payload = {
-                'type': 'update_stats',
-                'payload': {
-                    'health': session.player_object.Health,
-                    'max_health': session.player_object.MaxHealth,
-                    'heat': current_heat, 
-                    'max_heat': max_heat,
-                    'hunger': session.player_object.Hunger,
-                    'gold': session.player_object.gold,
-                    'day': session.player_object.Day,
-                    'time': f"{session.player_object.Time}:00",
-                    'location': session.player_object.current_town_name if session.player_object.invillage else "On the Trail",
-                    'difficulty': session.player_object.difficulty.capitalize()
-                }
-            }
-            messages.append(stat_payload)
-        except Exception as e:
-            print(f"[Stat Poll Error]: {e}")
+    # Start the message pump for this specific session
+    socketio.start_background_task(message_pump, session)
     
-    while not session.server_outbox.empty():
-        msg = session.server_outbox.get()
-        
-        # Prevent duplicate stat messages to save bandwidth
-        if msg.get("type") == "update_stats" and any(m.get("type") == "update_stats" for m in messages):
-            continue
-        
-        messages.append(msg)
-        if msg.get("type") in ["ask_for_choice", "ask_for_text"]:
-            break
-            
-    return jsonify({"messages": messages})
+    emit('game_started', {"session_id": session.session_id})
 
-@app.route('/send_response', methods=['POST'])
-def send_response():
-    data = request.json
-    
-    # 1. Guard against empty/invalid data
-    if not data:
-        return jsonify({"status": "Error: Invalid or missing request data."}), 400
-        
+@socketio.on('send_response')
+def handle_send_response(data):
+    if not data: return
     session_id = data.get("session_id")
-    session = get_session(session_id)
+    choice = data.get("choice")
     
-    if not session:
-        return jsonify({"status": "Error: Session not found."})
-    if session.stop_requested:
-        return jsonify({"status": "Error: Session ended."})
-        
-    # 2. Safely get the choice
-    choice = data.get('choice')
-    if choice is None:
-        return jsonify({"status": "Error: No choice provided."}), 400
-        
-    session.player_inbox.put(choice)
-    return jsonify({"status": "Response received"})
+    session = get_session(session_id)
+    if session and choice is not None:
+        session.player_inbox.put(choice)
 
 @app.route('/end_session', methods=['POST'])
 def end_session():
@@ -370,10 +311,46 @@ def load_game():
     except ClientError as e:
         return jsonify({"status": f"Load failed: {e.response['Error']['Message']}"})
 
-if __name__ == '__main__':
-    # Render provides a PORT environment variable. If it's not there, use 5001 for local dev.
-    port = int(os.environ.get("PORT", 5001))
-    print(f"Starting Flask server on http://0.0.0.0:{port}")
-    # You must use 0.0.0.0 to be visible to the network on Render
-    app.run(host="0.0.0.0", port=port, debug=False)
+def message_pump(session):
+    """Constantly checks the outbox and pushes messages to the client."""
+    while not session.stop_requested:
+        try:
+            # Wait up to 1 second for a message
+            msg = session.server_outbox.get(timeout=1)
+            
+            # Send the message directly to THIS specific player's room
+            socketio.emit('game_update', msg, room=session.session_id)
+            
+            # If the game is asking for input, push a fresh stat update right before it
+            if msg.get("type") in ["ask_for_choice", "ask_for_text"]:
+                if session.player_object:
+                    current_heat = getattr(session.player_object, 'Heat', 100)
+                    max_heat = getattr(session.player_object, 'MaxHeat', 100)
+                    stat_payload = {
+                        'type': 'update_stats',
+                        'payload': {
+                            'health': session.player_object.Health,
+                            'max_health': session.player_object.MaxHealth,
+                            'heat': current_heat, 
+                            'max_heat': max_heat,
+                            'hunger': session.player_object.Hunger,
+                            'gold': session.player_object.gold,
+                            'day': session.player_object.Day,
+                            'time': f"{session.player_object.Time}:00",
+                            'location': session.player_object.current_town_name if session.player_object.invillage else "On the Trail",
+                            'difficulty': session.player_object.difficulty.capitalize()
+                        }
+                    }
+                    socketio.emit('game_update', stat_payload, room=session.session_id)
 
+        except queue.Empty:
+            continue # Nothing in the outbox, keep waiting
+        except Exception as e:
+            print(f"[Pump Error]: {e}")
+            break
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5001))
+    print(f"Starting Flask-SocketIO server on http://0.0.0.0:{port}")
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)

@@ -9,6 +9,7 @@ HTML_CONTENT = """
     <title>Western Simulator - Winter</title>
     <link rel="icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
@@ -304,18 +305,13 @@ HTML_CONTENT = """
             clearActions();
             actionTitle.textContent = "Actions";
             actionArea.innerHTML = '<p class="themed-muted">Waiting for server...</p>';
-            try {
-                if (!sessionId) {
-                    addMessage("[Session Error]: No active session. Refresh to start again.");
-                    return;
-                }
-                await fetch('/send_response', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 'choice': choice, 'session_id': sessionId })
-                });
-                pollServer();
-            } catch (error) { addMessage(`[Connection Error]: ${error.message}`); }
+            
+            if (!sessionId) {
+                addMessage("[Session Error]: No active session. Refresh to start again.");
+                return;
+            }
+            // Instantly shoot the choice to the server via WebSockets
+            socket.emit('send_response', { 'choice': choice, 'session_id': sessionId });
         }
         
         function handleServerMessages(messages) {
@@ -393,40 +389,28 @@ HTML_CONTENT = """
             input.focus();
         }
 
-        let pollInterval;
-        let isPolling = false; 
+        const socket = io(); // Connect to the WebSocket server
 
-        async function pollServer() {
-            if (isPolling) return; 
-            isPolling = true;
-            try {
-                const url = sessionId ? `/get_update?session_id=${encodeURIComponent(sessionId)}` : '/get_update';
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
-                const data = await response.json();
-                if (data.messages && data.messages.length > 0) handleServerMessages(data.messages);
-            } catch (error) {
-                console.error("Poll error:", error);
-            }
-            isPolling = false;
+        // Listen for game updates pushed from the server
+        socket.on('game_update', function(msg) {
+            handleServerMessages([msg]); 
+        });
+
+        // Listen for the "game started" confirmation
+        socket.on('game_started', function(data) {
+            sessionId = data.session_id;
+            addMessage('Connected! Starting game...');
+        });
+
+        function stopPolling() { 
+            // Kept empty so the 'game_over' event doesn't cause an error, 
+            // but we don't need to stop anything anymore! 
         }
 
-        function startPolling() { 
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(pollServer, 1000); 
-        }
-        function stopPolling() { clearInterval(pollInterval); }
-
-        async function initializeGame() {
+        function initializeGame() {
             display.innerHTML = '';
             addMessage('Connecting to server...');
-            try {
-                const response = await fetch('/start_game', { method: 'POST' });
-                const data = await response.json();
-                sessionId = data.session_id;
-                addMessage('Connected! Starting game...');
-                startPolling();
-            } catch (error) { addMessage(`[Fatal Error] Could not connect to server: ${error.message}`); }
+            socket.emit('start_game'); // Tell the server we are ready
         }
 
         initializeGame();
@@ -480,7 +464,6 @@ HTML_CONTENT = """
                 const data = await res.json();
                 alert(data.status);
                 // Force an immediate update to show loaded stats
-                pollServer(); 
             } catch (e) {
                 alert("Connection error: " + e);
             }

@@ -1,8 +1,8 @@
 Flask
 Flask-SocketIO
+eventlet==0.33.3
 groq
 PyYAML
-
 python-dotenv
 boto3
 gunicorn==21.2.0
