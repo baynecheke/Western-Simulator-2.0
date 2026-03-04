@@ -1,5 +1,7 @@
 import os
 import threading
+import eventlet
+eventlet.monkey_patch()
 import queue
 import builtins 
 import time     
@@ -45,7 +47,7 @@ import game_html
 # --- Global Game Objects ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-key')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*")
 @dataclass
 class GameSession:
     session_id: str
