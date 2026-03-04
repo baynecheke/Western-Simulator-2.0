@@ -249,13 +249,25 @@ def get_update():
 @app.route('/send_response', methods=['POST'])
 def send_response():
     data = request.json
+    
+    # 1. Guard against empty/invalid data
+    if not data:
+        return jsonify({"status": "Error: Invalid or missing request data."}), 400
+        
     session_id = data.get("session_id")
     session = get_session(session_id)
+    
     if not session:
         return jsonify({"status": "Error: Session not found."})
     if session.stop_requested:
         return jsonify({"status": "Error: Session ended."})
-    session.player_inbox.put(data['choice'])
+        
+    # 2. Safely get the choice
+    choice = data.get('choice')
+    if choice is None:
+        return jsonify({"status": "Error: No choice provided."}), 400
+        
+    session.player_inbox.put(choice)
     return jsonify({"status": "Response received"})
 
 @app.route('/end_session', methods=['POST'])
@@ -276,6 +288,11 @@ def end_session():
 def save_game():
     global table
     data = request.json
+    
+    # Add this guard
+    if not data:
+        return jsonify({"status": "Error: Invalid request data."}), 400
+        
     session_id = data.get("session_id")
     session = get_session(session_id)
     if not table or not session or not session.player_object:
@@ -315,6 +332,11 @@ def load_game():
         return jsonify({"status": "Error: Database not connected."})
         
     data = request.json
+    
+    # Add this guard
+    if not data:
+        return jsonify({"status": "Error: Invalid request data."}), 400
+        
     session_id = data.get("session_id")
     session = get_session(session_id)
     if not session:
