@@ -15,7 +15,7 @@ HTML_CONTENT = """
 
         /* --- 1. CSS VARIABLES FOR DYNAMIC THEMES --- */
         :root, body.theme-default {
-            --bg-body: #3a2e25;
+            --bg-body: #d2b48c;
             --bg-image: url('/static/background_default.png');
             --bg-panel: #fff2ce;
             --bg-header: #f1d9ac;

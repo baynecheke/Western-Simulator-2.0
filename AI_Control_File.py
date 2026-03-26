@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import traceback
 from textwrap import dedent
 from groq import Groq 
 from groq.types.chat import ChatCompletionMessageParam # <-- ADD THIS LINE
@@ -172,7 +173,8 @@ class AI_Control:
             )
             return response.choices[0].message.content
         except Exception as e:
-            self.print_to_client(f"[Groq API Error: {e}]")
+            traceback.print_exc() # <--- ADD THIS LINE
+            self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
             return None
 
     # --- PARSER FUNCTIONS (These are identical to your file) ---
@@ -245,7 +247,8 @@ class AI_Control:
                 narration = raw_content.strip() if raw_content else "Welcome in."
                 
             except Exception as e:
-                self.print_to_client(f"[Groq API Error: {e}]")
+                traceback.print_exc() # <--- ADD THIS LINE
+                self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
                 narration = "Welcome to the shop. Take a look."
 
             # Send the AI's first greeting
@@ -288,7 +291,8 @@ class AI_Control:
                     narration = raw_content.strip() if raw_content else "Sorry, lost my train of thought."
 
                 except Exception as e:
-                    self.print_to_client(f"[Groq API Error: {e}]")
+                    traceback.print_exc() # <--- ADD THIS LINE
+                    self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
                     narration = "Sorry, lost my train of thought."
                 
                 # Send the AI's reply

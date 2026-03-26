@@ -1500,12 +1500,8 @@ class Player:
 
         elif choice == "rob the bank":
             # 1. Weapon Check: Scan inventory for anything containing a base weapon string
-            available_weapons = []
-            for inv_item in self.itemsinventory:
-                for base_weapon in weapons_data:
-                    if base_weapon in inv_item:
-                        available_weapons.append(inv_item)
-                        break
+            available_weapons = self.get_inventory_matches("firearms")
+            
 
             if not available_weapons:
                 print("\nYou reach for a weapon, but your holster is empty!")
@@ -3968,6 +3964,7 @@ class Player:
             print("You tell Wyatt you need a moment to prepare.")
             print("Find him at the Saloon when you're ready.")
             return
+            
         print("The Vendetta Posse closes in on Curly Bill Brocius at Iron Springs.")
         print("This is the showdown that will decide everything.")
         print("Options:")
@@ -3989,20 +3986,117 @@ class Player:
             else:
                 print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
+                
         elif choice == "2":
-            if self.perform_stat_check(self.trail_skill, base_target=18) == True:
-                print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
-                self.gold += 30
-                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
-                self.set_flag("earp_vendetta", "bonus", bonus + 2)
-            else:
-                print("Your shot misses! Curly Bill fires back, grazing you. -10hp")
-                print("If only you had better trail skills...")
+            # 1. Use the helper to ensure they actually have a loaded rifle!
+            if not self.get_inventory_matches("rifle"):
+                print("You climb to a vantage point, but realize you don't have a loaded rifle to make the shot!")
+                print("Curly Bill spots you in the open! -10hp")
                 self.Health -= 10
+                
                 print("Curly Bill charges your position!")
                 combat = Combat(self)
                 combat.FindAttacker("curly bill")
                 combat.Attack()
+                return
+
+            # --- 2. SNIPER MINIGAME ---
+            print("\n--- SNIPER NEST ---")
+            print("You settle into the rocks overlooking Iron Springs.")
+            print("Curly Bill is pacing in the camp below. You must wait for a clear shot.")
+            print("But beware... his Cowboy scouts are watching the ridges.")
+            
+            sniper_mode = True
+            scout_awareness = 0  # Grows each turn you wait
+            
+            # Dictionary to guide AI and prevent hallucinations
+            cover_descriptions = {
+                10: "peeking out from behind a small rock, mostly hidden",
+                20: "hunkered down low behind a thick wooden water trough",
+                40: "peeking out carefully from behind a heavy wooden wagon wheel",
+                60: "moving behind a hitched horse, partially obscured",
+                80: "walking near the campfire with only light brush in the way",
+                100: "standing completely out in the open dirt road"
+            }
+            
+            while sniper_mode:
+                exposure = random.choice([10, 20, 40, 60, 80, 100])
+                cover_text = cover_descriptions[exposure]
+                
+                # --- STAT-BASED UI CLARITY ---
+                # A trail skill of 6 or higher gives the player exact numbers
+                if self.trail_skill >= 6: 
+                    print(f"\n[!] Your sharpshooter instincts gauge his exact cover: Exposure {exposure}%")
+                    print(f"He is {cover_text}.")
+                else:
+                    # Low skill uses AI to narrate the scene without exact numbers
+                    if self.AI_File.use_ai:
+                        print("\n[!] Observing target...")
+                        prompt = (
+                            f"You are a narrator for a tense sniper scene in an authentic 1880s Wild West text game. "
+                            f"The player is looking through a rifle scope at the outlaw Curly Bill. "
+                            f"Describe Curly Bill as {cover_text}. "
+                            f"Limit your response to 1 or 2 atmospheric sentences. "
+                            f"IMPORTANT: Do not mention any modern technology (like cars or semis). Do not mention percentages."
+                        )
+                        # We use your existing _call_groq helper!
+                        narrative = self.AI_File._call_groq(prompt, "You are a western game narrator.", is_json=False)
+                        if narrative:
+                            print(narrative)
+                        else:
+                            print(f"[!] You see Curly Bill {cover_text}.")
+                    else:
+                        print(f"\n[!] You see Curly Bill {cover_text}.")
+
+                # --- Player Choices ---
+                choices = ["Take the shot", "Wait for a better shot", "Relocate (Reset scout awareness)"]
+                action = self.AI_File.parse_choice(choices, "What do you do?")
+                
+                if action == "take the shot":
+                    # Add Trail Skill as a bonus to the base exposure chance
+                    hit_chance = exposure + (self.trail_skill * 3) 
+                    roll = random.randint(1, 100)
+                    
+                    self.play_sound("rifle_shot.mp3")
+                    time.sleep(1)
+                    
+                    if roll <= hit_chance:
+                        print("\nYour shot echoes across the canyon...")
+                        print("Bullseye! Curly Bill falls into the dust, dead before he hits the ground.")
+                        print("Wyatt tips his hat to your vantage point.")
+                        self.gold += 30
+                        bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                        self.set_flag("earp_vendetta", "bonus", bonus + 2)
+                        sniper_mode = False
+                    else:
+                        print("\nYour shot chips the wood right next to Curly Bill's head! You missed!")
+                        print("Curly Bill points up at your smoke! 'Get that sniper!'")
+                        self.Health -= 10
+                        print("Return fire grazes you! -10hp")
+                        print("You have no choice but to fight him head-on!")
+                        sniper_mode = False
+                        
+                        combat = Combat(self)
+                        combat.FindAttacker("curly bill")
+                        combat.Attack()
+                        
+                elif action == "wait for a better shot":
+                    print("You steady your breathing and wait...")
+                    time.sleep(1)
+                    scout_awareness += 20
+                    
+                    # Cowboy Scout check
+                    if random.randint(1, 100) <= scout_awareness:
+                        dmg = random.randint(5, 12)
+                        self.Health -= dmg
+                        print(f"\n*CRACK!* A Cowboy scout spotted your scope glint! You are hit for {dmg} health!")
+                        print("You duck into cover. You can't stay here forever!")
+                        
+                elif action == "relocate (reset scout awareness)":
+                    print("You quietly crawl to a new set of rocks. You lose your current bead on him, but you are hidden again.")
+                    scout_awareness = 0
+                    time.sleep(2)
+                    
         else:
             print("You freeze. The others charge ahead without you.")
             bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
@@ -4014,6 +4108,7 @@ class Player:
         self.set_flag("earp_vendetta", "stage", -1)
         rewards = 20 + (int(self.get_flag("earp_vendetta", "bonus", 0) or 0) * 10)
         print(f"You receive {rewards} gold for your efforts.")
+        
         if int(self.get_flag("earp_vendetta", "bonus", 0) or 0) <= 0:
             print("Your neutral actions earned you no bonus or penalty.")
         elif int(self.get_flag("earp_vendetta", "bonus", 0) or 0) == 1:
@@ -4024,6 +4119,7 @@ class Player:
             self.loot_drop("vendetta badge")
             print("'You have done well today,' Wyatt says with a grin.")
             print("'Use this badge and the posse will help you once more if needed.'")
+            
         self.quests_done.append("earp_vendetta")
         self.quest_today = True
 
@@ -4187,57 +4283,59 @@ class Player:
                     if mounted_bandits <= 0:
                         print("No mounted bandits left to shoot at!")
                         continue
+                        
                     print("Which weapon would you like to use?")
                     print("1) Rifle")
                     print("2) Shotgun")
-                    print("3) Revolver")
+                    print("3) Pistol / Revolver")
                     weapon_choice = input(": ").strip()
+                    
                     if weapon_choice not in ["1", "2", "3"]:
                         print("Invalid choice. You lose your chance to shoot!")
                         continue
-                    if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
-                        print("You fire your rifle from the rooftop!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider drops, his horse veering off!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["rifle"] for item in self.itemsinventory) == False:
-                                print("You have no rifle!")
-                                print("A shot grazes you. -8hp")
+                        
+                    if weapon_choice == "1":
+                        if self.get_inventory_matches("rifle"):
+                            print("You fire your rifle from the rooftop!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("A rider drops, his horse veering off!")
+                                mounted_bandits -= 1
+                            else:
+                                print("You miss! A shot grazes you. -8hp")
                                 self.Health -= 8
-                                continue
-                            print("You miss! A shot grazes you. -8hp")
+                        else:
+                            print("You have no loaded rifle!")
+                            print("A shot grazes you. -8hp")
                             self.Health -= 8
-                    elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
-                        print("You blast your shotgun downward at the riders!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider is blown clean off his saddle!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["shotgun"] for item in self.itemsinventory) == False:
-                                print("You have no shotgun!")
-                                print("A shot grazes your arm. -6hp")
+                            
+                    elif weapon_choice == "2":
+                        if self.get_inventory_matches("shotgun"):
+                            print("You blast your shotgun downward at the riders!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("A rider is blown clean off his saddle!")
+                                mounted_bandits -= 1
+                            else:
+                                print("Pellets scatter wide. A return shot hits your arm! -6hp")
                                 self.Health -= 6
-                                continue
-                            print("Pellets scatter wide. A return shot hits your arm! -6hp")
-                            self.Health -= 6
-                    elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
-                        print("You fire your revolver rapidly!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("One rider tumbles off his horse!")
-                            mounted_bandits -= 1
                         else:
-                            if any(item in self.weapons["revolver"] for item in self.itemsinventory) == False:
-                                print("You have no revolver!")
-                                print("A rider's bullet clips you. -5hp")
-                                self.Health -= 5
-                                continue
+                            print("You have no loaded shotgun!")
+                            print("A shot grazes your arm. -6hp")
+                            self.Health -= 6
+                            
+                    elif weapon_choice == "3":
+                        if self.get_inventory_matches("revolver"):
+                            print("You fire your revolver rapidly!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("One rider tumbles off his horse!")
+                                mounted_bandits -= 1
                             else:
                                 print("You miss under pressure. A rider's bullet clips you! -5hp")
                                 self.Health -= 5
-                    else:
-                        print("You have no gun! The riders fire at you mercilessly. -10 hp")
-                        self.Health -= 10
+                        else:
+                            print("You have no loaded revolver!")
+                            print("A rider's bullet clips you. -5hp")
+                            self.Health -= 5
+                            
                     time.sleep(2)
 
                 # --- Option 2: Defend inside cars ---
@@ -4247,7 +4345,9 @@ class Player:
                         continue
 
                     print("You rush into the passenger car where bandits terrorize civilians!")
-                    if any(item in self.weapons["melee"] for item in self.itemsinventory):
+                    
+                    # Using the helper function for melee checks too!
+                    if self.get_inventory_matches("melee"): 
                         if self.perform_stat_check(self.Speed, base_target=11) == True:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
@@ -5215,12 +5315,13 @@ class Player:
     def get_inventory_matches(self, category):
             """
             A master helper to find items by category or keyword.
-            Categories: 'weapons', 'melee', 'firearms', or any specific string like 'rope'.
+            Categories: 'weapons', 'melee', 'firearms', 'revolver', 'rifle', 'shotgun',
+            or any specific string like 'rope'.
             """
             matches = []
             
             # 1. Weapon Categories
-            if category in ["weapons", "firearms", "melee"]:
+            if category in ["weapons", "firearms", "melee", "revolver", "rifle", "shotgun"]:
                 # Combine all weapon types from your internal weapons dict
                 all_base_firearms = self.weapons["revolver"] + self.weapons["rifle"] + self.weapons["shotgun"]
                 all_base_melee = self.weapons["melee"]
@@ -5229,6 +5330,9 @@ class Player:
                 if category == "weapons": target_list = all_base_firearms + all_base_melee
                 elif category == "firearms": target_list = all_base_firearms
                 elif category == "melee": target_list = all_base_melee
+                elif category == "revolver": target_list = self.weapons["revolver"]
+                elif category == "rifle": target_list = self.weapons["rifle"]
+                elif category == "shotgun": target_list = self.weapons["shotgun"]
                 
                 for inv_item in self.itemsinventory:
                     # STRICT FILTER: Immediately skip any item that is ammo
@@ -5254,7 +5358,7 @@ class Player:
                                 if self.itemsinventory.get(ammo_type, 0) > 0:
                                     matches.append(inv_item)
             
-            # 2. Specific Keyword (e.g., 'rope', 'rifle', 'bread')
+            # 2. Specific Keyword (e.g., 'rope', 'bread')
             else:
                 for inv_item in self.itemsinventory:
                     if category.lower() in inv_item.lower():
