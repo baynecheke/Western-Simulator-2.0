@@ -213,8 +213,15 @@ class AI_Control:
             base_prompt = dedent(f"""
             You are an NPC for a western text RPG.
             The world state is: {game_state}. Event: {event}. You are {NPC}.
+            You are the owner of {store_name}.
             Stay in character, answer very briefly in dialogue style (1-2 sentences).
             Make sure you respond with the correct hostility.
+            
+            CRITICAL RULES FOR TRADING:
+            1. NEVER list specific items, weapons, or prices. You do not know your exact mechanical inventory.
+            2. Refer to your goods broadly based on your store type (e.g., "I've got plenty of supplies," "Finest firearms in town," "Need provisions?").
+            3. If the player seems interested in shopping or asks what you have, naturally invite them to "take a look," ask to "see my wares," or tell you they want to "buy" something.
+            
             Do NOT greet the player, just respond to what they say.
             If the player just enters your shop, you should greet them.
             """)
@@ -343,3 +350,91 @@ class AI_Control:
         full_entry = self._call_groq(prompt_content, "Write the diary entry.", is_json=False)
         if not full_entry: full_entry = fallback_entry
         return full_entry.strip()
+
+    def narrate_conversation(self, game_state, event, NPC, player_hostility):
+        """A free-form conversation loop with an NPC."""
+        if not self.use_ai or not self.groq_client:
+            self.print_to_client(f"\n{NPC}: I don't have much to say right now.")
+            self.parse_choice(["Continue"], "")
+            return
+            
+        base_prompt = dedent(f"""
+        You are an NPC in a gritty, authentic 1880s Western text RPG.
+
+        [CONTEXT]
+        Current World State: {game_state}
+        Current Event/Location: {event}
+        Your Identity: {NPC}
+        Player's Hostility Level: {player_hostility} (0 = Friendly, 3+ = Hated/Wanted)
+
+        [YOUR PERSONALITY & KNOWLEDGE]
+        - You only know what a person in your position would naturally know in the 1880s.
+        - If the player asks about modern concepts, act confused or interpret them through a 19th-century lens.
+        - React appropriately to the Player's Hostility Level (e.g., be warm if it's 0, guarded or aggressive if it's high).
+
+        [CONVERSATION RULES]
+        1. Stay strictly in character as {NPC}. Use period-appropriate phrasing, but keep it highly readable.
+        2. Keep responses brief and punchy (1-3 sentences). This is a rapid back-and-forth dialogue.
+        3. NEVER act as the narrator. You are a participant in the scene. 
+        4. Do not offer quests, items, or mechanical game benefits unless explicitly told to in the Context.
+        5. If the player says goodbye, threatens you, or ends the chat, respond appropriately so the game can transition.
+
+        The player approaches you. Await their first words, or give a brief, in-character opening greeting if this is the start of the interaction.
+        """)
+
+        # This will store the conversation history
+        dialogue_history: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": base_prompt}
+        ]
+        
+        leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya", "done", "quit"}
+
+        # --- First Message from AI ---
+        try:
+            dialogue_history.append({"role": "user", "content": f"The player approaches {NPC}."})
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=dialogue_history,
+                temperature=0.4 # Slightly higher than the shop for more varied roleplay
+            )
+            raw_content = response.choices[0].message.content
+            narration = raw_content.strip() if raw_content else "Hello."
+            
+        except Exception as e:
+            traceback.print_exc()
+            self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]")
+            narration = "Greetings."
+
+        self.print_to_client(f"\n{NPC}: {narration}")
+        dialogue_history.append({"role": "assistant", "content": narration})
+
+        # --- Start Conversation Loop ---
+        while True:
+            player_input = self._get_web_input("You: ", input_type='text')
+            player_lower = player_input.lower().strip()
+
+            # Check for LEAVE intent
+            if any(word in player_lower.split() for word in leave_words) or player_lower in leave_words:
+                self.print_to_client(f"{NPC}: See you around.")
+                break
+
+            # Continue conversation
+            dialogue_history.append({"role": "user", "content": player_input})
+            
+            try:
+                # Keep the last 7 messages for slightly deeper context memory in free-chat
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=dialogue_history[-7:], 
+                    temperature=0.4
+                )
+                raw_content = response.choices[0].message.content
+                narration = raw_content.strip() if raw_content else "..."
+
+            except Exception as e:
+                traceback.print_exc()
+                self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]")
+                narration = "..."
+            
+            self.print_to_client(f"{NPC}: {narration}")
+            dialogue_history.append({"role": "assistant", "content": narration})

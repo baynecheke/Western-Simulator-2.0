@@ -499,9 +499,13 @@ class Player:
                     print("\nSelect a Season:")
                     print("1. Standard (Normal)")
                     print("2. The Long Winter (Hard Mode + Winter Events)")
+                    print("3. Showcase Mode (Demo)")
                         
-                    season_choice = self.AI_File.parse_choice(["standard", "winter"], "Choose season:")
-                        
+                    season_choice = self.AI_File.parse_choice(["standard", "winter", "showcase"], "Choose season:")
+                    if season_choice == "showcase":
+                        self.run_showcase_mode()
+                        break
+
                     if season_choice == "winter":
                         self.winter_mode = True
                         print("You have chosen The Long Winter. Bundle up...")
@@ -5537,6 +5541,82 @@ class Player:
                 store[name] = entry
         for name in expired:
             del store[name]
+
+    def run_showcase_mode(self):
+        print("\n======================================")
+        print("     WELCOME TO THE SHOWCASE MODE     ")
+        print("======================================")
+        print("This is a curated tour of the game's core features.")
+        print("Let's get you geared up...")
+        time.sleep(2)
+
+        # 1. Buff Stats & Grant Elite Gear
+        print("\n[Feature 1: Dynamic Inventory & Stat System]")
+        self.gold = 5000
+        self.MaxHealth = 200
+        self.Health = 200
+        self.shadow_skill = 10
+        self.strength_skill = 10
+        self.trail_skill = 10
+        self.current_town_name = "Recruiter's Ridge"
+        
+        self.add_item("winchester rifle")
+        self.add_item("chain mail")
+        self.add_item("vendetta badge")
+        self.add_item("bourbon roast")
+        self.itemsinventory["rifle_ammo"] = 50
+        self.itemsinventory["pistol_ammo"] = 50
+        
+        print("Granted 5000 Gold, maxed-out skills, and elite gear.")
+        self.AI_File.update_stats_display(self)
+        self.Statcheck()
+        
+        # 2. Showcase LLM Store Integration
+        print("\n======================================")
+        print("[Feature 2: LLM-Powered NPC Trading]")
+        print("======================================")
+        print("We've maxed out the Gunsmith's inventory for you.")
+        print("Try chatting with him before buying!")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to visit the Gunsmith:")
+        
+        self.TownUpgrades["gunsmith"]["level"] = 4 
+        self.Gunsmiths() 
+
+        # 3. Showcase Free-Form Conversational AI
+        print("\n======================================")
+        print("[Feature 3: Open-Ended LLM Roleplay]")
+        print("======================================")
+        print("You head over to the Saloon. Wyatt Earp is sitting in the corner.")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to talk to Wyatt:")
+        
+        # Call the new conversation method
+        game_state_str = self.generate_game_state()
+        event_str = "Sitting at a poker table in the Oriental Saloon. Morgan Earp was recently murdered."
+        self.AI_File.narrate_conversation(game_state_str, event_str, "Wyatt Earp", self.Hostility)
+
+        # 4. Showcase Turn-Based Combat
+        print("\n======================================")
+        print("[Feature 4: Advanced Turn-Based Combat]")
+        print("======================================")
+        print("As you leave the Saloon, you are ambushed! Time to test your weapons.")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to fight:")
+        
+        combat = Combat(self)
+        combat.FindAttacker("warlord_lieutenant")
+        combat.Attack()
+
+        if self.Health <= 0:
+            return # Let the normal Death() flow happen if they somehow lose
+
+        # 5. Showcase the Finale
+        print("\n======================================")
+        print("[Feature 5: Cinematic Minigames & Final Boss]")
+        print("======================================")
+        print("Transitioning directly to the Grand Finale...")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to begin the final mission:")
+        
+        self.Health = self.MaxHealth # Heal them up for the boss
+        self.run_final_mission()
         
 class Combat:
     def __init__(self, player):
