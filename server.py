@@ -1,8 +1,8 @@
 import os
 
 import threading
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
 import queue
 import builtins 
 import time     
@@ -14,6 +14,7 @@ from typing import Optional
 from flask import Flask, render_template_string, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from dotenv import load_dotenv
+load_dotenv() 
 from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
@@ -31,6 +32,7 @@ if aws_access_key and aws_secret_key:
             aws_secret_access_key=aws_secret_key
         )
         table = dynamodb.Table('WesternSim')
+        table.load()
         print("[SERVER] AWS DynamoDB connection initialized.")
     except Exception as e:
         print(f"[SERVER] Warning: AWS DynamoDB setup failed. Saving disabled. Error: {e}")
@@ -38,7 +40,7 @@ else:
     print("[SERVER] Warning: AWS credentials missing from environment. DynamoDB disabled.")
 
 # --- Load Environment Variables ---
-load_dotenv() 
+
 
 # --- Import Your Game Logic ---
 from AI_Control_File import AI_Control, SessionEnded
@@ -268,6 +270,15 @@ def save_game():
         return jsonify({"status": f"Game saved successfully for {username}!"})
     except ClientError as e:
         return jsonify({"status": f"Save failed: {e.response['Error']['Message']}"})
+def convert_decimals(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals(i) for i in obj]
+    return obj
+
 
 @app.route('/load_game', methods=['POST'])
 def load_game():
@@ -296,7 +307,7 @@ def load_game():
                 time.sleep(1.0) # Wait a second for the thread to create the object
             
             if session.player_object:
-                session.player_object.load_from_dict(response['Item'])
+                session.player_object.load_from_dict(convert_decimals(response['Item']))
                 # Force an update to the client
                 session.ai_file.update_stats_display(session.player_object)
                 while not session.player_inbox.empty():
