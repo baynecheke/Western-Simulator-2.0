@@ -5545,10 +5545,11 @@ class Player:
     def run_showcase_mode(self):
         self.winter_mode = False
         self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'default'})
+        self.change_music("Town.mp3", -1)
 
-        print("\n======================================")
+        print("\n")
         print("     WELCOME TO THE SHOWCASE MODE     ")
-        print("======================================")
+        print("")
         print("This is a curated tour of the game's core features.")
         print("Let's get you geared up...")
         time.sleep(2)
@@ -5575,9 +5576,9 @@ class Player:
         self.Statcheck()
         
         # 2. Showcase LLM Store Integration
-        print("\n======================================")
+        print("\n")
         print("[Feature 2: LLM-Powered NPC Trading]")
-        print("======================================")
+        print("")
         print("We've maxed out the Gunsmith's inventory for you.")
         print("Try chatting with him before buying!")
         self.AI_File.parse_choice(["Continue"], "Press Enter to visit the Gunsmith:")
@@ -5586,9 +5587,9 @@ class Player:
         self.Gunsmiths() 
 
         # 3. Showcase Free-Form Conversational AI
-        print("\n======================================")
+        print("\n")
         print("[Feature 3: Open-Ended LLM Roleplay]")
-        print("======================================")
+        print("")
         print("You head over to the Saloon. Wyatt Earp is sitting in the corner.")
         self.AI_File.parse_choice(["Continue"], "Press Enter to talk to Wyatt:")
         
@@ -5598,23 +5599,23 @@ class Player:
         self.AI_File.narrate_conversation(game_state_str, event_str, "Wyatt Earp", self.Hostility)
 
         # 4. Showcase Turn-Based Combat
-        print("\n======================================")
+        print("\n")
         print("[Feature 4: Advanced Turn-Based Combat]")
-        print("======================================")
+        print("")
         print("As you leave the Saloon, you are ambushed! Time to test your weapons.")
         self.AI_File.parse_choice(["Continue"], "Press Enter to fight:")
         
         combat = Combat(self)
-        combat.FindAttacker("warlord_lieutenant")
+        combat.FindAttacker("bandit leader")
         combat.Attack()
 
         if self.Health <= 0:
             return # Let the normal Death() flow happen if they somehow lose
 
         # 5. Showcase the Finale
-        print("\n======================================")
+        print("\n")
         print("[Feature 5: Cinematic Minigames & Final Boss]")
-        print("======================================")
+        print("")
         print("Transitioning directly to the Grand Finale...")
         self.AI_File.parse_choice(["Continue"], "Press Enter to begin the final mission:")
         
