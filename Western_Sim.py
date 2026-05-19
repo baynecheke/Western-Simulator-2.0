@@ -5543,6 +5543,9 @@ class Player:
             del store[name]
 
     def run_showcase_mode(self):
+        self.winter_mode = False
+        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'default'})
+
         print("\n======================================")
         print("     WELCOME TO THE SHOWCASE MODE     ")
         print("======================================")
