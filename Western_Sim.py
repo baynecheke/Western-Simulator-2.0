@@ -1,75 +1,53 @@
 import random
-import ollama
+
 import time
 import json
 import os
-import pygame
+
 from store import ShopItem, ShopSession
-pygame.init()
-pygame.mixer.init()
-import yaml
+global USE_OLLAMA
+USE_OLLAMA = True
 import builtins
 import sys
-from AI_Control_File import AI_Control
-AI_File = AI_Control()
-from requests.exceptions import ConnectionError
-USE_OLLAMA = False # Default to False
-print("[Checking for Ollama server...]") # Add feedback
-try:
-    # 1. Try creating a client - checks basic connectivity
-    client = ollama.Client() 
-    
-    # 2. Try a simple command like listing models
-    client.list() # Use the client object
-    
-    print("[Ollama server detected and responding. Natural language input enabled.]")
-    USE_OLLAMA = True
-    
-# --- Catch specific connection errors FIRST ---
-except ConnectionError:
-    print("[Ollama Connection Error: Server not found or not running at the expected address (usually http://localhost:11434).]")
-    print("[Falling back to numerical input.]")
-    
-# --- Catch other potential Ollama/Request errors ---
-# except RequestError as e: # Use the specific Ollama error if known
-#     print(f"[Ollama Request Error: {e}]")
-#     print("[Falling back to numerical input.]")
-    
-# --- Catch ANY other unexpected errors during detection ---
-except Exception as e: 
-    print(f"[Unexpected Error during Ollama detection: {type(e).__name__} - {e}]")
-    print("[Falling back to numerical input.]")
 
-if not USE_OLLAMA:
-     print("[Install Ollama and run 'ollama pull phi3' and 'ollama pull llama3:8b' to enable full features.]")
-# --- END DETECTION ---
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS # type: ignore
-    except AttributeError: # <-- This is more specific
-        # AttributeError is raised when _MEIPASS doesn't exist
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-base_dir = resource_path(".")
-with open(os.path.join(base_dir, "weapons"), "r") as file:
-    weapons_data = yaml.safe_load(file)
+from AI_Control_File import GameLoadedException
 
 
-with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
-    loot_data = yaml.safe_load(file)
+
+
 
 
 class Player:
-    def __init__(self):
+    def __init__(self, ai_file_arg):
         #Basic player stuff
+        self.AI_File = ai_file_arg
+
         self.player_name = "default"
         self.rumors = {}
         self.Day = 1
-        self.AI_File = AI_File
+        import yaml
+        global weapons_data
+        global loot_data
+        def resource_path(relative_path):
+            """ Get absolute path to resource, works for dev and for PyInstaller """
+            try:
+                # PyInstaller creates a temp folder and stores path in _MEIPASS
+                base_path = sys._MEIPASS # type: ignore
+            except AttributeError: # <-- This is more specific
+                # AttributeError is raised when _MEIPASS doesn't exist
+                base_path = os.path.abspath(".")
+
+            return os.path.join(base_path, relative_path)
+        base_dir = resource_path(".")
+        with open(os.path.join(base_dir, "weapons"), "r") as file:
+            weapons_data = yaml.safe_load(file)
+
+
+        with open(os.path.join(base_dir, "loot.yaml"), "r") as file:
+            loot_data = yaml.safe_load(file)
+        
+
+        self.skip_freeze = False
         self.Time = 9
         self.Speed = 3
         self.counter = 0
@@ -81,7 +59,16 @@ class Player:
         self.distancenext = 0
         self.event = []
         self.number_of_towns_visited = 0
-
+        self.town_event_occurred = False
+        self.town_encounter_available = False
+        self.quest_flags = {
+            "iron_tracks": {"stage": 0, "bonus": 0},
+            "earp_vendetta": {"stage": 0, "bonus": 0},
+            "defend_town": {"outcome": None, "aftermath": None, "final": None, "bonus": 0}
+        }
+        self.Heat = 100
+        self.MaxHeat = 100
+        self.cold_penalty = 0
         
         self.EmptyTown = False
         self.Speed = 3
@@ -91,12 +78,14 @@ class Player:
         self.rumors_collected = 0
         self.rumors_heard = []
         self.rebirth = False
+        self.tent_used_today = False
 
         #stuff
         self.score = 0
         self.poisoned = 0
         self.difficulty = 'frontier'  # Default
-        
+        # --- WINTER UPDATE: INIT FLAG ---
+        self.winter_mode = False
         #boosts
         self.Armor_Boost = 1
         self.travel_bonus = 0
@@ -109,8 +98,8 @@ class Player:
         self.travelspeed = 3 + (self.trail_skill - 3) // 2
         self.Temporaryspdboost = 0
         self.Temporarytravelboost = 0
-        self.enemy_effects = []
-        self.player_effects = []
+        self.enemy_effects = {}
+        self.player_effects = {}
         self.TownUpgrades = {
             "general store": {'level':1},
             "gunsmith": {'level':1},
@@ -149,6 +138,149 @@ class Player:
             ]
         }
 
+        self.QUEST_DATABASE = [
+            # --- IRON TRACKS ---
+            {
+                "id": "iron_intro",
+                "theme": "railroad",
+                "trigger": "saloon",  # This appears as a button in the Saloon
+                "description": "Talk to Railroad Men (Start Quest)",
+                "condition": lambda p: "iron_tracks" not in p.quests_done and p.Tquest == "None" and p.rumors.get("railroad_job", 0) == 1,
+                "function": "encounter_iron_intro"
+            },
+            {
+                "id": "iron_missing_wagon",
+                "theme": "railroad",
+                "trigger": "arrive_town", # Happens automatically on arrival
+                "description": "The Railroad Foreman looks furious and is asking for help.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 1,
+                "function": "encounter_iron_stage1"
+            },
+            {
+                "id": "iron_depot_night",
+                "theme": "railroad",
+                "trigger": "leave_town", # Happens when you try to leave
+                "description": "You hear shouting coming from the train depot.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 2,
+                "function": "encounter_iron_stage2"
+            },
+            {
+                "id": "iron_train_defense",
+                "theme": "railroad",
+                "trigger": "leave_town", # Happens during daily update
+                "description": "The first train is arriving. The Foreman needs guards.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 3,
+                "function": "encounter_iron_stage3"
+            },
+            {
+                "id": "iron_bridge",
+                "theme": "railroad",
+                "trigger": "leave_town",
+                "description": "The Foreman runs up to you with urgent news about the bridge.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 4,
+                "function": "encounter_iron_stage4"
+            },
+            {
+                "id": "iron_dynamite_boss",
+                "theme": "railroad",
+                "trigger": "leave_town",
+                "description": "The notorious Dynamite Kid has ridden into town.",
+                "condition": lambda p: p.Tquest == "iron_tracks" and p.get_flag("iron_tracks", "stage") == 5,
+                "function": "encounter_iron_stage5"
+            },
+
+            # --- TOWN DEFENSE ---
+            {
+                "id": "town_def_1",
+                "theme": "town_defense",
+                "trigger": "arrive_town",
+                "description": "The Sheriff looks frantic and is asking for volunteers.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is None,
+                "function": "encounter_town_part1"
+            },
+            {
+                "id": "town_def_2",
+                "theme": "town_defense",
+                "trigger": "arrive_town",
+                "description": "The town is scarred from the raid. They are rebuilding.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "outcome") is not None and p.get_flag("defend_town", "aftermath") is None,
+                "function": "encounter_town_part2"
+            },
+            {
+                "id": "town_def_3",
+                "theme": "town_defense",
+                "trigger": "leave_town",
+                "description": "Rumors say the bandits are returning for revenge tonight.",
+                "condition": lambda p: p.Tquest == "defend_town" and p.get_flag("defend_town", "aftermath") is not None and p.get_flag("defend_town", "final") is None,
+                "function": "encounter_town_part3"
+            },
+            {
+                "id": "earp_meet_saloon",
+                "theme": "earp",
+                "trigger": "saloon",
+                "description": "Approach the table where Wyatt Earp sits.",
+                # Condition: Tquest is Earp, but stage is 0 (Waiting)
+                "condition": lambda p: "earp_vendetta" not in p.quests_done and (
+                    (p.Tquest == "None" and p.rumors.get("earp_rumor", 0) == 1) or 
+                    (p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage", 0) == 0)
+                ),
+                "function": "encounter_earp_intro" 
+            },
+            
+            # 2. Stage 1: Pete Spence's Camp
+            {
+                "id": "earp_stage_1",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "The Posse rides to Pete Spence's wood camp.",
+                "condition": lambda p: "earp_vendetta" not in p.quests_done and p.Tquest == "None" and p.rumors.get("earp_rumor", 0) == 1,
+                "function": "encounter_earp_stage1"
+            },
+
+            # 3. Stage 2: Florentino Cruz
+            {
+                "id": "earp_stage_2",
+                "theme": "earp",
+                "trigger": "on_the_trail",
+                "description": "Word comes that Florentino Cruz is near the San Pedro River.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 2,
+                "function": "encounter_earp_stage2"
+            },
+
+            # 4. Stage 3: The Clanton Brothers
+            {
+                "id": "earp_stage_3",
+                "theme": "earp",
+                "trigger": "town_event",
+                "description": "The Clanton brothers have been spotted nearby.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 3,
+                "function": "encounter_earp_stage3"
+            },
+
+            # 5. Stage 4: Curly Bill Showdown
+            {
+                "id": "earp_stage_4",
+                "theme": "earp",
+                "trigger": "saloon",
+                "description": "The final showdown with Curly Bill Brocius at Iron Springs.",
+                "condition": lambda p: p.Tquest == "earp_vendetta" and p.get_flag("earp_vendetta", "stage") == 4,
+                "function": "encounter_earp_stage4"
+            },
+            {
+                "id": "warlord_finale",
+                "theme": "finale",
+                "trigger": "arrive_town",  # Triggers when you enter a town
+                "description": "A US Marshal approaches you with an urgent mission.",
+                # Condition: You must have survived at least 20 days and have no active quest
+                "condition": lambda p: (
+                    p.Day >= 10
+                    and p.Tquest == "None"
+                    and any(q in p.quests_done for q in ("iron_tracks", "earp_vendetta", "defend_town"))
+                ),
+
+                "function": "run_final_mission"
+            }
+            ]
 
 
 
@@ -186,10 +318,6 @@ class Player:
         self.Tquest = "None"  
         self.quest_today = False
         self.quest = []
-        self.iron_stage = 0
-        self.iron_bonus = 0
-        self.earp_stage = 0 # Add this line
-        self.earp_bonus = 0 # Add this line
         self.quests_done = []
         self.boots_used = False
         self.town_defense_outcome   = None
@@ -207,7 +335,7 @@ class Player:
         ]
         
         # Actions only available WHILE traveling
-        self.travel_actions = ["travel road"]
+        self.travel_actions = ["travel road", "make camp"] 
         
         # Actions available in BOTH states
         self.universal_actions = ["use item", "inventory"]
@@ -220,236 +348,283 @@ class Player:
         self.current_town_name = "Dustbowl"
         self.update_actions()
 
-    @classmethod
-    def load_game(cls):
-        print("\n--- Load Game ---")
-        save_folder = 'saves'
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
+# --- PASTE THIS INSIDE THE PLAYER CLASS IN Western_Sim.py ---
 
-        save_files = [f for f in os.listdir(save_folder) if f.endswith('.json')]
-        if not save_files:
-            print("No save files found. Starting a new game.")
-            return cls()
+    def to_dict(self):
+        """Converts ALL player state to a dictionary for AWS saving."""
+        return {
+            # --- Core Stats ---
+            "player_name": self.player_name,
+            "Day": self.Day,
+            "Time": self.Time,
+            "Health": self.Health,
+            "MaxHealth": self.MaxHealth,
+            "gold": self.gold,
+            "Hunger": self.Hunger,
+            "Hostility": self.Hostility,
+            "score": self.score,
+            
+            # --- Location & Travel ---
+            "invillage": self.invillage,
+            "current_town_name": self.current_town_name,
+            "distancenext": self.distancenext,
+            "travel_bonus": self.travel_bonus,
+            "trade_bonus": self.trade_bonus,
+            "boots_used": self.boots_used,
+            "number_of_towns_visited": self.number_of_towns_visited,
+            "winter_mode": self.winter_mode,
+            "cold_penalty": self.cold_penalty,
+            
+            # --- Inventory & Skills ---
+            "itemsinventory": self.itemsinventory,
+            "caravan": self.caravan,
+            "shadow_skill": self.shadow_skill,
+            "trail_skill": self.trail_skill,
+            "strength_skill": self.strength_skill,
+            
+            # --- Quests & Events ---
+            "Tquest": self.Tquest,
+            "quest": self.quest,
+            "quests_done": self.quests_done,
+            "quest_flags": self.quest_flags,
+            "event": self.event,
+            "difficulty": self.difficulty,
+            "rebirth": self.rebirth,
+            
+            # --- Town Defense / Outcomes ---
+            "town_defense_outcome": self.town_defense_outcome,
+            "town_aftermath_outcome": self.town_aftermath_outcome,
+            "town_final_outcome": self.town_final_outcome,
+            "TownUpgrades": self.TownUpgrades,
+            
+            # --- Story & Lore ---
+            "diary_entries": self.diary_entries,
+            "diary_bonuses": self.diary_bonuses,
+            "rumors": self.rumors,
+            "rumors_heard": self.rumors_heard,
+            
+            # --- Status Effects ---
+            "enemy_effects": self.enemy_effects,
+            "player_effects": self.player_effects,
+            "Heat": getattr(self, 'Heat', 100),       # Safe check if variable is missing
+            "MaxHeat": getattr(self, 'MaxHeat', 100)
+        }
 
-        # Display saves by number
-        for idx, filename in enumerate(save_files, start=1):
-            print(f"{idx}. {filename.replace('save_', '').replace('.json', '')}")
+    def load_from_dict(self, data):
+        """Restores ALL player state from the dictionary."""
+        # --- Core Stats ---
+        self.player_name = data.get("player_name", "Stranger")
+        self.Day = int(data.get("Day", 1))
+        self.Time = int(data.get("Time", 8))
+        self.Health = float(data.get("Health", 100))
+        self.MaxHealth = float(data.get("MaxHealth", 100))
+        self.gold = float(data.get("gold", 0))
+        self.Hunger = float(data.get("Hunger", 0))
+        self.Hostility = int(data.get("Hostility", 0))
+        self.score = int(data.get("score", 0))
+        
+        # --- Location & Travel ---
+        self.invillage = data.get("invillage", False)
+        self.current_town_name = data.get("current_town_name", "Rust Ridge")
+        self.distancenext = int(data.get("distancenext", 0))
+        self.travel_bonus = int(data.get("travel_bonus", 0))
+        self.trade_bonus = int(data.get("trade_bonus", 0))
+        self.boots_used = data.get("boots_used", False)
+        self.number_of_towns_visited = int(data.get("number_of_towns_visited", 0))
+        self.winter_mode = data.get("winter_mode", False)
+        self.cold_penalty = int(data.get("cold_penalty", 0))
+        
+        # --- Inventory & Skills ---
+        self.itemsinventory = data.get("itemsinventory", {})
+        self.caravan = data.get("caravan", [])
+        self.shadow_skill = int(data.get("shadow_skill", 3))
+        self.trail_skill = int(data.get("trail_skill", 3))
+        self.strength_skill = int(data.get("strength_skill", 3))
+        
+        # --- Quests & Events ---
+        self.Tquest = data.get("Tquest", "None")
+        self.quest = data.get("quest", [])
+        self.quests_done = data.get("quests_done", [])
+        self.quest_flags = data.get("quest_flags", {})
+        self.event = data.get("event", [])
+        self.difficulty = data.get("difficulty", "frontier")
+        self.rebirth = data.get("rebirth", False)
+        
+        # --- Town Defense / Outcomes ---
+        self.town_defense_outcome = data.get("town_defense_outcome", None)
+        self.town_aftermath_outcome = data.get("town_aftermath_outcome", None)
+        self.town_final_outcome = data.get("town_final_outcome", None)
+        self.TownUpgrades = data.get("TownUpgrades", {})
+        
+        # --- Story & Lore ---
+        self.diary_entries = data.get("diary_entries", [])
+        self.diary_bonuses = data.get("diary_bonuses", [])
+        self.rumors = data.get("rumors", {})
+        self.rumors_heard = data.get("rumors_heard", [])
+        
+        # --- Status Effects ---
+        self.enemy_effects = data.get("enemy_effects", [])
+        self.player_effects = data.get("player_effects", [])
+        self.Heat = data.get("Heat", 100)
+        self.MaxHeat = data.get("MaxHeat", 100)
+        
+        # --- Compatibility Checks (From your old code) ---
+        # If loading an old save that missed these flags, we add them now so the game doesn't crash.
+        if "iron_tracks" not in self.quest_flags:
+            self.quest_flags["iron_tracks"] = {
+                "stage": data.get("iron_stage", 0), 
+                "bonus": data.get("iron_bonus", 0)
+            }
+        
+        if "defend_town" not in self.quest_flags:
+            self.quest_flags["defend_town"] = {
+                "outcome": self.town_defense_outcome,
+                "aftermath": self.town_aftermath_outcome,
+                "final": self.town_final_outcome,
+                "bonus": 0
+            }
 
-        slot_choice = input("Enter the number of the save slot you want to load: ").strip()
-
-        if not slot_choice.isdigit() or not (1 <= int(slot_choice) <= len(save_files)):
-            print("Invalid choice. Starting a new game.")
-            return cls()
-
-        save_file = save_files[int(slot_choice) - 1]
-        filepath = os.path.join(save_folder, save_file)
-        with open(filepath, 'r') as f:
-            save_data = json.load(f)
-
-        player = cls()
-
-        # Restore saved data
-        player.rebirth = save_data.get("rebirth", False)
-        player.gold = save_data.get("gold", 0)
-        player.itemsinventory = save_data.get("itemsinventory", {})
-        player.distancenext = save_data.get("distancenext", 0)
-        player.Day = save_data.get("Day", 1)
-        player.Time = save_data.get("Time", 9)
-        player.Health = save_data.get("Health", 100)
-        player.Hunger = save_data.get("Hunger", 0)
-        player.Hostility = save_data.get("Hostility", 0)
-        player.score = save_data.get("score", 0)
-        player.invillage = save_data.get("invillage", True)
-        player.travel_bonus = save_data.get("travel_bonus", 0)
-        player.trade_bonus = save_data.get("trade_bonus", 0)
-        player.caravan = save_data.get("caravan", [])
-        player.town_defense_outcome = save_data.get("defense_outcome", False)
-        player.town_aftermath_outcome = save_data.get("aftermath_outcome", False)
-        player.town_final_outcome = save_data.get("final_outcome", False)
-        player.boots_used = save_data.get("boots", False)
-        player.diary_entries = save_data.get("diary_entries", [])
-        player.difficulty = save_data.get("difficulty", [])
-        player.MaxHealth = save_data.get("MaxHealth", 0)
-        player.TownUpgrades = save_data.get("TownUpgrades", [])
-        player.Tquest = save_data.get("Tquest", "None")
-        player.quest = save_data.get("quest", [])
-        player.rumors = save_data.get("rumors", {})
-        player.diary_bonuses = save_data.get("diary_bonuses", [])
-        player.rumors_heard = save_data.get("rumors_heard", [])
-        player.enemy_effects = save_data.get("enemy_effects", [])
-        player.player_effects = save_data.get("player_effects", [])
-        player.iron_bonus = save_data.get("iron_bonus", 0)
-        player.iron_stage = save_data.get("iron_stage", 0)
-        player.shadow_skill = save_data.get("shadow_skill", 3)
-        player.trail_skill = save_data.get("trail_skill", 3)
-        player.strength_skill = save_data.get("strength_skill", 3)
-        player.earp_bonus = save_data.get("earp_bonus", 0)
-        player.earp_stage = save_data.get("earp_stage", 0)
-        player.quests_done = save_data.get("quests_done", [])
-        player.event = save_data.get("event", [])
-        player.number_of_towns_visited = save_data.get("number_of_towns_visited", 0)
-        player.player_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
-        player.current_town_name = save_data.get("current_town_name", "Dustbowl")
-
-        print(f"Game loaded from {save_file} successfully!")
-        # Update possible actions based on whether the player is in a village
-        player.save_name = save_data.get("save_name", save_file.replace("save_", "").replace(".json", ""))
-        player.update_actions()
-        return player
-
-    def save_game(self):
-        if not self.save_name:
-            self.save_name = input("Enter a name for your save file: ").strip().replace(" ", "_")
-        save_folder = 'saves'
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-        save_path = os.path.join(save_folder, f"save_{self.save_name}.json")
-        with open(save_path, "w") as file:
-            json.dump({
-                "gold": self.gold,
-                "itemsinventory": self.itemsinventory,
-                "distancenext": self.distancenext,
-                "Day": self.Day,
-                "Time": self.Time,
-                "Health": self.Health,
-                "Hunger": self.Hunger,
-                "Hostility": self.Hostility,
-                "score": self.score,
-                "invillage": self.invillage,
-                "travel_bonus": self.travel_bonus,
-                "trade_bonus": self.trade_bonus,
-                "caravan": self.caravan,
-                "defense_outcome": self.town_defense_outcome,
-                "aftermath_outcome": self.town_aftermath_outcome,
-                "final_outcome": self.town_final_outcome,
-                "boots": self.boots_used,
-                "diary_entries": self.diary_entries,
-                "difficulty": self.difficulty,
-                "MaxHealth": self.MaxHealth,
-                "save_name": self.save_name,
-                "TownUpgrades": self.TownUpgrades,
-                "Tquest": self.Tquest,
-                "quest": self.quest,
-                "rumors": self.rumors,
-                "diary_bonuses": self.diary_bonuses,
-                "rumors_heard": self.rumors_heard,
-                "enemy_effects": self.enemy_effects,
-                "player_effects": self.player_effects,
-                "iron_bonus": self.iron_bonus,
-                "iron_stage": self.iron_stage,
-                "rebirth": self.rebirth,
-                "shadow_skill": self.shadow_skill,
-                "trail_skill": self.trail_skill,
-                "strength_skill": self.strength_skill,
-                "earp_bonus": self.earp_bonus,
-                "earp_stage": self.earp_stage,
-                "quests_done": self.quests_done,
-                "event": self.event,
-                "number_of_towns_visited": self.number_of_towns_visited,
-                "player_name": self.player_name,
-                "current_town_name": self.current_town_name,
-            }, file)
-        print(f"Game saved successfully to 'save_{self.save_name}.json'.")
-
+        # Normalize effects just in case
+        if hasattr(self, 'normalize_effects'):
+            self.normalize_effects()
+        self.update_actions()
+            
     def main_game_loop(self):
-        global player
-        print("Would you like to (1) Start New Game or (2) Load a Save?")
-        choice = input("Enter 1 or 2: ").strip()
-        if choice == "2":
-            player = Player.load_game()
-        else:
-            print("Would you like the instructions?")
-            Choice = input("Yes/No:").strip().lower()
-            Choice = AI_File.parse_YN(Choice)
-            if Choice == "yes":
-                print("Welcome to Western Simulator!")
-                time.sleep(2,)
-                print("In this game you will try and survive the western life and complete quests.")
-                time.sleep(2,)
-                print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
-                time.sleep(2,)
-                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-                choice = input(": ").strip()
-                if choice == "1":
-                    player.difficulty = 'adventure'
-                elif choice == "3":
-                    player.difficulty = 'savage'
+        self.loaded_game_flag = False # Track if we are booting from a save
+        
+        while True:
+            try:
+                # 1. SKIP THE INTRO IF WE JUST LOADED A SAVE
+                if not getattr(self, 'loaded_game_flag', False):
+                    print("\nSelect a Season:")
+                    print("1. Standard (Normal)")
+                    print("2. The Long Winter (Hard Mode + Winter Events)")
+                    print("3. Showcase Mode (Demo)")
+                        
+                    season_choice = self.AI_File.parse_choice(["standard", "winter", "showcase"], "Choose season:")
+                    if season_choice == "showcase":
+                        self.run_showcase_mode()
+                        break
+
+                    if season_choice == "winter":
+                        self.winter_mode = True
+                        print("You have chosen The Long Winter. Bundle up...")
+                        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'winter'})
+                    else:
+                        self.winter_mode = False
+                        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'default'})
+                        
+                    print("Would you like the instructions (Yes/No)?")
+                    Choice = self.AI_File.parse_YN(": ")
+                    if Choice == "yes":
+                        print("Welcome to Western Simulator!")
+                        time.sleep(2)
+                        print("In this game you will try and survive the western life and complete quests.")
+                        time.sleep(2)
+                        print("The rules are simple. You chose options that you would like to do. I tell you what happens. If you run out of health, you die.")
+                        time.sleep(2)
+                        
+                        available_choices = ["adventure", "frontier", "savage"]
+                        prompt = "Choose a difficulty:"
+                        choice = self.AI_File.parse_choice(available_choices, prompt)
+                        if choice == "adventure": self.difficulty = 'adventure'
+                        elif choice == "savage": self.difficulty = 'savage'
+                        else: self.difficulty = 'frontier'
+                        
+                        time.sleep(2)
+                        print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
+                        time.sleep(2)
+                        print("Others like the knife and armor have unlimited uses.")
+                        time.sleep(2)
+                        print("Now let's start your journey.")
+                        print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
+                        time.sleep(1)
+                        Location = ["Dustbowl, a tough town in the South Dakota territory.", 
+                                    "Rust Ridge, a thriving town in the eastern half of Colorado.", 
+                                    "Quarry Town, a large mining town on the banks of the Missouri River."]
+                        print("You wake up in the town of " + random.choice(Location))
+                        print("The people greet you with nods as you walk down the mainstreet.")
+                        time.sleep(4)
+                        self.change_music("Town.mp3", -1)
+                        self.add_item("diary")
+                        
+                    else:
+                        self.change_music("Town.mp3", -1)
+                        self.add_item("diary")
+                        available_choices = ["adventure", "frontier", "savage"]
+                        prompt = "Choose a difficulty:"
+                        choice = self.AI_File.parse_choice(available_choices, prompt)
+                        if choice == "adventure": self.difficulty = 'adventure'
+                        elif choice == "savage": self.difficulty = 'savage'
+                        else: self.difficulty = 'frontier'
+
+                # Reset the flag so if they die and restart normally, the intro plays
+                self.loaded_game_flag = False
+
+                # 2. THE MAIN SURVIVAL LOOP
+                while not self.Health <= 0:
+                    self.tent_used_today = False
+                    if self.invillage == True:
+                        self.HostilityFunc()
+                        self.change_music("Town.mp3", -1)
+                    else:
+                        self.change_music("game_theme.mp3", -1)
+                        
+                    self.RunDay()
+                    
+                    if self.has_effect("drunk"):
+                        print("You suffer from the effects of alcohol, but it slowly wears off.")
+                        self.Health -= 5
+                        self.Speed += 1
+                    self.tick_effects()
+                    self.counter = 0
+                    self.Day += 1
+                    
+                    if self.Temporaryspdboost > 0:
+                        self.Speed -= self.Temporaryspdboost
+                        self.Temporaryspdboost = 0
+                        
+                    if self.Health <= 0:
+                        time.sleep(2)
+                        self.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
+                        
+                    self.Hunger = self.Hunger + 2
+                    print("You feel hungrier...")
+                    time.sleep(2)
+                    if self.Hunger >= 10: 
+                        print("You are starving! Your body is consuming itself.")
+                        self.Hunger = 10
+                        self.Health -= 20
+                    elif self.Hunger >= 7:
+                        print("You are very hungry. Find some food soon.")
+                        self.Health -= 10
+                        
+                    if self.poisoned > 0:
+                        print("You remain poisoned, feeling weak and faint.")
+                        time.sleep(2)
+
+                    print(f"Your health is: {self.Health}.")
+                    print("The day ends. You prepare for tomorrow...")
+                    print("(Use the Save button below if you wish to save your progress.)")
+                    print("Continuing your adventure...")
+                    time.sleep(4)
+                    
+            # 3. THE LOAD INTERRUPTION CATCH
+            except BaseException as e:
+                # Check the exception name as a string to prevent ImportErrors
+                if type(e).__name__ == "GameLoadedException":
+                    # Send text directly to the web UI so the player knows it worked
+                    self.AI_File.print_to_client("<br><br><b>--- GAME LOADED SUCCESSFULLY ---</b>")
+                    self.AI_File.print_to_client("<b>Resuming your adventure...</b><br><br>")
+                    
+                    # Flag that we are loaded so we skip the intro sequence
+                    self.loaded_game_flag = True
+                    
+                    # Continue forces Python back to the top of the 'while True' loop!
+                    continue 
                 else:
-                    player.difficulty = 'frontier'
-                time.sleep(2,)
-                print("Certain items are a single use like bread, antivenom, and boots, and provide a one time bonus.")
-                time.sleep(2,)
-                print("Others like the knife and armor have unlimited uses.")
-                time.sleep(2,)
-                print("Now let's start your journey.")
-                print("(I would recommend going to the gunsmith first, maybe get a revolver and some ammo.)")
-                time.sleep(1,)
-                Location = ["Dustbowl, a tough town in the South Dakota territory.", 
-                            "Rust Ridge, a thriving town in the eastern half of Colorado.", 
-                            "Quarry Town, a large mining town on the banks of the Missouri River."]
-                print("You wake up in the town of " + Location[random.randint(0,2)])
-                print("The people greet you with nods as you walk down the mainstreet.")
-                time.sleep(4,)
-                player.change_music("Town.mp3", -1)
-                player.add_item("diary")
-                
-            else:
-                player.change_music("Town.mp3", -1)
-                player.add_item("diary")
-                print("Choose a difficulty: (1) adventure, (2) frontier, (3) savage")
-                choice = input(": ").strip()
-                if choice == "1":
-                    player.difficulty = 'adventure'
-                elif choice == "3":
-                    player.difficulty = 'savage'
-                else:
-                    player.difficulty = 'frontier'
-
-
-        while not player.Health <= 0:
-            if player.invillage == True:
-                player.HostilityFunc()
-                player.change_music("Town.mp3", -1)
-            else:
-                player.change_music("game_theme.mp3", -1)
-            player.RunDay()
-            player.counter = 0
-            player.Day += 1
-            if player.Temporaryspdboost > 0:
-                player.Speed -= player.Temporaryspdboost
-                player.Temporaryspdboost = 0
-            if player.Health <= 0:
-                time.sleep(2,)
-                player.Death("You have succumbed to your injuries and the harsh conditions of the wild west.")
-            player.Hunger = player.Hunger + 1
-            print("You feel hungrier...")
-            time.sleep(2,)
-            if player.Hunger >= 3:
-                print("You stagger, feeling the effects of your ravenous hunger.")
-                hunger_damage = player.Hunger*5
-                lost_health = hunger_damage
-                player.Health -= lost_health
-                print(f"You lost {lost_health} health of hunger.")
-                if player.Health <= 0:
-                    player.Death("You have succumbed to starvation in the unforgiving wild west.")
-                
-            if player.poisoned > 0:
-                print("You remain poisoned, feeling weak and faint.")
-                time.sleep(2,)
-
-            print(f"Your health is: {player.Health}.")
-            if player.Health <= 0:
-                break
-            player.save_game()
-            choice = input("Would you like to quit? (yes/no): ").strip().lower()
-            if choice == 'yes':
-                print("Thanks for playing! See you next time.")
-                pygame.mixer.music.stop()
-                exit()
-            else:
-                print("Continuing your adventure...")
-                time.sleep(4,)
+                    # If the game crashes for a real reason, let it crash so we can see the error!
+                    raise e
 
     def update_actions(self):
         """
@@ -459,10 +634,14 @@ class Player:
         """
         if self.invillage:
             # In town: Show town actions + universal actions
-            self.possibleactions = self.town_actions + self.universal_actions
+            actions = list(self.town_actions)
+            if self.town_encounter_available:
+                actions.insert(0, "town encounter")
+            self.possibleactions = actions + self.universal_actions
         else:
             # Traveling: Show travel actions + universal actions
             self.possibleactions = self.travel_actions + self.universal_actions
+
 
     def lose_random_item(self, amount):
         if not self.itemsinventory:
@@ -509,13 +688,13 @@ class Player:
                 return True  # Critical Success (5% chance, always wins)
             if roll == 1:
                 return False # Critical Failure (5% chance, always fails)
-
+            
             # 2. Adjust target based on game difficulty
             adjusted_target = base_target
             if self.difficulty == 'adventure':
-                adjusted_target -= 3  # Make it easier
+                adjusted_target -= 2  # Make it easier
             elif self.difficulty == 'savage':
-                adjusted_target += 3  # Make it harder
+                adjusted_target += 2  # Make it harder
             # 'frontier' uses the base_target as-is
 
             # 3. Calculate the final score and check
@@ -523,7 +702,8 @@ class Player:
             # This makes your starting skill of 3 a "+0" (average) bonus.
             # A skill of 4 is +1. A skill of 2 is -1.
             stat_bonus = stat_value - 3 
-            
+            if self.winter_mode:
+                roll -= self.cold_penalty
             final_score = roll + stat_bonus
             
             # You can uncomment this for testing:
@@ -532,76 +712,44 @@ class Player:
             return final_score >= adjusted_target
 
     def TakeActionsChose(self):
-            # This function will now ONLY print the list if USE_OLLAMA is false.
-            # If USE_OLLAMA is true, it prints the simple list.
+        # This function will now ONLY print the list if USE_OLLAMA is false.
+        # If USE_OLLAMA is true, it prints the simple list.
+        # Initial prompt
+        # Print the numbered list for the first time
+        print("\nAvailable Actions:")
+        print("\n--- Available Actions ---")
+        for action_text in self.possibleactions:
+            print(f"{action_text.capitalize()}")
+        print(f"Help")
+        
+
+        while True:
+
+            parsed = self.AI_File.parse_action(f"Enter a number (1-{len(self.possibleactions) + 1}): ", self.possibleactions)
+            action_result = parsed.get('action', 'none')
+
+            # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
+
+            # 3. Parse the action
+            # AI_File.parse_action will now handle the number-to-action conversion
+            # or the text-to-action conversion.
             
-            def print_action_list():
-                """Helper function to print the correct list format."""
-                print("\n--- Available Actions ---")
-                if USE_OLLAMA:
-                    for action1 in self.possibleactions:
-                        print(action1)
-                else:
-                    for i, action_text in enumerate(self.possibleactions, 1):
-                        print(f"{i}. {action_text.capitalize()}")
-                    print(f"{len(self.possibleactions) + 1}. Help")
-                print("-------------------------")
 
-            # Initial prompt
-            if USE_OLLAMA:
-                print("You may choose an action to take:")
-                for action1 in self.possibleactions:
-                    print(action1)
+            # 4. Handle result
+            if action_result in self.possibleactions:
+                # if USE_OLLAMA: # We don't need this feedback line anymore
+                #     print(f"[{action_result.capitalize()}]") 
+                return action_result # Success!
+            
+
+            
             else:
-                # Print the numbered list for the first time
-                print("\nAvailable Actions:")
-                for i, action_text in enumerate(self.possibleactions, 1):
-                    print(f"{i}. {action_text.capitalize()}")
-                print(f"{len(self.possibleactions) + 1}. Help")
-
-            while True:
-                # 1. Get input
-                if USE_OLLAMA:
-                    choice = input("Choice: ").strip()
-                    if choice == "67":
-                        self.coffee_mill_showdown()
-                        self.gold += 100
-                        self.encounter_earp_intro()
-                        self.loot_drop("sharps rifle")
-                        self.loot_drop("tomahawk")
-                        self.run_final_mission()
-                        print("executed")
-                else:
-                    choice = input(f"Enter a number (1-{len(self.possibleactions) + 1}): ").strip()
-
-                # 2. Manual 'help' check (for Ollama mode, or if user types 'help' in numerical)
-                if choice.lower() == "help":
-                    print_action_list()
-                    continue # Ask for input again
-
-                # 3. Parse the action
-                # AI_File.parse_action will now handle the number-to-action conversion
-                # or the text-to-action conversion.
-                parsed = AI_File.parse_action(choice, self.possibleactions, use_ollama=USE_OLLAMA)
-                action_result = parsed.get('action', 'none')
-
-                # 4. Handle result
-                if action_result in self.possibleactions:
-                    if USE_OLLAMA:
-                        print(f"[{action_result.capitalize()}]") # Give feedback on AI choice
-                    return action_result # Success!
-                
-                elif action_result == "help":
-                    print_action_list()
-                    continue # Ask for input again
-                
-                else:
-                    # In Ollama mode, print a generic error
-                    if USE_OLLAMA:
-                        print("Invalid or unavailable choice. Try again.")
-                    # In Numerical mode, parse_action already printed the error.
-                    # We just loop to re-prompt.
-                    pass
+                # In Ollama mode, print a generic error
+                # if USE_OLLAMA: # We don't need this branch
+                #     print("Invalid or unavailable choice. Try again.")
+                # In Numerical mode, parse_action already printed the error.
+                # We just loop to re-prompt.
+                pass
 
     def generate_game_state(self):
         if self.invillage == True:
@@ -639,6 +787,8 @@ class Player:
                 self.TradingPost()
             case "blacksmith shop":
                 self.Blacksmith()
+            case "town encounter":
+                self.town_encounter()
             case "leave town":
                 self.LeaveTown()
             case "use item":
@@ -647,6 +797,9 @@ class Player:
                 self.Statcheck()
             case "travel road":
                 self.Explore()
+            case "make camp":
+                self.MakeCamp()
+
             case _:
                 print("That action is not currently available.")
 
@@ -688,34 +841,69 @@ class Player:
                 "pendant of recognition": "A memorandom of the vendetta ride. Grants +20 score at the end of the game.",
                 "winchester barrel": "Bring it to the blacksmith with a winchester stock to make a winchester rifle.",
                 "winchester stock": "Bring it to the blacksmith with a winchester barrel to make a winchester rifle.",
+                "whiskey": "Liquid courage. +15 HP, +5 Damage buff. Don't drink too much.",
+                "steak": "A large, fire-cooked steak. Huge meal. -5 Hunger, +30 Health.",
+                "bourbon roast": "Meat slow-cooked in whiskey. A king's meal. Fully Restores Health & Hunger.",
+                "salted pork sandwich": "A hearty sandwich made with salted pork and bread. -2 Hunger, +15 Health.",
+                "pemmican": "A high-energy food made from dried meat and fat. Hunger set to 0, +20 Health.",
             }
 
-            for idx, (item, qty) in enumerate(self.itemsinventory.items(), 1):
+            for item, qty in self.itemsinventory.items():
                 description = item_descriptions.get(item, "This item can't be used.")
-                print(f"{idx}. {item.capitalize()} (x{qty}) - {description}")
+                print(f"{item.capitalize()} (x{qty}) - {description}")
+            # --- MODIFICATION START ---
+            # Define the list of choices for the parser
+            item_list = list(self.itemsinventory.keys())
+            choices_for_parser = item_list + ["leave"] # Add "leave" as an explicit choice
 
-            choice = input("Enter the number of the item you want to use (or 'q to leave'): ").strip().lower()
 
-            if choice == "q":
+            choice = self.AI_File.parse_choice(
+                choices_for_parser, 
+                "Choose an item to use:"
+            )
+            # 'choice' is now the item *name* (e.g., "bread") or "leave"
+
+            if choice == "leave": # <-- Changed from "q"
                 print("You decided not to use anything.")
                 use_continue = False
                 break
 
-            item_list = list(self.itemsinventory.keys())
-
-            if not choice.isdigit() or int(choice) < 1 or int(choice) > len(item_list):
-                print("Invalid choice.")
-                continue
-
-            selected_item = item_list[int(choice) - 1]
+            # We no longer need the isdigit() check or the index conversion.
+            # 'choice' is already the item name.
+            selected_item = choice
             if combat == False:
+                
                 if selected_item == "bread":
-                    self.Hunger = self.Hunger - 1
+                    self.Hunger = self.Hunger - 2
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
-                    print(f"You eat some bread and reduce {1} hunger.")
+                    print(f"You eat some bread and reduce {2} hunger.")
+                
+                elif selected_item == "salted pork":
+                    self.Hunger = self.Hunger - 4
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+                    print("The salty meat is tough, but filling. -4 Hunger, +5 Health.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+                
+                elif selected_item == "salted pork sandwich":
+                    self.Hunger = self.Hunger - 4
+                    self.Health = min(self.Health + 15, self.MaxHealth)
+                    print("The sandwich is hearty. -4 Hunger, +15 Health.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
 
+                elif selected_item == "pemmican":
+                    self.Hunger = 0 # Fully cures hunger
+                    self.Health = min(self.Health + 20, self.MaxHealth)
+                    print("You eat the nutrient-dense pemmican. You feel completely full. Hunger cleared.")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0:
+                        del self.itemsinventory[selected_item]
+                
                 elif selected_item == "coffee tin":
                     print("You slam the coffee—your reflexes sharpen!")
                     self.Speed += 1
@@ -742,17 +930,19 @@ class Player:
                     self.read_diary_day()
 
                 elif selected_item == "ammo cartridge":
+                    # --- MODIFICATION START ---
                     # Let player choose which ammo to receive
-                    print("Which ammo type would you like?") 
-                    print("1) Pistol Ammo")
-                    print("2) Rifle Ammo")
-                    print("3) Shotgun Ammo")
-                    choice = input("Choice: ").strip()
-                    if choice == "1":
+                    prompt = "Which ammo type would you like?"
+                    available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
+                    
+                    choice = self.AI_File.parse_choice(available_choices, prompt)
+                    # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
+                    
+                    if choice == "pistol ammo":
                         ammo = "pistol_ammo"
-                    elif choice == "2":
+                    elif choice == "rifle ammo":
                         ammo = "rifle_ammo"
-                    elif choice == "3":
+                    elif choice == "shotgun ammo":
                         ammo = "shotgun_ammo"
                     else:
                         print("Invalid selection. No ammo granted.")
@@ -792,6 +982,37 @@ class Player:
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
 
+
+                elif selected_item == "whiskey":
+                    print("You take a long swig of the burning liquid.")
+                    self.Health = min(self.Health + 15, self.MaxHealth)
+                    self.damage_modifier += 5 # "Liquid Courage" buff for next fight
+                    self.add_effect("drunk", duration=1)
+                    
+                    # Small chance to get "drunk" (slow)
+                    if random.randint(1, 10) == 1:
+                        print("You feel a bit woozy... -1 Speed.")
+                        self.Speed = max(1, self.Speed - 1)
+                    else:
+                        print("You feel warm and ready for a fight. (+15 HP, +5 Dmg)")
+
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
+
+                elif selected_item == "steak":
+                    self.Hunger = max(0, self.Hunger - 5)
+                    self.Health = min(self.Health + 30, self.MaxHealth)
+                    print("You devour the steak. It is delicious. (-5 Hunger, +30 Health)")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
+
+                elif selected_item == "bourbon roast":
+                    self.Hunger = 0
+                    self.Health = self.MaxHealth
+                    self.damage_modifier += 10 
+                    print("The flavor is incredible. You feel invincible! (Full Restore + Damage Buff)")
+                    self.itemsinventory[selected_item] -= 1
+                    if self.itemsinventory[selected_item] <= 0: del self.itemsinventory[selected_item]
                 else:
                     print(f"You can't use {selected_item} right now.")
     
@@ -815,7 +1036,7 @@ class Player:
                 elif selected_item == "whetstone":
                     print("You run the whetstone along your melee weapon, sharpening it to a razor edge.")
                     print("Your next melee attack will deal extra damage.")
-                    self.player_effects.append("sharpened_blade")
+                    self.add_effect("sharpened_blade")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
@@ -844,8 +1065,8 @@ class Player:
                     if combat and enemy_combatant and enemy_combatant.get("type") == "pack":
                         print(f"You used the fire cracker! The {enemy_name}'s health is halved!")
                         print(f"They are much more disorganized.")
-                        self.enemy_effects.append("stun")
-                        self.enemy_effects.append("hphalf")
+                        self.add_effect("stun", target="enemy")
+                        self.add_effect("hphalf", target="enemy")
                         time.sleep(2,)
                         self.itemsinventory[selected_item] -= 1
                         if self.itemsinventory[selected_item] <= 0:
@@ -862,17 +1083,19 @@ class Player:
                     self.Armor_Boost = 0.7
 
                 elif selected_item == "ammo cartridge":
+                    # --- MODIFICATION START ---
                     # Let player choose which ammo to receive
-                    print("Which ammo type would you like?") 
-                    print("1) Pistol Ammo")
-                    print("2) Rifle Ammo")
-                    print("3) Shotgun Ammo")
-                    choice = input("Choice: ").strip()
-                    if choice == "1":
+                    prompt = "Which ammo type would you like?"
+                    available_choices = ["Pistol Ammo", "Rifle Ammo", "Shotgun Ammo"]
+                    
+                    choice = self.AI_File.parse_choice(available_choices, prompt)
+                    # 'choice' will be "pistol ammo", "rifle ammo", or "shotgun ammo"
+                    
+                    if choice == "pistol ammo":
                         ammo = "pistol_ammo"
-                    elif choice == "2":
+                    elif choice == "rifle ammo":
                         ammo = "rifle_ammo"
-                    elif choice == "3":
+                    elif choice == "shotgun ammo":
                         ammo = "shotgun_ammo"
                     else:
                         print("Invalid selection. No ammo granted.")
@@ -888,7 +1111,7 @@ class Player:
 
                 elif selected_item == "flashbang":
                     print("You throw the stun bomb! It explodes in a flash and bang!")
-                    self.enemy_effects.append("stun")
+                    self.add_effect("stun", target="enemy")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
@@ -896,28 +1119,18 @@ class Player:
 
                 elif selected_item == "field dressing kit":
                     print("You quickly apply a field dressing, bracing for the next attack.")
-                    self.player_effects.append("half_incoming_damage")
+                    self.add_effect("half_incoming_damage")
                     self.itemsinventory[selected_item] -= 1
                     if self.itemsinventory[selected_item] <= 0:
                         del self.itemsinventory[selected_item]
                 elif selected_item == "vendetta badge":
                     print("\nYou hold the badge high. You hear the thunder of hooves and a volley of gunfire rings out!")
-                    self.player_effects.append("posse_help")
+                    self.add_effect("posse_help")
                 else:
                     print(f"You can't use {selected_item} right now.")
                     time.sleep(2,)
                                 
             time.sleep(2,)
-
-    def hunger_check(self):
-        if self.Hunger >= 3:
-            return "You are ravenously hungry."
-        elif self.Hunger == 2:
-            return "You are quite hungry."
-        elif self.Hunger == 1:
-            return "You feel a bit hungry."
-        elif self.Hunger == 0:
-            return "You are well fed."
 
     def Statcheck(self):
         print(f"You are on day {self.Day}.")
@@ -938,7 +1151,19 @@ class Player:
         #print(f"Your role is {self.active_role.name.capitalize()} (XP: {self.active_role.xp}).")
         print(self.hunger_check())
         print(f"Your health is {self.Health}.")
-        input("Press Enter to continue:")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to continue:")
+
+    def hunger_check(self):
+            if self.Hunger >= 9:
+                return "You are starving to death."
+            elif self.Hunger >= 7:
+                return "You are ravenously hungry. You feel weak."
+            elif self.Hunger >= 4:
+                return "Your stomach is growling."
+            elif self.Hunger > 0:
+                return "You could eat."
+            else:
+                return "You are well fed."
 
     def TownJail(self):
         print("You walk into the town jail.")
@@ -949,9 +1174,8 @@ class Player:
         print("Ask the sheriff about rumors.")
         print("Ask the sheriff to teach you some skills.")
         print("Leave the jail.")
-        choice = input("Enter your choice: ").strip()
         available_choices = ["pay fine", "return criminal", "ask rumors", "teach skills", "leave"]
-        choice = AI_File.parse_choice(available_choices, choice, use_ollama=USE_OLLAMA)
+        choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ")
         if choice == "pay fine":
             if self.Hostility > 0:
                 fine = self.Hostility * 5
@@ -969,17 +1193,18 @@ class Player:
             if "outlaw" in self.caravan:
                 print("You turn in the outlaw you captured.")
                 print("The sheriff approaches you.")
-                print("How can we reward you for bringing in this outlaw? (1) Gold (2) Supplies?")
-                choice = input(": ").strip()
-                if choice == "1":
+                prompt = "How can we reward you for bringing in this outlaw?"
+                available_choices = ["Gold", "Supplies"]
+                
+                choice = self.AI_File.parse_choice(available_choices, prompt)
+                if choice == "gold": # <-- Changed from "1"
                     reward = random.randint(20, 40)
                     self.gold += reward
                     print(f"The sheriff thanks you and gives you {reward} gold as a reward.")
-                else:
+                else: # <-- This now handles "supplies"
                     supply = random.choice(self.rare_loot)
                     self.add_item(supply)
                     print(f"The sheriff thanks you and gives you some supplies: {supply}.")
-                self.caravan.remove("outlaw")
             else:
                 print("You have no criminals to turn in.")
         elif choice == "ask rumors":
@@ -988,6 +1213,7 @@ class Player:
                 rumor_topics = {
                 "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
                 "old_mine_lights": "Nobody goes near the old mine anymore.",
+                "earp_vendetta": "I don't tell anybody this, but go to the saloon, Wyatt Earp is looking for help in the saloon.",
                 }
                 topic, rumor = random.choice(list(rumor_topics.items()))
                 print(f"The sheriff murmurs: \"{rumor}\"")
@@ -996,13 +1222,12 @@ class Player:
                 # Example: trigger a quest after hearing a rumor 2 times
                 if self.rumors[topic] == 2:
                     if topic == "earp_vendetta":
-                        print("I don't tell anybody this, but go to the saloon, Wyatt Earp is looking for help.")
-                        self.event.append("Earp_Saloon")
+                        self.rumors["earp_rumor"] = 1 # Set the flag
+                        print("\n[Quest Update] You can now approach Wyatt Earp in the Saloon.")
                     print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    print("Would you like to accept this quest? (will replace your current town quest if any) (yes/no)")
-                    choice = input(": ").strip().lower()
-                    if self.AI_File.parse_YN(choice) == "yes":
-                        self.Tquest = topic
+                    print("Would you like to accept this quest? (yes/no)")
+                    if self.AI_File.parse_YN(": ") == "yes":
+                        self.quest.append(topic)
                         print(f"You have accepted the quest: {topic.replace('_',' ').capitalize()}!")
                     else:
                         print("You declined the quest for now.")
@@ -1015,17 +1240,15 @@ class Player:
             print(f"Strength Skill - Improves combat effectiveness. Current: {self.strength_skill}")
             print(f"Trail Skill - Improves navigation and survival. Current: {self.trail_skill}")
             print(f"Durability Skill - Improves max Health. Current: {self.MaxHealth}")
-            skill_choice = input("Enter your choice: ").strip().lower()
             available_choices = ['durability', 'trail', 'strength', 'shadow']
-            skill_choice = AI_File.parse_choice(available_choices, skill_choice, use_ollama=USE_OLLAMA)
+            skill_choice = self.AI_File.parse_choice(available_choices, "Enter your choice: ")
             if skill_choice == "shadow":
                 gold = (self.shadow_skill - 2) * 5
                 if gold > self.gold:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.shadow_skill += 1
                     print("Your shadow skill has improved! +1 shadow skill.")
@@ -1038,8 +1261,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.trail_skill += 1
                     print("Your trail skill has improved! +1 trail skill.")
@@ -1052,8 +1274,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.strength_skill += 1
                     print("Your strength skill has improved! +1 strength skill.")
@@ -1066,8 +1287,7 @@ class Player:
                     print("You don't have enough gold.")
                 print(f"The sheriff agrees to teach you for {gold}.")
                 print("Will you pay? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.MaxHealth += 5
                     print("Your durability skill has improved! +5 max Health.")
@@ -1107,9 +1327,26 @@ class Player:
             {"give": "medium hide", "get": "bandage"},
             {"give": "shotgun_ammo", "get": "rifle_ammo"},
         ]
-
+        price_mult = 1.25 if self.winter_mode else 1.0
+        if self.winter_mode: 
+            print("Trader: 'I pay extra for furs in this cold.'")
+            sell_prices = {
+                "small hide": int(12 * price_mult), 
+                "medium hide": int(20 * price_mult), 
+                "large hide": int(40 * price_mult),
+                "small meat": 12, "medium meat": 20, "large meat": 40,
+                "horn": 45, "bread": 2, "knife": 5,
+                "revolver": 15, "colt pistol": 20, "sharps rifle": 40,
+                "rifle": 15, "shotgun": 25,
+                "pistol_ammo": 1, "rifle_ammo": 2, "shotgun_ammo": 3,
+                "winchester rifle": 50, "carved horn": 40,
+                "gold nugget": random.randint(15, 45),
+                "silver watch": random.randint(10, 20),
+                "silver bar": random.randint(40, 60),
+                "gold bar": random.randint(45, 100)
+            }
         # We don't need a buy inventory, so we pass an empty dict {}
-        trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, USE_OLLAMA)
+        trader_session = ShopSession(self, self.AI_File, "Trading Post", {}, "Trader")
 
         # Call our new, specialized method!
         trader_session.run_trade_session(sell_prices, trade_offers)
@@ -1127,20 +1364,14 @@ class Player:
         if "winchester barrel" in self.itemsinventory and "winchester stock" in self.itemsinventory:
             print("You have the parts to assemble a Winchester rifle.")
             print("Would you like to assemble it now? (yes/no)")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 self.itemsinventory.pop("winchester barrel")
                 self.itemsinventory.pop("winchester stock")
                 self.add_item("winchester rifle")
                 print("You have assembled a Winchester rifle!")
         time.sleep(2,)
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the blacksmith's forge, and is greeted by the owner."
-            NpC = "blacksmith"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
+
 
         item_prices = {
             'boots': 15,
@@ -1165,7 +1396,7 @@ class Player:
         for name in available_items:
             # Use a default quantity of 5 for this example
             shop_inventory[name] = ShopItem(name, item_prices[name], 5)
-        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory, USE_OLLAMA)
+        BlacksmithShop = ShopSession(self, self.AI_File, "Blacksmith Shop", shop_inventory, "Blacksmith")
         BlacksmithShop.run_buy_session()
 
     def DoctorOffice(self):
@@ -1195,13 +1426,12 @@ class Player:
         cost = round(cost)
         print("'Would you like me to heal you?' Yes/No")
         print(f"It will cost you {cost}.")
-        Choice = input(": ").strip().lower()
-        Choice = AI_File.parse_YN(Choice)
+        Choice = self.AI_File.parse_YN(": ")
         if Choice == "yes":
             if self.gold >= cost:
                 self.gold -= cost
                 print(f"You were healed {Heal}")
-                self.Health = 100
+                self.Health = self.MaxHealth
             else:
                 print("You do not have enough gold.")
             time.sleep(2,)
@@ -1211,13 +1441,8 @@ class Player:
             'field dressing kit': ShopItem('field dressing kit', 20, 5),
             'antivenom': ShopItem('antivenom', 10, 5),
         }
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the Doctor's Supply Store, and is greeted by the owner."
-            NpC = "doctor"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
-        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, USE_OLLAMA)
+
+        doc_shop = ShopSession(self, self.AI_File, "Doctor's Supply Store", doctor_inventory, "Doctor")
         doc_shop.run_buy_session() # Call the new method
         print("You leave the Doctor's Office.")
 
@@ -1225,12 +1450,6 @@ class Player:
         self.play_sound("store_bell.mp3")
         print("You enter the gunsmith.")
         print("The gunsmith greets you with a nod. Guns line the walls.")
-        if random.randint(1,3) == 3:
-            print(f"The owner walks over and greets you.")
-            game_state = player.generate_game_state()
-            event = f"The player walks into the Gunsmith's Store, and is greeted by the owner."
-            NpC = "gunsmith"
-            AI_File.narrate_shop(game_state, event, NpC, use_ollama=USE_OLLAMA)
         time.sleep(2,)
 
         available_weapons = ["revolver", "rifle", "shotgun", "knife"]
@@ -1258,70 +1477,153 @@ class Player:
             'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10),
         })
 
-        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory, USE_OLLAMA)
+        GunsmithStore = ShopSession(self, self.AI_File, "Gunsmith", inventory, "Gunsmith")
         GunsmithStore.run_buy_session()
 
     def Bank(self):
-            print("You walk into the Bank. The air smells of leather and dust.")
-            print("What town building would you like to invest in?")
+        print("You walk into the Bank. The air smells of leather and dust.")
+        
+        # 1. Anti-Exploit: Check if the bank was already hit
+        if "bank_robbed" in self.event:
+            print("The bank doors are locked tight, and armed guards are patrolling outside!")
+            print("You can't do business here right now.")
+            return
 
-            # 1. Define buildings and their upgrade prices in a dictionary
+        # 2. Top-Level Bank Menu
+        available_choices = ["invest in town", "rob the bank", "leave"]
+        print("\n--- The Bank ---")
+        print("Invest in town")
+        print("Rob the bank")
+        print("Leave")
+        
+        choice = self.AI_File.parse_choice(available_choices, "What would you like to do? ")
+
+        if choice == "leave":
+            print("You tip your hat and leave the bank.")
+            return
+
+        elif choice == "rob the bank":
+            # 1. Weapon Check: Scan inventory for anything containing a base weapon string
+            available_weapons = self.get_inventory_matches("firearms")
+            
+
+            if not available_weapons:
+                print("\nYou reach for a weapon, but your holster is empty!")
+                print("You can't rob a bank with your bare hands. You leave before you look suspicious.")
+                return
+
+            # 2. Select the tool for the job
+            print("\nYou duck into an alley and pull a bandana over your face.")
+            print("Which weapon will you use for the heist?")
+            heist_weapon = self.AI_File.parse_choice(available_weapons, "Select weapon: ")
+            
+            # Lock the bank and advance time
+            self.event.append("bank_robbed")
+            self.Time += 1 
+
+            print(f"\nYou stride into the bank, leveling your {heist_weapon.title()} at the ceiling.")
+            print("'EVERYBODY ON THE GROUND!' you bark.")
+            time.sleep(2)
+
+            # 3. Robust Skill Check
+            # High difficulty Shadow check. 
+            # We use 17 as the target, but maybe 'Masterwork' weapons make people more intimidated?
+            target = 17
+            if "masterwork" in heist_weapon:
+                print("The craftsmanship of your weapon cows the crowd instantly.")
+                target -= 2
+            elif "rusty" in heist_weapon:
+                print("The teller notices the rust on your iron and looks less than impressed.")
+                target += 1
+
+            if self.perform_stat_check(self.shadow_skill, base_target=target):
+                print("\nYou swiftly intimidate the teller. They fumble with the keys and crack the vault.")
+                print("You work in total silence; no one outside even looks toward the window.")
+                
+                payout = random.randint(50, 150)
+                self.gold += payout
+                print(f"You stuff your bags with {payout} gold!")
+                self.loot_drop("gold bar")
+                
+                print("You slip out the back alley and blend into the street crowds.")
+                self.Hostility += 2 # Minor suspicion
+            
+            else:
+                # FAILURE BRANCH
+                print("\nYou fumble with your bandana, and the teller catches a glimpse of your face!")
+                print("They panic and kick a hidden lever—a bell begins clanging wildly!")
+                time.sleep(1)
+                print("\nThe Sheriff bursts through the front doors, weapon drawn!")
+                self.Hostility += 3 
+                
+                print(f"'Drop that {heist_weapon.split()[-1]}, outlander!' the Sheriff yells.")
+                print("Will you surrender? (yes/no)")
+                surrender_choice = self.AI_File.parse_YN(": ")
+                
+                if surrender_choice == "yes":
+                    print("You drop your iron and raise your hands.")
+                    self.jail_penalty()
+                else:
+                    print("You fan the hammer and open fire!")
+                    # Initiate combat using the Sheriff template
+                    combat = Combat(self)
+                    combat.FindAttacker("sheriff")
+                    # Pass 'escape' flag check
+                    if combat.Attack(): 
+                        return # They escaped combat
+
+                    # Post-combat looting if they won
+                    if self.Health > 0:
+                        counter_cash = random.randint(20, 50)
+                        self.gold += counter_cash
+                        print(f"\nYou step over the Sheriff and grab {counter_cash} gold from the counter.")
+                        print("You flee the bank, but the whole town is out for your blood!")
+                        self.Hostility += 4
+            return
+
+        elif choice == "invest in town":
+            # Your existing investment logic
+            print("\nWhat town building would you like to invest in?")
+
             buildings_to_upgrade = {
                 "general store": self.TownUpgrades["general store"]["level"] * 10,
                 "blacksmith": self.TownUpgrades["blacksmith"]["level"] * 10,
                 "gunsmith": self.TownUpgrades["gunsmith"]["level"] * 10,
             }
 
-            # 2. Create the list of valid choices for the parser
-            # We add "leave" so the parser knows it's a valid option.
-            available_choices = list(buildings_to_upgrade.keys()) + ["leave"]
+            invest_choices = list(buildings_to_upgrade.keys()) + ["leave"]
 
-            # 3. Display the options to the user
-            # The parse_choice function will handle numbering if USE_OLLAMA is False
             print("\n--- Town Investments ---")
             for building, price in buildings_to_upgrade.items():
                 current_level = self.TownUpgrades[building]['level']
-                # This text will be shown in both modes
                 print(f"{building.capitalize()} (Level {current_level}) - Price to upgrade: {price} gold.")
-            
-            if USE_OLLAMA:
-                print("Leave") # Explicitly tell Ollama users they can leave
-            
-            # 4. Get and parse the user's input
-            choice_input = input("Choice: ").strip()
-            # Pass the full list, including "leave", to the parser
-            choice = self.AI_File.parse_choice(available_choices, choice_input, use_ollama=USE_OLLAMA)
 
-            # 5. Handle the parsed choice
-            if choice == "leave":
+            invest_choice = self.AI_File.parse_choice(invest_choices, "Choice: ")
+
+            if invest_choice == "leave":
                 print("You decide not to invest right now and leave the bank.")
                 return
 
-            # Check if the choice is a valid building (it should be, if not 'leave')
-            if choice in buildings_to_upgrade:
-                price_to_pay = buildings_to_upgrade[choice]
+            if invest_choice in buildings_to_upgrade:
+                price_to_pay = buildings_to_upgrade[invest_choice]
 
-                # Check affordability
                 if self.gold < price_to_pay:
                     print("You check your coin purse. You cannot afford that investment.")
                     return
                 
-                # Process the upgrade
                 self.gold -= price_to_pay
-                self.TownUpgrades[choice]["level"] += 1
+                self.TownUpgrades[invest_choice]["level"] += 1
                 
-                # Get new level for confirmation message
-                new_level = self.TownUpgrades[choice]["level"]
-                new_price = new_level * 10 # Calculate the *next* price
+                new_level = self.TownUpgrades[invest_choice]["level"]
+                new_price = new_level * 10 
                 
                 print(f"\nYou paid {price_to_pay} gold.")
-                print(f"The {choice.capitalize()} has been upgraded to Level {new_level}!")
+                print(f"The {invest_choice.capitalize()} has been upgraded to Level {new_level}!")
                 print(f"(The next upgrade will cost {new_price} gold.)")
-            
-            else:
-                # This case should rarely happen if parse_choice is working, but it's safe
-                print(f"Invalid choice '{choice}'. Leaving the bank.")
-                return
+        
+        else:
+            print("Invalid choice. You step back outside.")
+            return
 
     def Armory(self):
         print("You enter the Armory, a shattered house on the edge of town.")
@@ -1331,30 +1633,36 @@ class Player:
 
         for i in range(2):
             print(f"\n--- Choice {i+1}/2 ---")
-            print("1) Heal to full health")
-            print("2) Buy ammo")
-            print("3) Get supplies")
-            choice = input("What would you like to do? (1-3): ").strip()
-
-            if choice == "1":
+            
+            # --- MODIFICATION START ---
+            prompt = f"What would you like to do? (Choice {i+1}/2)"
+            available_choices = ["Heal to full health", "Buy ammo", "Get supplies"]
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt)
+            # 'choice' will be the lowercase string of the selected option
+            
+            if choice == "heal to full health":
                 self.Health = self.MaxHealth
                 print(f"You are fully healed. Health is now {self.Health}.")
-            elif choice == "2":
+            elif choice == "buy ammo":
                 ammo_inventory = {
                     'pistol_ammo': ShopItem('pistol_ammo', 2, 10),
                     'rifle_ammo': ShopItem('rifle_ammo', 3, 10),
                     'shotgun_ammo': ShopItem('shotgun_ammo', 5, 10)
                 }
                 print("The quartermaster unlocks an ammo crate for you.")
-                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, USE_OLLAMA)
+                # Note: Updated to use USE_OLLAMA to match your current Store class
+                ammo_shop = ShopSession(self, self.AI_File, "Armory Ammo Shop", ammo_inventory, "Quartermaster")
                 ammo_shop.run_buy_session()
-            elif choice == "3":
+            elif choice == "get supplies":
                 print("The armory clerk hands you a crate of supplies...")
                 loot = random.choice(["colt pistol", "revolver", "bandage", "ammo cartridge", "bread", "rope"])
                 self.loot_drop(loot)
                 time.sleep(1)
             else:
-                print("Invalid choice. You missed that opportunity.")
+                print("You decided to do nothing.")
+            # --- MODIFICATION END ---
+            
             time.sleep(1)
 
         print("\nYou step out of the Armory, ready for what comes next.")
@@ -1365,37 +1673,75 @@ class Player:
         print("The saloon is alive with music and conversation.")
         self.change_music("Saloon_music.mp3", -1)
         time.sleep(1)
+        
+        # Random flavor event (Brawls, cards, etc.)
         self.saloon_entry_event()
 
-        for i in range(max(3-self.counter,0)):
+        # Allow multiple interactions
+        for i in range(max(3-self.counter, 0)):
             self.counter += 1
-            print("\nWhat would you like to do?")
-            print("1) Talk to the barkeeper")
-            print("2) Sing a drinking song")
-            print("3) Talk to the patrons")
-            print("4) Leave the bar")
-            choice = input("Choice: ").strip()
-            if choice == "1":
+            
+            # --- 1. Base Menu Options ---
+            available_choices = [
+                "Talk to the barkeeper",
+                "Sing a drinking song", 
+                "Talk to the patrons",
+                "Leave the bar"
+            ]
+            quest_options = None
+            if not self.quest_today:
+                quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
+            # --- 2. Dynamic Quest Wiring ---
+            # Ask the database: "Are there any buttons for the Saloon right now?"
+            if not self.quest_today:
+                quest_options = self.process_quest_triggers("saloon", is_menu_option=True)
+            quest_map = {}
+            
+            # If we got a list of quests back, add them as buttons
+            if isinstance(quest_options, list):
+                for q in quest_options:
+                    btn_text = q['description']
+                    # Add to the top of the list so they are seen first
+                    available_choices.insert(0, btn_text)
+                    # Map the lowercase text to the quest object for lookup
+                    quest_map[btn_text.lower()] = q
+            
+            # --- 3. Get User Choice ---
+            prompt = "\nWhat would you like to do?"
+            # parse_choice typically returns the choice as a lowercase string
+            choice = self.AI_File.parse_choice(available_choices, prompt)
+
+            # --- 4. Handle Quest Buttons ---
+            if choice in quest_map:
+                selected_quest = quest_map[choice]
+                # Run the specific function (e.g., encounter_iron_intro)
+                method_to_call = getattr(self, selected_quest["function"])
+                method_to_call()
+                
+                # If the quest state changed (e.g. you accepted a quest), 
+                # break the loop to refresh the game state/menu
+                if self.Tquest != "None": 
+                    break 
+                continue
+
+            # --- 5. Handle Standard Options ---
+            if choice == "talk to the barkeeper":
                 self.saloon_barkeeper()
-            elif choice == "2":
+            elif choice == "sing a drinking song":
                 self.saloon_song()
-            elif choice == "3":
+            elif choice == "talk to the patrons":
                 self.saloon_patrons()
-            else:
+            else: # Leave the bar
                 print("You decide to just watch the crowd for a while.")
                 break
+            
             time.sleep(1)
+            
         print("You have gathered all new information.")
         self.change_music("Town.mp3", -1)
 
     def saloon_entry_event(self):
         roll = random.randint(1,7)
-        if "Earp_Saloon" in self.event and "earp_vendetta" not in self.quests_done:
-            roll = 5
-            self.event.remove("Earp_Saloon")
-        if "final_earp_confrontation" in self.event:
-            self.encounter_earp_stage4()
-            self.event.remove("final_earp_confrontation")
         if roll == 1:
             print("A brawl erupts in the corner—chairs fly as punches land.")
             combat = Combat(self)
@@ -1417,8 +1763,7 @@ class Player:
                 print("The saloon is lively, but nothing new catches your attention.")
                 return
             print("A drunk cowboy staggers over and offers you a swig of whiskey. (yes/no)")
-            ans = input(": ").strip().lower()
-            ans = AI_File.parse_YN(ans)
+            ans = self.AI_File.parse_YN(": ")
             if ans == "yes":
                 if random.randint(1,10) >= 9:
                     print("The whiskey was spoiled! You feel ill.")
@@ -1433,52 +1778,67 @@ class Player:
             if self.Tquest == "None" and "earp_vendetta" not in self.quests_done:
                 self.encounter_earp_intro()
             else:
-                print("You decline and step aside.")
+                # Just flavor text if you already did it or have another quest
+                print("The saloon is rowdy tonight.")
 
-        elif roll == 7 or roll == 8:
-            self.encounter_iron_intro()
-
+        elif roll == 7:
+            if self.Tquest == "None" and "iron_tracks" not in self.quests_done:
+                self.encounter_iron_intro()
 
         else:
             print("Lot's of people gather around the saloon's door and inside.")
 
     def saloon_barkeeper(self):
-        print("\nThe barkeeper polishes a glass and nods.")
-        print("1) Ask about rumors")
-        print("2) Buy a drink (5 gold)")
-        choice = input("Choice: ").strip()
-        if choice == "1":
+            print("\nThe barkeeper polishes a glass and nods.")
+            
+            # --- MODIFICATION START ---
+            # Define the choices for the buttons
+            # I included the cost in the button text so the player knows before clicking
+            available_choices = ["Ask about rumors", "Buy a drink (5 gold)"]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?")
+            # choice will be the lowercase string of the button clicked
 
-            if "barkeeper_rumor" not in self.rumors_heard:
-                self.rumors_heard.append("barkeeper_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-                "old_mine_lights": "Nobody goes near the old mine anymore.",
-                }
-            topic, rumor = random.choice(list(rumor_topics.items()))
-            print(f"The barkeeper murmurs: \"{rumor}\"")
-            self.rumors[topic] = self.rumors.get(topic, 0) + 1
-            print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-            # Example: trigger a quest after hearing a rumor 2 times
-            if self.rumors[topic] == 2:
-                print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                self.quest.append(topic)
-            else:
-                print("Unfortunately, the barkeeper has no new rumors for you.")
-            self.rumors_heard.append("barkeeper_rumor")
-            time.sleep(2)
-        elif choice == "2":
-            if self.gold >= 5:
-                self.gold -= 5
-                print("You pay 5 gold and down a shot. +5 health.")
-                print("You feel a warm buzz, and faster. +1 speed.")
-                self.Health = min(self.Health + 5, self.MaxHealth)
-                self.Temporaryspdboost += 1
-            else:
-                print("You check your pouch—you don't have enough gold.")
+            if choice == "ask about rumors": # <-- Changed from "1"
+                if "barkeeper_rumor" not in self.rumors_heard:
+                    self.rumors_heard.append("barkeeper_rumor")
+                    rumor_topics = {
+                    "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                    "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    "railroad_job": "The Railroad Foreman is in the back. He's looking for hired guns.",
+                    }
+                    # Fix: Initialize topic and rumor properly before use
+                    topic, rumor = random.choice(list(rumor_topics.items()))
+                    
+                    print(f"The barkeeper murmurs: \"{rumor}\"")
+                    self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                    print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                    
+                    # Example: trigger a quest after hearing a rumor 2 times
+                    if self.rumors[topic] == 2:
+                        print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                        self.quest.append(topic)
+                else:
+                    print("Unfortunately, the barkeeper has no new rumors for you.")
+                
+                # Ensure this flag is added (it was in your original code, seemingly outside the 'if' but logic suggests it marks the interaction)
+                if "barkeeper_rumor" not in self.rumors_heard:
+                    self.rumors_heard.append("barkeeper_rumor")
+                time.sleep(2)
 
-        else:
-            print("He shrugs: \"Suit yourself.\"")
+            elif choice == "buy a drink (5 gold)": # <-- Changed from "2"
+                if self.gold >= 5:
+                    self.gold -= 5
+                    print("You pay 5 gold and down a shot. +5 health.")
+                    print("You feel a warm buzz, and faster. +1 speed.")
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+                    self.Temporaryspdboost += 1
+                else:
+                    print("You check your pouch—you don't have enough gold.")
+
+            else:
+                print("He shrugs: \"Suit yourself.\"")
+            # --- MODIFICATION END ---
 
     def saloon_song(self):
         print("\nYou stand and clear your throat to sing...")
@@ -1505,8 +1865,7 @@ class Player:
     
     def saloon_steal_attempt(self):
         print("\nYou notice the crowd is enthralled by the music... could be your chance to steal something.")
-        choice = input("Would you like to attempt to steal? (yes/no): ").strip().lower()
-        choice = AI_File.parse_YN(choice)
+        choice = self.AI_File.parse_YN("Would you like to attempt to steal? (yes/no): ")
         if choice == "yes":
             # Determine success based on shadow skill
 
@@ -1526,8 +1885,7 @@ class Player:
                 print("'We can do this the easy way, or the hard way.'")
                 print("'Surrender, or I make you.'")
                 print("Will you surrender? (yes/no)")
-                Choice = input(": ").strip().lower()
-                Choice = AI_File.parse_YN(Choice)
+                Choice = self.AI_File.parse_YN(": ")
                 if Choice == "yes":
                     print("You surrender to the sheriff, and he takes you to the Town Jail.")
                     self.jail_penalty()
@@ -1548,58 +1906,73 @@ class Player:
             print("You decide against the risk and keep singing.")
 
     def saloon_patrons(self):
-        print("\nYou join a group of patrons at a table.")
-        print("1) Gather gossip")
-        print("2) Play cards (gamble)")
-        print("3) Arm-wrestling contest")
-        choice = input("Choice: ").strip()
-        if choice == "1":
-            if "patron_rumor" not in self.rumors_heard:
+            print("\nYou join a group of patrons at a table.")
+            
+            # --- MODIFICATION START ---
+            available_choices = [
+                "Gather gossip", 
+                "Play cards (gamble)", 
+                "Arm-wrestling contest"
+            ]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What would you like to do?")
+            # choice is now a lowercase string
 
-                self.rumors_heard.append("patron_rumor")
-                rumor_topics = {
-                "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
-                "old_mine_lights": "Nobody goes near the old mine anymore.",
-                }
-                topic, rumor = random.choice(list(rumor_topics.items()))
-                print(f"A patron murmurs: \"{rumor}\"")
-                self.rumors[topic] = self.rumors.get(topic, 0) + 1
-                print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
-                # Example: trigger a quest after hearing a rumor 2 times
-                if self.rumors[topic] == 2:
-                    print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
-                    self.quest.append(topic)
-            else:
-                print("They shrug: \"We'll let you know if something happens.\"")
-            time.sleep(2)
-        elif choice == "2":
-            bet = input("Enter bet amount: ").strip()
-            if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
-                bet = int(bet)
-                self.gold -= bet
+            if choice == "gather gossip": # <-- Changed from "1"
+                if "patron_rumor" not in self.rumors_heard:
 
-                if self.perform_stat_check(self.shadow_skill, base_target=16):
-                    winnings = bet + 10 + bet//2
-                    self.gold += winnings
-                    print(f"You win! You gain {winnings} gold.")
+                    self.rumors_heard.append("patron_rumor")
+                    rumor_topics = {
+                    "bandits_coyote_camp": "People have been being robbed by coyote pass, somethings not right there.",
+                    "old_mine_lights": "Nobody goes near the old mine anymore.",
+                    }
+                    # Ensure topic/rumor variables are defined inside the scope or earlier
+                    topic, rumor = random.choice(list(rumor_topics.items()))
+                    print(f"A patron murmurs: \"{rumor}\"")
+                    self.rumors[topic] = self.rumors.get(topic, 0) + 1
+                    print(f"[Rumor about '{topic.replace('_',' ').capitalize()}' added! Heard {self.rumors[topic]} times.]")
+                    # Example: trigger a quest after hearing a rumor 2 times
+                    if self.rumors[topic] == 2:
+                        print(f"A new quest is now available: {topic.replace('_',' ').capitalize()}!")
+                        self.quest.append(topic)
                 else:
-                    print("You lose the hand and your bet.")
-                    print("If you had been more stealthy, you might have won.")
+                    print("They shrug: \"We'll let you know if something happens.\"")
+                time.sleep(2)
+
+            elif choice == "play cards (gamble)": # <-- Changed from "2"
+
+                bet = input("Enter bet amount: ").strip()
+                
+                if bet.isdigit() and int(bet) > 0 and int(bet) <= self.gold:
+                    bet = int(bet)
+                    self.gold -= bet
+
+                    if self.perform_stat_check(self.shadow_skill, base_target=16):
+                        winnings = bet + 10 + bet//2
+                        self.gold += winnings
+                        print(f"You win! You gain {winnings} gold.")
+                    else:
+                        print("You lose the hand and your bet.")
+                        print("If you had been more stealthy, you might have won.")
+                else:
+                    print("Invalid bet.")
+
+            elif choice == "arm-wrestling contest": # <-- Changed from "3"
+                print("You grip a burly patron's hand and push...")
+                if self.perform_stat_check(self.strength_skill, base_target=13) == True:
+                    prize = 5
+                    print(f"You win the arm-wrestle! +{prize} gold.")
+                    self.gold += prize
+                else:
+                    print("You lose and take a punch. -5 health.")
+                    print("If you had been stronger, you might have won.")
+                    self.Health -= 5
+            
             else:
-                print("Invalid bet.")
-        elif choice == "3":
-            print("You grip a burly patron's hand and push...")
-            if self.perform_stat_check(self.strength_skill, base_target=13) == True:
-                prize = 5
-                print(f"You win the arm-wrestle! +{prize} gold.")
-                self.gold += prize
-            else:
-                print("You lose and take a punch. -5 health.")
-                print("If you had been stronger, you might have won.")
-                self.Health -= 5
-        else:
-            print("No one notices your hesitation.")
-        time.sleep(2)
+                print("No one notices your hesitation.")
+            # --- MODIFICATION END ---
+                
+            time.sleep(2)
 
     def Townspeople(self):
         if self.Hostility >= 3:
@@ -1618,7 +1991,7 @@ class Player:
             print("A merchant walks up to you.")
             NpC = "merchant"
             event = "A merchant asks if the player will help load wagons at the stable."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice.strip().lower() == "yes":
                 earned = random.randint(20, 40)
                 self.gold += earned
@@ -1632,7 +2005,7 @@ class Player:
             NpC = "farmer"
             print("A farmer waves you over.")
             event = "A farmer waves the player over. 'My plow's busted—can you help fix it?'"
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice == "yes":
                 if "rope" in self.itemsinventory:
                     print("You tie it back together with your rope.")
@@ -1658,7 +2031,7 @@ class Player:
             print("A schoolteacher walks over.")
             NpC = "schoolteacher"
             event = "A schoolteacher asks if the player will speak to the children about survival."
-            choice = AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC, use_ollama=USE_OLLAMA)
+            choice = self.AI_File.narrate_dialogue_once(self.generate_game_state(), event, NpC)
             if choice == "yes":
                 self.Time += 2
                 self.shadow_skill += 1
@@ -1683,8 +2056,7 @@ class Player:
             # Rare: town alert
             print("A kid runs by shouting, 'Bandits near the ridge!'")
             print("The sheriff is calling for help. Do you join him? (yes/no)")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
+            choice = self.AI_File.parse_YN(": ")
             if choice == "yes":
                 print("You ride with the sheriff to confront the bandits!")
                 self.Speed += 1
@@ -1734,36 +2106,69 @@ class Player:
             self.add_item(item)
 
     def LeaveTown(self):
-        if self.event == "final_earp_confrontation":
-            print("Earp yells at you to stop, 'We need to finish Curly Bill.'")
-            print("Will you stay and help him? (yes/no)")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
+        # 1. Run standard triggers (like Iron Tracks Stage 2)
+        # We assume these don't block leaving, they just play a scene.
+        if not self.quest_today:
+            self.process_quest_triggers("leave_town", is_menu_option=False)
+
+        # 2. Earp Vendetta Interception
+        # Check if we are on Stage 4 OR if we deferred the fight earlier
+        on_finale_stage = (self.Tquest == "earp_vendetta" and self.get_flag("earp_vendetta", "stage") == 4)
+
+
+        if on_finale_stage:
+            print("\nAs you head for the edge of town, Wyatt Earp steps into the road, blocking your path.")
+            print("'We have business to finish with Curly Bill,' he says sternly.")
+            print("'You aren't riding out on us now, are you?'")
+            
+            # Ask the player what to do
+            choice = self.AI_File.parse_YN("Do you stay and fight? (yes/no): ")
+            
             if choice == "yes":
-                print("'Meet me at the saloon,' Earp says.")
-                return
+                print("'Good. Meet me at the Saloon. We ride out soon.'")
+                # Ensure the deferred flag is set so the button appears in the Saloon
+                if "final_earp_confrontation" not in self.event:
+                    self.event.append("final_earp_confrontation")
+                return # Cancel leaving, go back to town menu
+            
             else:
-                print("You decide to leave Earp to his vendetta.")
-                print("You turn your back, leaving him behind.")
-                print("Suddenly some gunshots ring out from behind you...")
+                print("You shake your head and push past him.")
+                print("You turn your back, leaving the vendetta behind.")
+                time.sleep(1)
+                print("Suddenly, gunshots ring out from the shadows!")
+                print("The Earp posse ambushes you for your cowardice! -20 health.")
                 self.Health -= 20
-                print("Earp and his posse ambush you as you leave! -20 health.")
+                
+                # FAIL THE QUEST (Clean up flags)
+                self.Tquest = "None"
+                if "final_earp_confrontation" in self.event:
+                    self.event.remove("final_earp_confrontation")
+                # Optional: Add to completed so it doesn't trigger again
+                self.quests_done.append("earp_vendetta") 
+
+        # 3. Cleanup Event Flags
         if "coin" in self.event:
             self.event.remove("coin")
         if "drink" in self.event:
             self.event.remove("drink")
+        if "bank_robbed" in self.event:         # <--- ADD THIS
+            self.event.remove("bank_robbed")
+
+        # 4. Actual Leaving Logic
         self.counter = 0
         self.current_town_name = "none"
         self.distancenext = random.randint(15, 20) + self.number_of_towns_visited * 3
-        print("You leave the town and head down the road.")
+        
+        print("\nYou leave the town and head down the road.")
         if "surveyor's kit" in self.itemsinventory:
             print(f"[Surveyor's Kit] {self.distancenext} miles to next town.")
+            
         self.play_sound("rolling_wheels.mp3")
         self.change_music("game_theme.mp3", -1)
         self.invillage = False
         self.Hostility = 0
         self.update_actions()
-        time.sleep(2,)
+        time.sleep(2)
 
     def Interaction(self):
         Random = random.randint(1,50)
@@ -1794,44 +2199,34 @@ class Player:
                 self.Interaction()
 
     def town_encounter(self):
-        quest_chance = random.randint(1, 2)
-        if self.Tquest == "None" and quest_chance >= 2:
-            Random = random.choice(["defend_town","iron_tracks"])
-            if Random == "defend_town" and "defend_town" not in self.quests_done:
-                # Episode 1 not done yet?
-                if self.town_defense_outcome is None:
-                    self.encounter_town_part1()
-            elif Random == "iron_tracks" and "iron_tracks" not in self.quests_done:
-                    self.encounter_iron_intro()
-                    return
-        if self.Tquest == "defend_town":
-            # Episode 2 pending?
-            if self.town_defense_outcome and self.town_aftermath_outcome is None:
-                self.encounter_town_part2()
-                return
-            # Episode 3 pending?
-            if self.town_aftermath_outcome and self.town_final_outcome is None:
-                self.encounter_town_part3()
-                return
-        elif self.Tquest == "iron_tracks":
-            if self.iron_stage == 1:
-                self.encounter_iron_stage1()
-                return
-            elif self.iron_stage == 2:
-                self.encounter_iron_stage2()
-                return
-            elif self.iron_stage == 3:
-                self.encounter_iron_stage3()
-                return
-            elif self.iron_stage == 4:
-                self.encounter_iron_stage4()
-                return
-            elif self.iron_stage == 5:
-                self.encounter_iron_stage5()
-                return
+        """
+        Handles daily events in town.
+        Prioritizes active quest progression over random new quests.
+        """
+        self.town_encounter_available = False
+        self.update_actions()
+        if self.Tquest == "None":
+            roll = random.randint(1, 10)
+            
+            # 30% chance to start the Town Defense quest (Force Start)
+            if roll <= 2 and "defend_town" not in self.quests_done:
+                print("\nSomething is happening in town...")
+                self.Tquest = "defend_town" # Set as active
+                self.encounter_town_part1() # Start it immediately
+                
+            # 30% chance to hear the Iron Tracks rumor (Hint)
+            elif roll <= 4 and "iron_tracks" not in self.quests_done:
+                print("\n[Rumor] You see a new poster: 'Railroad Hiring - See Foreman at Saloon'.")
+                # CHANGE THESE LINES:
+                # Instead of starting the quest, we just give the "Key" to unlock the button
+                self.rumors["railroad_job"] = 1
+            elif roll <= 6:
+                print("\nYou hear whispers of a vendetta. Wyatt Earp is looking for brave souls in the Saloon.")
+                self.rumors["earp_rumor"] = 1 # Set the flag
+
             else:
-                self.encounter_iron_intro()
-                return
+                # Fallback: Just a quiet day
+                print("The town is relatively quiet today.")
 
     def ArriveTown(self):
         name = f"{random.choice(self.TownNames1)} {random.choice(self.TownNames2)}"
@@ -1841,7 +2236,7 @@ class Player:
         self.change_music("Town.mp3", -1)
         self.number_of_towns_visited += 1
         self.current_town_name = name
-
+        self.town_event_occurred = False
         if "family" in self.caravan:
             self.travel_bonus += 1
             print("The family thanks you sincerely for allowing them to travel with you, and gives you a handsome reward. +20 gold.")
@@ -1854,21 +2249,15 @@ class Player:
         self.update_actions()
         self.score = self.score + 5
         time.sleep(2)
-        
-        if self.Tquest == "earp_vendetta" and self.earp_stage == 4:
-            print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
-            print("'Word is Curly Bill is holed up here in town. This ends now.'")
-            time.sleep(2)
-            # Optional: Ask if ready or want to prepare
-            ready = input("Are you ready for the final confrontation? (yes/no): ").strip().lower()
-            ready = self.AI_File.parse_YN(ready)
-            if ready == "yes":
-                self.encounter_earp_stage4() # Directly trigger the final stage
-            else:
-                print("You tell Wyatt you need a moment to prepare.")
-                print("Find him at the Saloon when you're ready.")
-                self.event.append("final_earp_confrontation")
-        self.town_encounter()
+        if self.Tquest == "earp_vendetta" and self.get_flag("earp_vendetta", "stage") == 4:
+            print("Wyatt Earp nods at you as you enter town.")
+            print("'Ready to finish this?' he asks.")
+            print("'I will be at the saloon when you are ready.'")
+        if not self.quest_today:
+            self.process_quest_triggers("arrive_town", is_menu_option=False)
+
+        self.town_encounter_available = (self.Tquest == "None")
+        self.update_actions()
 
     def GeneralStore(self):
         self.play_sound("store_bell.mp3")
@@ -1883,8 +2272,20 @@ class Player:
             'tobacco pouch': ShopItem('tobacco pouch', 7, 7),
             'coffee tin': ShopItem('coffee tin', 5, 5),
             'diary': ShopItem('diary', 5, 5),
+            'salted pork': ShopItem('salted pork', 10, 10), # -2 Hunger
+            'pemmican': ShopItem('pemmican', 20, 5),        # -3 Hunger (Full)
+            'flint and steel': ShopItem('flint and steel', 15, 1), # Reusable fire starter
+            'firewood': ShopItem('firewood', 2, 20),        # Fuel
+            'wool blanket': ShopItem('wool blanket', 25, 1), # Passive heat drain reduction
+            'bedroll': ShopItem('bedroll', 15, 1), 
+            'small tent': ShopItem('small tent', 40, 1),
+            'wall tent': ShopItem('wall tent', 100, 1),      
+            'wool blanket': ShopItem('wool blanket', 25, 2),
         }
-        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, USE_OLLAMA)
+        if self.winter_mode:
+            general_inventory['heavy coat'] = ShopItem('heavy coat', 50, 5)
+            general_inventory['firewood'].base_price = 5
+        gen_shop = ShopSession(self, self.AI_File, "General Store", general_inventory, "store owner")
         gen_shop.run_buy_session()
 
     def HostilityFunc(self):
@@ -1908,57 +2309,248 @@ class Player:
             self.jail_penalty()
 
     def Death(self, death_cause):
-        pygame.mixer.music.stop()
+        self.change_music("stop", 0)
         self.play_sound("death.mp3")
         print("You fall to the ground, your vision fading...")
+        
         time.sleep(2,)
         print(death_cause)
         if self.rebirth == True:
             print("You have already respawned once.")
             print("You feel your life slipping away, and you know this is the end.")
+            self.score = 0
         else:
             print("Your stats:")
             print(f"Days survived: {self.Day}")
             print(f"Score: {self.score}")
-            input("Press Enter to continue...")
+            
+
+            self.AI_File.parse_choice(["Continue"], "Press Enter to continue...")
+            
             self.Statcheck()
-            print("You have come so far, would you like to respawn at your current position? (yes/no)")
+            
+            # 2. Replace the yes/no prompt
+            prompt = "You have come so far, would you like to respawn at your current position?"
             print("You will no longer track score.")
-            choice = input(": ").strip().lower()
-            choice = AI_File.parse_YN(choice)
+            choice = self.AI_File.parse_YN(prompt)
             if choice == "yes":
                 self.lose_random_item(2)
                 self.gold -= self.gold/2
                 print("You feel a strange sensation, as if you are being pulled back to life...")
                 self.Health = self.MaxHealth
                 self.rebirth = True
+                self.score = 0
                 return
-        print("Would you like to restart the game? (yes/no)")
-        choice = input(": ").strip().lower()
-        choice = AI_File.parse_YN(choice)
  
 
         print("Credits: Bayne Cheke, Designer and Programmer.")
         time.sleep(1,)
         print("Music/audio effects: Freesound.com")
         time.sleep(1,)
-        print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
+        print("Playtesters: Deric R Cheke, Dax Cheke!!!, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
         time.sleep(1,)
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         time.sleep(1,)
-        if choice == "yes":
-            print("Restarting game...")
-            
-            player = Player()
-            player.main_game_loop()
-            exit()
-        else:
-            print("Thank you for playing!")
-            print("Until next time...")
-            time.sleep(2,)
-            exit()
 
+        print("Thank you for playing!")
+        print("Until next time...")
+        time.sleep(2,)
+        exit()
+
+    def MakeCamp(self):
+        print("\nYou pull your wagon off the road to set up a temporary camp.")
+        print("This will cost 1 hour of daylight.")
         
+        # 1. Define Camp Options
+        print("1. Build a Fire (Requires Firewood + Flint)")
+        print("2. Rest in Tent (Better if you have a Tent)")
+        print("3. Cook Food (requires Firewood + Flint + Meat)")
+        print("4. Pack up and leave")
+        
+        choice = self.AI_File.parse_choice(["build fire", "rest", "cook", "leave"], "Camp Action:")
+        
+        if choice == "build fire":
+            self.skip_freeze = True
+            if "flint and steel" in self.itemsinventory and "firewood" in self.itemsinventory:
+                print("You strike the flint and light a roaring fire.")
+                self.itemsinventory["firewood"] -= 1
+                if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                
+                # Restore Heat
+                if self.winter_mode:
+                    print("The warmth thaws your frozen limbs. Heat fully restored.")
+                    self.Heat = self.MaxHeat
+                    self.cold_penalty = 0
+                
+                # Small morale/health boost
+                self.Health = min(self.Health + 5, self.MaxHealth)
+                self.Time += 1
+            elif "firewood" in self.itemsinventory:
+                if random.randint(1, 2) == 1:
+                    print("You light a small fire with the wood.")
+                    self.itemsinventory["firewood"] -= 1
+                    if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                    if self.winter_mode:
+                        print("The warmth thaws your frozen limbs. Heat fully restored.")
+                        self.Heat = self.MaxHeat
+                        self.cold_penalty = 0
+                    # Small morale/health boost
+                    self.Health = min(self.Health + 5, self.MaxHealth)
+
+                    self.Time += 1
+                else:
+                    print("You try to light the fire, but it fails. -5 health.")
+            else:
+                print("You need 'Flint and Steel' AND 'Firewood' to build a fire.")
+        
+        elif choice == "rest":
+            self.skip_freeze = True
+            sleep_options = ["sleep in wagon"] # Always available
+            
+            if "bedroll" in self.itemsinventory:
+                sleep_options.append("use bedroll")
+            if "small tent" in self.itemsinventory:
+                sleep_options.append("use small tent")
+            if "wall tent" in self.itemsinventory:
+                sleep_options.append("use wall tent")
+            sleep_choice = self.AI_File.parse_choice(sleep_options, "How do you want to sleep?")
+            # --- TIER CHECK ---
+            # Check from Best -> Worst
+            if sleep_choice == "use wall tent":
+                print("It takes some time to set up your Wall Tent. +2 Hours.")
+                self.Time += 2
+                print("You enter your spacious Wall Tent. It feels like a home away from home.")
+                heal = 20
+                heat = 50
+                print(f"You sleep deeply. +{heal} Health. +{heat} Heat.")
+
+                
+            elif sleep_choice == "use small tent":
+                print("It takes some time to set up your Small Tent. +1 Hour.")
+                self.Time += 1
+                print("You crawl into your Small Tent. It blocks the wind effectively.")
+                heal = 10
+                heat = 30
+                print(f"You rest well. +{heal} Health. +{heat} Heat.")
+
+                
+            elif sleep_choice == "use bedroll":
+                print("You unroll your Bedroll near the fire. It's better than the ground.")
+                heal = 5
+                heat = 15
+                print(f"You catch some sleep. +{heal} Health. +{heat} Heat.")
+
+                
+            else:
+                print("You curl up in your wagon.")
+                self.Health = min(self.Health + 5, self.MaxHealth)
+                print("You feel a bit better. +5 Health.")
+                if self.winter_mode:
+                    self.Heat = min(self.Heat + 15, self.MaxHeat)
+                    print("You warm up slightly. +15 Heat.")
+                    self.cold_penalty = 0
+                    self.skip_freeze = True
+            
+            # Apply Blanket Bonus (Stacks with anything)
+            if "wool blanket" in self.itemsinventory:
+                print("Your Wool Blanket provides extra warmth. (+5 Heat)")
+                if self.winter_mode: self.Heat = min(self.Heat + 5, self.MaxHeat)
+            
+            if not self.tent_used_today: 
+                self.Health = min(self.Health + heal, self.MaxHealth)
+            else:
+                print("You cannot heal twice with a tent today. (You can still regain heat if in winter)")
+            if self.winter_mode: self.Heat = min(self.Heat + heat, self.MaxHeat)
+            self.cold_penalty = 0
+            self.Time += 1
+            self.tent_used_today = True
+            
+
+        elif choice == "cook":
+            self.skip_freeze = True
+            
+            # Check for fire tools
+            if "flint and steel" in self.itemsinventory and "firewood" in self.itemsinventory:
+                print("\nYou light a fire. The flames crackle warmly.")
+                
+                # Consume 1 firewood for the cooking session
+                self.itemsinventory["firewood"] -= 1
+                if self.itemsinventory["firewood"] <= 0: del self.itemsinventory["firewood"]
+                
+                # --- INTERACTIVE COOKING LOOP ---
+                cooking_session = True
+                while cooking_session:
+                    recipes = []
+                    
+                    # 1. Basic Recipes
+                    if "small meat" in self.itemsinventory: recipes.append("Grill Small Meat (-> Salted Pork)")
+                    if "medium meat" in self.itemsinventory: recipes.append("Grill Medium Meat (-> Salted Pork)")
+                    if "large meat" in self.itemsinventory: recipes.append("Seer Large Meat (-> Steak)")
+                    
+                    # 2. Combo Recipes
+                    if "large meat" in self.itemsinventory and "whiskey" in self.itemsinventory:
+                        recipes.append("Cook Bourbon Roast (Large Meat + Whiskey)")
+                    if "bread" in self.itemsinventory and "salted pork" in self.itemsinventory:
+                        recipes.append("Cook Salted Pork Sandwich (Bread + Salted Pork)")
+                    
+                    recipes.append("Stop Cooking")
+                    
+                    # Ask player
+                    print(f"\n--- Campfire Cooking (Firewood remaining: {self.itemsinventory.get('firewood', 0)}) ---")
+                    cook_choice = self.AI_File.parse_choice(recipes, "Select a recipe:")
+                    
+                    if cook_choice == "stop cooking":
+                        cooking_session = False
+                        print("You put out the fire.")
+                    
+                    # --- RECIPE LOGIC ---
+                    elif "small meat" in cook_choice:
+                        self.itemsinventory["small meat"] -= 1
+                        if self.itemsinventory["small meat"] <= 0: del self.itemsinventory["small meat"]
+                        self.add_item("salted pork")
+                        print("You grilled the small meat into a decent meal.")
+                        
+                    elif "medium meat" in cook_choice:
+                        self.itemsinventory["medium meat"] -= 1
+                        if self.itemsinventory["medium meat"] <= 0: del self.itemsinventory["medium meat"]
+                        self.add_item("salted pork")
+                        self.add_item("salted pork")
+                        print("You grilled the medium meat into two rations.")
+
+                    elif "seer large meat" in cook_choice: # Matches the button text
+                        self.itemsinventory["large meat"] -= 1
+                        if self.itemsinventory["large meat"] <= 0: del self.itemsinventory["large meat"]
+                        self.add_item("steak")
+                        print("You sear the large meat into a juicy Steak.")
+
+                    elif "bourbon roast" in cook_choice:
+                        # Consume Meat
+                        self.itemsinventory["large meat"] -= 1
+                        if self.itemsinventory["large meat"] <= 0: del self.itemsinventory["large meat"]
+                        # Consume Whiskey
+                        self.itemsinventory["whiskey"] -= 1
+                        if self.itemsinventory["whiskey"] <= 0: del self.itemsinventory["whiskey"]
+                        
+                        self.add_item("bourbon roast")
+                        print("You slow-cook the meat in whiskey glaze. It smells heavenly.")
+                    
+                    elif "salted pork sandwich" in cook_choice:
+                        # Consume Ingredients
+                        self.itemsinventory["bread"] -= 1
+                        if self.itemsinventory["bread"] <= 0: del self.itemsinventory["bread"]
+                        self.itemsinventory["salted pork"] -= 1
+                        if self.itemsinventory["salted pork"] <= 0: del self.itemsinventory["salted pork"]
+                        
+                        self.add_item("salted pork sandwich")
+                        print("You prepare a hearty Salted Pork Sandwich. It's filling.")
+                    
+                self.Time += 1
+            else:
+                print("You need 'Flint and Steel' AND 'Firewood' to start a cooking fire.")
+
+        else:
+            print("You pack up and head back to the road.")
+        time.sleep(3,)
 
 
     #RunDay
@@ -1967,18 +2559,21 @@ class Player:
         print("You step out of your wagon and stretch.")
         time.sleep(2,)
         while self.Time < 21:
-            if self.Hunger == 3:
-                print("You feel ravenous. You need to eat something soon.")
-                if random.randint(1,3) == 1:
-                    print("You stumble and fall weakly to the ground.")
-                    print("You find the strength to get back up after half an hour.")
+            if self.Hunger >= 7:
+                print("You feel weak from hunger.")
+                if random.randint(1, 4) == 1: # Reduced chance to 25%
+                    print("You stumble from exhaustion.")
                     self.Time += 0.5
+                    self.Health -= 5
+                    if self.Health <= 0:
+                        self.Death("You have succumbed to exhaustion.")
                     continue
             self.DoAction()
+            time.sleep(1,)
             print()
             if self.Hunger < 0:
                 Heal_bonus = self.Hunger
-                Heal_bonus = Heal_bonus*10
+                Heal_bonus = Heal_bonus*2
                 self.Health -= Heal_bonus
                 self.Hunger = 0
             self.Time += 1
@@ -1993,7 +2588,44 @@ class Player:
                 self.Health = self.MaxHealth
             if self.Health <= 0:
                 self.Death("You have succumbed to your injuries during the day.")
-            self.quest_today = False
+            if self.winter_mode:
+                if self.skip_freeze:
+                    self.skip_freeze = False
+                    continue
+                if self.invillage:
+                    # Towns restore heat automatically
+                    self.Heat = min(self.Heat + 30, self.MaxHeat)
+                    self.cold_penalty = 0
+                else:
+                    # 1. Calculate Drain Amount
+
+                    heat_drain = 10 # You lose 15 Heat per hour by default
+                    
+                    if "heavy coat" in self.itemsinventory:
+                        heat_drain = 5 # Coat slows it down significantly
+                        
+                    # 2. Apply Drain
+                    self.Heat -= heat_drain
+                    
+                    # 3. Check Thresholds (The Danger Zone)
+                    if self.Heat <= 0:
+                        self.Heat = 0
+                        print(f"(!) HYPOTHERMIA. You are freezing to death. Heat: 0/{self.MaxHeat}")
+                        self.Health -= 5
+                        self.cold_penalty = 5 # Massive stat reduction
+                        self.Hunger += 0.25 # Shivering burns calories (Lowers food stat)
+                        
+                    elif self.Heat < 30:
+                        print(f"(!) You are shivering violently. Heat: {self.Heat}/{self.MaxHeat}")
+                        self.Health -= 2 # Chip damage
+                        self.Hunger += 0.1
+                        self.cold_penalty = 2 # Moderate stat reduction
+                    
+                    else:
+                        # Just getting cold, no damage yet
+                        print(f"The cold gnaws at you. Heat: {self.Heat}/{self.MaxHeat}")
+
+        self.quest_today = False
         time.sleep(1)
         if self.Health <= 0:
             self.Death("You have succumbed to your injuries during the day.")
@@ -2019,6 +2651,27 @@ class Player:
                 time.sleep(4,)
                 self.write_diary_entry()
         else:
+            warmth_bonus = 0
+            
+            if "canvas tent" in self.itemsinventory:
+                print("You sleep soundly in your Canvas Tent. (+10 Health)")
+                self.Health = min(self.Health + 10, self.MaxHealth)
+                warmth_bonus += 1
+            
+            if "wool blanket" in self.itemsinventory:
+                print("Your Wool Blanket keeps the chill away.")
+                warmth_bonus += 1
+
+            if self.winter_mode:
+                if warmth_bonus == 0:
+                    print("It is freezing tonight! You shiver uncontrollably. -10 Health.")
+                    self.Health -= 10
+                elif warmth_bonus == 1:
+                    print("It's cold, but your gear helps. -5 Health.")
+                    self.Health -= 5
+                else:
+                    print("Your tent and blanket make the winter night comfortable. No Health lost.")
+
             print("You make camp under the stars.")
             self.write_diary_entry()
             print("You sleep through the night")
@@ -2030,22 +2683,14 @@ class Player:
         Random = random.randint(1,40)
         Random = Random + self.Day*5-5
 
-        if self.Tquest == "earp_vendetta" and not self.quest_today:
-                # Check ONLY for stages 1, 2, or 3 here
-            if self.earp_stage == 1:
+
+        # --- On-the-trail quest handler (random chance) ---
+        if not self.quest_today and random.randint(1, 4) == 1:
+            if self.process_quest_triggers("on_the_trail", is_menu_option=False):
                 self.quest_today = True
-                self.encounter_earp_stage1()
-                return # Quest event happened
-            elif self.earp_stage == 2:
-                self.quest_today = True
-                self.encounter_earp_stage2()
-                return # Quest event happened
-            elif self.earp_stage == 3:
-                self.quest_today = True
-                self.encounter_earp_stage3()
-                return # Quest event happened
-                    
-            # --- Rumor quest handler ---
+                return
+
+        # --- Rumor quest handler ---
         if self.quest_today == False:
             if self.quest and random.randint(1,2) == 1:
                 print("You remember a rumor you heard in town.")
@@ -2101,10 +2746,9 @@ class Player:
         if "outlaw" not in self.caravan and rand == 2:
             print("A outlaw appears on the road.")
             print("Will you try and capture him? (yes/no)")
-            choice = input(": ").strip().capitalize()
-            choice = AI_File.parse_YN(choice)
+            choice = self.AI_File.parse_YN(": ")
             time.sleep(2,)
-            if choice == "Yes":
+            if choice == "yes":
                 print("You attempt to capture the outlaw.")
                 if self.perform_stat_check(self.strength_skill, base_target=14) == True:
                     print("You successfully capture the outlaw.")
@@ -2125,9 +2769,8 @@ class Player:
         elif "family" not in self.caravan and rand == 1:
             print("A family is travelling in their wagon, but it appears that they have a broken wheel.")
             print("Would you like to help, or pass them by? (yes/no)")
-            choice = input(": ").strip().capitalize()
-            choice = AI_File.parse_YN(choice)
-            if choice == "Yes":
+            choice = self.AI_File.parse_YN(": ")
+            if choice == "yes":
                 print("You tow the other wagon behind yours.")
                 print("The family thanks you for allowing them to travel with them")
                 print("It takes some extra time, but you feel it was worth it.")
@@ -2141,147 +2784,178 @@ class Player:
             time.sleep(2,)
 
     def encounter_abandoned_house(self):
-        print("You see an abandoned house by the side of the road.")
-        print("It could have some valuable loot, but you have no idea what is inside.")
-        print("You could (1) leave it, (2) enter the broken down door, (3) enter the cellar, or (4) loot the garden.")
-        choice = input(": ")
-        if choice == "1":
-            print("You decide it is wisest to leave it alone.")
-            time.sleep(2,)
-        elif choice == "2":
-            print("You enter the door.")
-            print("It makes a creaking sound as you walk in.")
-            time.sleep(2,)
-            print("(1) On the wall hangs a dusty rifle,(2) on the table lies a bundle, and (3), there is a painting on the far wall.")
-            choice = input(": ")
-            if choice == "1":
-                Random = random.randint(1,2)
-                if Random == 1:
-                    print("As you head over to the table you hear a noise.")
-                    time.sleep(2,)
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("There must be a way to disable the traps...")
-                    self.Health -= 20
-                    time.sleep(2,)
-                else:
-                    print("You grab the rifle")
-                    self.loot_drop("rifle")
-                    time.sleep(2,)
-            elif choice == "2":
-                Random = random.randint(1,3)
-                if Random == 1:
-                    print("As you head over to the table you hear a noise.")
-                    time.sleep(2,)
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("There must be a way to disable the traps...")
-                    self.Health -= 10
-                    time.sleep(2,)
-                else:
-                    print("You rummage around through the table")
-                    self.loot_drop(random.choice(self.common_loot))
-            elif choice == "3":
-                print("You examine the picture...")
+            print("You see an abandoned house by the side of the road.")
+            print("It could have some valuable loot, but you have no idea what is inside.")
+            
+            # --- MODIFICATION 1: Main Entry Menu ---
+            available_choices = ["Leave it", "Enter door", "Enter cellar", "Loot garden"]
+            prompt = "What do you want to do?"
+            
+            choice = self.AI_File.parse_choice(available_choices, prompt)
+            
+            if choice == "leave it":
+                print("You decide it is wisest to leave it alone.")
                 time.sleep(2,)
-                if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
-                    print("You accidentally trigger the trap attached to the painting!")
-                    print("Out of the darkness a blade hits you.")
-                    print("You stumble out of the building.")
-                    print("You were, close, if your shadow skill was higher you have had a better chance of disarming it.")
-                    time.sleep(4,)
-                else:
-                    print("You notice the elaborate trap around the painting, and streching around the room.")
-                    print("You carefully disarm the trap, glad your shadow skills have served you.")
-                    time.sleep(2,)
-                    print("You find a crate behind the painting.")
-                    print("Now that the trap is disarmed, you can loot the room safely.")
-                    print("(1), On the wall hangs a dusty rifle,(2), on the table lies a bundle, and (3), there is a crate behind the painting.")
-                    time.sleep(2,)
-                    choice = input(": ")
-                    if choice == "1":
+                
+            elif choice == "enter door":
+                print("You enter the door.")
+                print("It makes a creaking sound as you walk in.")
+                time.sleep(2,)
+                
+                # --- MODIFICATION 2: Inside the House Menu ---
+                print("You see three things of interest:")
+                print("1. A dusty rifle on the wall.")
+                print("2. A bundle on the table.")
+                print("3. A painting on the far wall.")
+                
+                choices_inside = ["Dusty Rifle", "Bundle", "Painting"]
+                choice_inside = self.AI_File.parse_choice(choices_inside, "What do you inspect?")
+
+                if choice_inside == "dusty rifle":
+                    Random = random.randint(1,2)
+                    if Random == 1:
+                        print("As you head over to the table you hear a noise.")
+                        time.sleep(2,)
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("There must be a way to disable the traps...")
+                        self.Health -= 20
+                        time.sleep(2,)
+                    else:
                         print("You grab the rifle")
                         self.loot_drop("rifle")
-                    elif choice == "2":
+                        time.sleep(2,)
+                
+                elif choice_inside == "bundle":
+                    Random = random.randint(1,3)
+                    if Random == 1:
+                        print("As you head over to the table you hear a noise.")
+                        time.sleep(2,)
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("There must be a way to disable the traps...")
+                        self.Health -= 10
+                        time.sleep(2,)
+                    else:
                         print("You rummage around through the table")
                         self.loot_drop(random.choice(self.common_loot))
-                    elif choice == "3":
-                        print("You find a wealth of supplies")
-                        self.gold += 20
-                        self.loot_drop(random.choice(self.uncommon_loot))
-                        self.loot_drop(random.choice(self.rare_loot))
+                
+                elif choice_inside == "painting":
+                    print("You examine the picture...")
+                    time.sleep(2,)
+                    if self.perform_stat_check(self.shadow_skill, base_target=15) == True:
+                        print("You accidentally trigger the trap attached to the painting!")
+                        print("Out of the darkness a blade hits you.")
+                        print("You stumble out of the building.")
+                        print("You were close. If your shadow skill was higher you might have disarmed it.")
+                        time.sleep(4,)
+                    else:
+                        print("You notice the elaborate trap around the painting, stretching around the room.")
+                        print("You carefully disarm the trap, glad your shadow skills have served you.")
+                        time.sleep(2,)
+                        print("You find a crate behind the painting.")
+                        print("Now that the trap is disarmed, you can loot the room safely.")
+                        
+                        # --- MODIFICATION 3: Behind Painting Menu ---
+                        choices_loot = ["Dusty Rifle", "Bundle", "Crate"]
+                        choice_loot = self.AI_File.parse_choice(choices_loot, "What do you want to take?")
+                        
+                        if choice_loot == "dusty rifle":
+                            print("You grab the rifle")
+                            self.loot_drop("rifle")
+                        elif choice_loot == "bundle":
+                            print("You rummage around through the table")
+                            self.loot_drop(random.choice(self.common_loot))
+                        elif choice_loot == "crate":
+                            print("You find a wealth of supplies")
+                            self.gold += 20
+                            self.loot_drop(random.choice(self.uncommon_loot))
+                            self.loot_drop(random.choice(self.rare_loot))
+                
+                else:
+                    print("Invalid choice.")
+                    return
 
+            elif choice == "enter cellar":
+                print("You enter the cellar, it is damp and dirty.")
+                if "lantern" in self.itemsinventory:
+                    print("You use your lantern to light the way.")
+                    time.sleep(1,)
+                    print("You found a rare item!")
+                    rare = random.choice(["winchester stock", "winchester barrel"])
+                    self.loot_drop(rare)
+                    for i in range(3):
+                        self.loot_drop("rifle_ammo")
+                else:
+                    print("It is too dark to explore so you leave.")
+                    time.sleep(1,)
+            
+            elif choice == "loot garden":
+                print("You loot the garden.")
+                self.loot_drop(random.choice(self.common_loot))
+                time.sleep(2,)
+            
             else:
-                print("Invalid")
+                print("Invalid choice.")
                 return
-        elif choice == "3":
-            print("You enter the cellar, it is damp and dirty.")
-            if "lantern" in self.itemsinventory:
-                print("You use your lantern to light the way.")
-                time.sleep(1,)
-                print("You found a rare item!")
-                rare = random.choice(["winchester stock", "winchester barrel"])
-                self.loot_drop(rare)
-                for i in range(3):
-                    self.loot_drop("rifle_ammo")
-            else:
-                print("It is too dark to explore so you leave.")
-                time.sleep(1,)
-        elif choice == "4":
-            print("You loot the garden.")
-            self.loot_drop(random.choice(self.common_loot))
+
+            print("Suddenly, you hear someone approaching the house.")
+            print("You quickly exit the house and get back on the road.")
             time.sleep(2,)
-        else:
-            print("Invalid choice.")
-            return
-        print("Suddenly, you hear someone approaching the house.")
-        print("You quickly exit the house and get back on the road.")
-        time.sleep(2,)
 
     def encounter_stage_coach(self):
-        print("You come upon a stagecoach dangling over a ravine. The driver pleads for help.")
-        print("1) Attempt to secure the coach with your rope")
-        print("2) Try to push the coach back yourself")
-        print("3) Leave the scene and continue on your way")
-        choice = input(": ").strip()
+            print("You come upon a stagecoach dangling over a ravine. The driver pleads for help.")
+            
+            # --- MODIFICATION START ---
+            available_choices = [
+                "Secure with rope", 
+                "Push it back", 
+                "Leave it"
+            ]
+            
+            choice = self.AI_File.parse_choice(available_choices, "What do you do?")
 
-        if choice == "1":
-            if "rope" in self.itemsinventory:
-                print("You tie off your rope and carefully secure the stagecoach...")
-                if random.randint(1, 4) == 1:  # 75% chance of success
-                    print("With effort, you pull it back to safety! The driver rewards you.")
-                    print("The rope frays! The coach lurches but you can't hold it.")
-                    print("Your rope isn't strong enough. The coach slips over the edge.")
-                    self.Health -= 5
-                    print("-5 health from the strain.")
+            if choice == "secure with rope": # <-- Changed from "1"
+                if "rope" in self.itemsinventory:
+                    print("You tie off your rope and carefully secure the stagecoach...")
+                    
+                    # Logic Fix: 1 is failure (25%), Else is success (75%)
+                    if random.randint(1, 4) == 1: 
+                        print("The rope frays! The coach lurches but you can't hold it.")
+                        print("Your rope isn't strong enough. The coach slips over the edge.")
+                        self.Health -= 5
+                        print("-5 health from the strain.")
+                    else:
+                        print("With effort, you pull it back to safety! The driver rewards you.")
+                        reward = random.randint(10, 30)
+                        self.gold += reward
+                        self.itemsinventory["rope"] -= 1
+                        if self.itemsinventory["rope"] <= 0:
+                            del self.itemsinventory["rope"]
+                        print(f"+{reward} gold")
                 else:
+                    print("You rummage through your bag, but realize you have no rope!")
+                    print("You try to pull the coach back but you are too late and it slips over the edge.")
+                    self.Time += 1
+
+            elif choice == "push it back": # <-- Changed from "2"
+                print("You brace yourself and try to push the stagecoach back...")
+                if self.perform_stat_check(self.strength_skill, base_target=14) == True:
+                    print("Your strength prevails! You save the stagecoach and earn a reward.")
                     reward = random.randint(10, 30)
                     self.gold += reward
-                    self.itemsinventory["rope"] -= 1
-                    if self.itemsinventory["rope"] <= 0:
-                        del self.itemsinventory["rope"]
                     print(f"+{reward} gold")
-            else:
-                print("You rummage through your bag, but realize you have no rope!")
-                print("You try to pull the coach back but you are too late and it slips over the edge.")
+                else:
+                    print("Your strength isn't enough. The coach slips over the edge.")
+                    self.Health -= 5
+                    print("-5 health from the effort.")
+
+            else: # Covers "leave it"
+                print("You decide it's too dangerous and ride on, losing some daylight.")
                 self.Time += 1
+            # --- MODIFICATION END ---
 
-        elif choice == "2":
-            print("You brace yourself and try to push the stagecoach back...")
-            if self.perform_stat_check(self.strength_skill, base_target=14) == True:
-                print("Your strength prevails! You save the stagecoach and earn a reward.")
-                reward = random.randint(10, 30)
-                self.gold += reward
-                print(f"+{reward} gold")
-            else:
-                print("Your strength isn't enough. The coach slips over the edge.")
-                self.Health -= 5
-                print("-5 health from the effort.")
-
-        else:
-            print("You decide it's too dangerous and ride on, losing some daylight.")
-            self.Time += 1
-        time.sleep(2,)
+            time.sleep(2,)
 
     def encounter_dry_river_bed(self):
         print("A dry river bed lies in your path.")
@@ -2289,10 +2963,11 @@ class Player:
         print("A storm is brewing in the West, and this location could flood easily.")
         print("You could either cross here, and risk the storm, or travel around.")
         time.sleep(2,)
-        print("(1) cross, (2) travel around.")
-        time.sleep(2,)
-        Choice = input(": ").strip()
-        if Choice == "1":
+        available_choices = ["Cross the river", "Go around"]
+        prompt = "What will you do?"
+        choice = self.AI_File.parse_choice(available_choices, prompt)
+        
+        if choice == "cross the river": 
             print("You take the chance and cross the river bank.")
             if "weather cloak" in self.itemsinventory:
                 print("Your weather cloak shields you from the flooding; you cross safely.")
@@ -2300,7 +2975,7 @@ class Player:
                 if self.itemsinventory["weather cloak"] <= 0:
                     del self.itemsinventory["weather cloak"]
             else:
-            # … your original flood/random-fail code …
+
                 Random = random.randint(1,10)
                 if Random < 6:
                     print("You cross safely, and the rain starts only after you get across.")
@@ -2312,106 +2987,101 @@ class Player:
                     time.sleep(2,)
                     print("You get back on the trail, but a lot of time has been wasted.")
                     self.Time += 2
-        else:
+        else: 
             print("You travel around the creek, but are glad you didn't take the risk")
             self.Time += 1
 
     def encounter_abandoned_wagon(self):
-        print(f"You notice an abandoned wagon a little ways off the trail.")
-        print(f"You could either search the wagon or leave and save time.")
-        time.sleep(2,)
-        print(f"1, search it.")
-        print(f"2, leave it.")
-        Choice = input(f": ")
-        if Choice == "1":
-            print(f"You take the time to search the wagon.")
-            Random1 = random.randint(1,2)
-            if Random1 == 1:
-                print(f"As you rummage through the bags and boxes you uncover a rattlesnake.")
-                if "rope" in self.itemsinventory:
-                    print("You use your rope to whack the snakes head away, and it flees through the grass.")
-                    selected_item = 'rope'
-                    self.itemsinventory[selected_item] -= 1
-                    if self.itemsinventory[selected_item] <= 0:
-                        del self.itemsinventory[selected_item]
-                elif self.Speed >= 5:
-                    print(f"You dodge the snakes attack, then strangle it")
-                else:
-                    print("The snake bites you, then retreats.")
-                    self.poisoned = 1
+            print("You notice an abandoned wagon a little ways off the trail.")
+            
+            choice = self.AI_File.parse_choice(["Search it", "Leave it"], "You could either search the wagon or leave and save time.")
+
+            if choice == "search it":
+                print("You take the time to search the wagon.")
+                Random1 = random.randint(1,2)
+                if Random1 == 1:
+                    print("As you rummage through the bags and boxes you uncover a rattlesnake.")
+                    if "rope" in self.itemsinventory:
+                        print("You use your rope to whack the snakes head away, and it flees through the grass.")
+                        self.itemsinventory["rope"] -= 1
+                        if self.itemsinventory["rope"] <= 0:
+                            del self.itemsinventory["rope"]
+                    elif self.Speed >= 5:
+                        print("You dodge the snakes attack, then strangle it")
+                    else:
+                        print("The snake bites you, then retreats.")
+                        self.poisoned = 1
+                    time.sleep(2,)
+                print("Inside the wagon you find many useful items.")
+                rare = random.choice(["colt pistol", "bowie knife", "bread", "rope"])
+                self.loot_drop(rare)
                 time.sleep(2,)
-            print("Inside the wagon you find many useful items.")
-            rare = random.choice(["colt pistol", "bowie knife", "bread", "rope"])
-            self.loot_drop(rare)
-            time.sleep(2,)
-        else:
-            print(f"You leave the wagon alone and proceed down the trail.")
+            else:
+                print("You leave the wagon alone and proceed down the trail.")
 
     def encounter_wounded_bandit(self):
-        Random = random.randint(1, 100)  # you can ignore or repurpose this if you like
-        print("\nYou spot a wounded bandit slumped against a rock. His pistol lies beside him.")
-        print("1) Help him")
-        print("2) Loot him")
-        print("3) Leave him be")
-        Choice = input(": ").strip()
-        if Choice == "1":
-            print("You tend his wounds and give him water.")
-            gold = random.randint(5, 15)
-            self.gold += gold
-            print(f"He thanks you and staggers off. +{gold} gold.")
-            if Random <= 50:
-                print("The bandit robbed you while you weren't looking!")
-                self.lose_random_item(1)
-        elif Choice == "2":
-            print("You search him and take what he has.")
-            gold = 5
-            self.gold += gold
-            if "revolver" not in self.itemsinventory:
-                self.itemsinventory["revolver"] = 1
-                print("You also pick up his revolver.")
-            print(f"+{gold} gold.")
-            if Random <= 50:
-                print("The bandit fights through his wounds and punches you!")
-                self.Health -= 10
-        else:
-            print("You decide not to get involved. You lose an hour of daylight.")
-            self.Time += 1
-        time.sleep(2)
+            Random = random.randint(1, 100)
+            print("\nYou spot a wounded bandit slumped against a rock. His pistol lies beside him.")
+            
+            choice = self.AI_File.parse_choice(["Help him", "Loot him", "Leave him be"], "What do you do?")
+            
+            if choice == "help him":
+                print("You tend his wounds and give him water.")
+                gold = random.randint(5, 15)
+                self.gold += gold
+                print(f"He thanks you and staggers off. +{gold} gold.")
+                if Random <= 50:
+                    print("The bandit robbed you while you weren't looking!")
+                    self.lose_random_item(1)
+            elif choice == "loot him":
+                print("You search him and take what he has.")
+                gold = 5
+                self.gold += gold
+                if "revolver" not in self.itemsinventory:
+                    self.itemsinventory["revolver"] = 1
+                    print("You also pick up his revolver.")
+                print(f"+{gold} gold.")
+                if Random <= 50:
+                    print("The bandit fights through his wounds and punches you!")
+                    self.Health -= 10
+            else:
+                print("You decide not to get involved. You lose an hour of daylight.")
+                self.Time += 1
+            time.sleep(2)
 
     def encounter_caravan_attack(self):
-        print("\nYou hear gunshots up ahead—a merchant caravan is under attack!")
-        print("1) Join the fight")
-        print("2) Stay hidden")
-        print("3) Loot the fallen afterwards")
-        Choice = input(": ").strip()
-        if Choice == "1":
-            print("You rush in to defend them!")
-            combat = Combat(self)
-            combat.FindAttacker("bandit")
-            escape = combat.Attack()
-            if escape == True:
-                return
+            print("\nYou hear gunshots up ahead—a merchant caravan is under attack!")
+            
+            choice = self.AI_File.parse_choice(["Join the fight", "Stay hidden", "Loot after"], "What will you do?")
+
+            if choice == "join the fight":
+                print("You rush in to defend them!")
+                combat = Combat(self)
+                combat.FindAttacker("bandit")
+                escape = combat.Attack()
+                if escape == True:
+                    return
+                else:
+                    if self.Health > 0:
+                        reward = random.randint(15, 30)
+                        self.gold += reward
+                        print(f"The grateful merchants reward you with {reward} gold.")
+                        print("They also give you some supplies.")
+                        self.loot_drop("bandage")
+            elif choice == "stay hidden":
+                print("You stay hidden until it's over. No one notices you.")
             else:
-                if self.Health > 0:
-                    reward = random.randint(15, 30)
-                    self.gold += reward
-                    print(f"The grateful merchants reward you with {reward} gold.")
-                    print("They also give you some supplies.")
-                    self.loot_drop("bandage")
-        elif Choice == "2":
-            print("You stay hidden until it's over. No one notices you.")
-        else:
-            print("You wait for the dust to settle, then loot the fallen.")
-            loot = random.choice(["bread", "pistol_ammo", "rope"])
-            self.loot_drop(loot)
-        time.sleep(2)
+                print("You wait for the dust to settle, then loot the fallen.")
+                loot = random.choice(["bread", "pistol_ammo", "rope"])
+                self.loot_drop(loot)
+            time.sleep(2)
 
     def encounter_wild_stallion(self):
         print("\nA wild stallion rears up in a clearing—untamed and swift.")
-        print("1) Try to catch it with your rope")
-        print("2) Leave it be")
-        Choice = input(": ").strip()
-        if Choice == "1":
+        
+        choice = self.AI_File.parse_choice(["Try to catch it", "Leave it be"], "What will you do?")
+
+        if choice == "try to catch it":
             if "rope" in self.itemsinventory:
                 print("You manage to rope the stallion! Your travels feel faster now. +1 travel speed.")
                 self.travelspeed += 1
@@ -2468,8 +3138,10 @@ class Player:
         else:
             print("You tip your hat and leave before nightfall.")
             self.town_defense_outcome = "refused"
+        self.set_flag("defend_town", "outcome", self.town_defense_outcome)
         time.sleep(2)
         self.Tquest = "defend_town"
+        self.quest_today = True
 
     def encounter_town_part2(self):
         if self.town_defense_outcome is None:
@@ -2509,7 +3181,8 @@ class Player:
             print("The townspeople fear and hate you.")
             self.gold += 25
             self.Hostility += 2
-
+        self.set_flag("defend_town", "aftermath", self.town_aftermath_outcome)
+        self.quest_today = True
         time.sleep(2)
 
     def encounter_town_part3(self):
@@ -2568,9 +3241,10 @@ class Player:
         else:
             self.town_final_outcome = "abandoned"
             print("You ride away, leaving the town to its fate.")
+        self.set_flag("defend_town", "final", self.town_final_outcome)
         self.Tquest = "None"
         self.quests_done.append("defend_town")
-
+        self.quest_today = True
         time.sleep(2)
 
     def wandering_trader(self):
@@ -2620,7 +3294,7 @@ class Player:
             wandering_trader_inventory[name] = ShopItem(name, price, quantity)
 
         # --- Open shop session ---
-        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory, USE_OLLAMA)
+        trader_shop = ShopSession(self, self.AI_File, "Wandering Trader", wandering_trader_inventory, "Wandering Trader")
         trader_shop.run_buy_session()
 
         print("You thank the trader and continue down the dusty trail.")
@@ -2718,7 +3392,7 @@ class Player:
         if choice not in ["1", "2"]:
             print("Invalid choice. You hesitate and are caught off guard!")
             combat = Combat(self)
-            self.enemy_effects.append("+20HP")
+            self.add_effect("+20HP", target="enemy")
             combat.FindAttacker("pack of wolves")
             combat.Attack()
             if self.Health <= 0:
@@ -2731,7 +3405,7 @@ class Player:
             time.sleep(1)
             print("Suddenly, a pack of wolves emerges from the shadows!")
             time.sleep(1)
-            self.enemy_effects.append("stunned")
+            self.add_effect("stun", target="enemy")
             print("You ready your weapon and prepare to fight.")
             print("The wolves are surprised by your readiness.")
             combat = Combat(self)
@@ -2774,8 +3448,7 @@ class Player:
         print(f"You gain {gold_reward} gold and the hermit gives you a {loot_item}.")
         print("You have learned from this adventure, you become more agile. +1 speed.")
         print("You may choose either a strength, shadow, or trail skill increase.")
-        choice = input("Which skill do you choose to improve? (strength/shadow/trail): ").strip().lower()
-        skill_choice = AI_File.parse_choice(["strength", "shadow", "trail"], choice, use_ollama=USE_OLLAMA).strip().lower()
+        skill_choice = self.AI_File.parse_choice(["strength", "shadow", "trail"], "Which skill do you choose to improve? (strength/shadow/trail): ").strip().lower()
         if choice == "strength":
             self.strength_skill += 2
             print("Your strength skill increases by 2.")
@@ -3122,8 +3795,7 @@ class Player:
                 print("Running quickly, you find the manage to catch the looter outside the mine.")
                 print("He surrenders, begging for mercy.")
                 print("Do you take him with you? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
                     self.caravan.append("outlaw")
                     print("You take the outlaw with you, hoping to turn him in for a reward.")
@@ -3146,14 +3818,16 @@ class Player:
         if choice == "yes":
             print("You swear loyalty to the Vendetta Ride.")
             self.Tquest = "earp_vendetta"
-            self.earp_stage = 1
+            self.set_flag("earp_vendetta", "stage", 1)
             print("Wyatt gives you a box of shells and a share of collected funds. +15 gold.")
             self.gold += 15
             self.loot_drop("ammo cartridge")
-            self.earp_bonus += 1
+            current_bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", current_bonus + 1)
         else:
             print("You refuse. Wyatt nods curtly, 'Then stay out of our way.'")
             self.Tquest = "None"
+        self.quest_today = True
 
     def encounter_earp_stage1(self):
         if self.Health < 90:
@@ -3175,7 +3849,8 @@ class Player:
             if self.Health > 0:
                 print("You help cut down the outlaw. The posse pushes forward.")
                 self.gold += 10
-                self.earp_bonus += 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 1)
             else:
                 print("You fall in the shootout. The posse drags you away as they move on.")
                 self.Tquest = "None"
@@ -3184,15 +3859,18 @@ class Player:
                 print("You flank the outlaw's position, forcing him into Wyatt's fire. Success!")
                 self.gold += 15
                 self.loot_drop("revolver")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
             else:
                 print("You trip in the brush — shots ring out! You're hit. -12hp")
                 self.Health -= 12
         else:
             print("You hang back. The posse fights without you.")
-            self.earp_bonus -= 1
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
-        self.earp_stage = 2
+        self.set_flag("earp_vendetta", "stage", 2)
+        self.quest_today = True
 
     def encounter_earp_stage2(self):
         if self.Health < 90:
@@ -3212,16 +3890,19 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You gun down Florentino Cruz. Wyatt is grim but satisfied.")
-                self.earp_bonus += 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 1)
                 self.gold += 20
             else:
                 print("You're shot from ambush and collapse.")
                 self.Tquest = "None"
         else:
             print("You refuse. Wyatt mutters about weak resolve.")
-            self.earp_bonus -= 1
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 1)
 
-        self.earp_stage = 3
+        self.set_flag("earp_vendetta", "stage", 3)
+        self.quest_today = True
 
     def encounter_earp_stage3(self):
         print("The posse learns the Clanton brothers are nearby.")
@@ -3250,7 +3931,8 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("In a fierce shootout, one Clanton falls dead in the dust.")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
                 self.gold += 35
                 self.loot_drop("lever-action rifle")
             else:
@@ -3261,18 +3943,32 @@ class Player:
                 print("Your ambush works! You take the Clantons by surprise, killing one instantly.")
                 self.gold += 25
                 self.loot_drop("lever-action rifle")
-                self.earp_bonus += 2
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 2)
             else:
                 print("The Clantons sense danger. They escape into the hills.")
-                self.earp_bonus -= 1
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus - 1)
         else:
             print("You abandon the vendetta. The posse brands you a coward.")
             self.Hostility += 1
             self.Tquest = "None"
-
-        self.earp_stage = 4
+        self.quest_today = True
+        self.set_flag("earp_vendetta", "stage", 4)
 
     def encounter_earp_stage4(self):
+        print("\nAs you enter town, you spot Wyatt Earp waiting grimly.")
+        print("'Word is Curly Bill is holed up here in town. This ends now.'")
+        time.sleep(2)
+            
+        ready = self.AI_File.parse_YN("Are you ready for the final confrontation? (yes/no): ")
+        if ready == "yes":
+            print("You nod to Wyatt, ready to face Curly Bill.")
+        else:
+            print("You tell Wyatt you need a moment to prepare.")
+            print("Find him at the Saloon when you're ready.")
+            return
+            
         print("The Vendetta Posse closes in on Curly Bill Brocius at Iron Springs.")
         print("This is the showdown that will decide everything.")
         print("Options:")
@@ -3289,44 +3985,147 @@ class Player:
                 print("Curly Bill is gunned down in a storm of lead. The Vendetta is triumphant!")
                 self.gold += 75
                 self.loot_drop("sawed-off shotgun")
-                self.earp_bonus += 3
+                bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                self.set_flag("earp_vendetta", "bonus", bonus + 3)
             else:
                 print("Curly Bill's scattergun blast drops you. The Vendetta staggers on without you.")
                 self.Tquest = "None"
+                
         elif choice == "2":
-            if self.perform_stat_check(self.trail_skill, base_target=18) == True:
-                print("Your shot finds its mark! Curly Bill falls, Wyatt tipping his hat to you.")
-                self.gold += 30
-                self.earp_bonus += 2
-            else:
-                print("Your shot misses! Curly Bill fires back, grazing you. -10hp")
-                print("If only you had better trail skills...")
+            # 1. Use the helper to ensure they actually have a loaded rifle!
+            if not self.get_inventory_matches("rifle"):
+                print("You climb to a vantage point, but realize you don't have a loaded rifle to make the shot!")
+                print("Curly Bill spots you in the open! -10hp")
                 self.Health -= 10
+                
                 print("Curly Bill charges your position!")
                 combat = Combat(self)
                 combat.FindAttacker("curly bill")
                 combat.Attack()
+                return
+
+            # --- 2. SNIPER MINIGAME ---
+            print("\n--- SNIPER NEST ---")
+            print("You settle into the rocks overlooking Iron Springs.")
+            print("Curly Bill is pacing in the camp below. You must wait for a clear shot.")
+            print("But beware... his Cowboy scouts are watching the ridges.")
+            
+            sniper_mode = True
+            scout_awareness = 0  # Grows each turn you wait
+            
+            # Dictionary to guide AI and prevent hallucinations
+            cover_descriptions = {
+                10: "peeking out from behind a small rock, mostly hidden",
+                20: "hunkered down low behind a thick wooden water trough",
+                40: "peeking out carefully from behind a heavy wooden wagon wheel",
+                60: "moving behind a hitched horse, partially obscured",
+                80: "walking near the campfire with only light brush in the way",
+                100: "standing completely out in the open dirt road"
+            }
+            
+            while sniper_mode:
+                exposure = random.choice([10, 20, 40, 60, 80, 100])
+                cover_text = cover_descriptions[exposure]
+                
+                # --- STAT-BASED UI CLARITY ---
+                # A trail skill of 6 or higher gives the player exact numbers
+                if self.trail_skill >= 6: 
+                    print(f"\n[!] Your sharpshooter instincts gauge his exact cover: Exposure {exposure}%")
+                    print(f"He is {cover_text}.")
+                else:
+                    # Low skill uses AI to narrate the scene without exact numbers
+                    if self.AI_File.use_ai:
+                        print("\n[!] Observing target...")
+                        prompt = (
+                            f"You are a narrator for a tense sniper scene in an authentic 1880s Wild West text game. "
+                            f"The player is looking through a rifle scope at the outlaw Curly Bill. "
+                            f"Describe Curly Bill as {cover_text}. "
+                            f"Limit your response to 1 or 2 atmospheric sentences. "
+                            f"IMPORTANT: Do not mention any modern technology (like cars or semis). Do not mention percentages."
+                        )
+                        # We use your existing _call_groq helper!
+                        narrative = self.AI_File._call_groq(prompt, "You are a western game narrator.", is_json=False)
+                        if narrative:
+                            print(narrative)
+                        else:
+                            print(f"[!] You see Curly Bill {cover_text}.")
+                    else:
+                        print(f"\n[!] You see Curly Bill {cover_text}.")
+
+                # --- Player Choices ---
+                choices = ["Take the shot", "Wait for a better shot", "Relocate (Reset scout awareness)"]
+                action = self.AI_File.parse_choice(choices, "What do you do?")
+                
+                if action == "take the shot":
+                    # Add Trail Skill as a bonus to the base exposure chance
+                    hit_chance = exposure + (self.trail_skill * 3) 
+                    roll = random.randint(1, 100)
+                    
+                    self.play_sound("rifle_shot.mp3")
+                    time.sleep(1)
+                    
+                    if roll <= hit_chance:
+                        print("\nYour shot echoes across the canyon...")
+                        print("Bullseye! Curly Bill falls into the dust, dead before he hits the ground.")
+                        print("Wyatt tips his hat to your vantage point.")
+                        self.gold += 30
+                        bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+                        self.set_flag("earp_vendetta", "bonus", bonus + 2)
+                        sniper_mode = False
+                    else:
+                        print("\nYour shot chips the wood right next to Curly Bill's head! You missed!")
+                        print("Curly Bill points up at your smoke! 'Get that sniper!'")
+                        self.Health -= 10
+                        print("Return fire grazes you! -10hp")
+                        print("You have no choice but to fight him head-on!")
+                        sniper_mode = False
+                        
+                        combat = Combat(self)
+                        combat.FindAttacker("curly bill")
+                        combat.Attack()
+                        
+                elif action == "wait for a better shot":
+                    print("You steady your breathing and wait...")
+                    time.sleep(1)
+                    scout_awareness += 20
+                    
+                    # Cowboy Scout check
+                    if random.randint(1, 100) <= scout_awareness:
+                        dmg = random.randint(5, 12)
+                        self.Health -= dmg
+                        print(f"\n*CRACK!* A Cowboy scout spotted your scope glint! You are hit for {dmg} health!")
+                        print("You duck into cover. You can't stay here forever!")
+                        
+                elif action == "relocate (reset scout awareness)":
+                    print("You quietly crawl to a new set of rocks. You lose your current bead on him, but you are hidden again.")
+                    scout_awareness = 0
+                    time.sleep(2)
+                    
         else:
             print("You freeze. The others charge ahead without you.")
-            self.earp_bonus -= 2
+            bonus = int(self.get_flag("earp_vendetta", "bonus", 0) or 0)
+            self.set_flag("earp_vendetta", "bonus", bonus - 2)
 
         # Quest complete
         print("The Vendetta Ride is over. The Cowboys are broken, scattered to the winds.")
         self.Tquest = "None"
-        self.earp_stage = None
-        rewards = 20 + (self.earp_bonus * 10)
+        self.set_flag("earp_vendetta", "stage", -1)
+        rewards = 20 + (int(self.get_flag("earp_vendetta", "bonus", 0) or 0) * 10)
         print(f"You receive {rewards} gold for your efforts.")
-        if self.earp_bonus <= 0:
+        
+        if int(self.get_flag("earp_vendetta", "bonus", 0) or 0) <= 0:
             print("Your neutral actions earned you no bonus or penalty.")
-        elif self.earp_bonus == 1:
+        elif int(self.get_flag("earp_vendetta", "bonus", 0) or 0) == 1:
             print("Your efforts were noted.")
             self.loot_drop("pendant of recognition")
-        elif self.earp_bonus >= 2:
+        elif int(self.get_flag("earp_vendetta", "bonus", 0) or 0) >= 3:
             print("Your valor stood out! You are hailed as a hero of the Vendetta.")
             self.loot_drop("vendetta badge")
             print("'You have done well today,' Wyatt says with a grin.")
             print("'Use this badge and the posse will help you once more if needed.'")
+            
         self.quests_done.append("earp_vendetta")
+        self.quest_today = True
 
     def encounter_iron_intro(self):
         if "iron_tracks" in self.quests_done:
@@ -3334,20 +4133,21 @@ class Player:
             return
         print("At the saloon, you overhear a group of railroad men talking.")
         print("'Tracks are coming through this territory... but bandits don't like progress.'")
-        choice = input("Do you agree to help the railroad? (yes/no): ").strip().lower()
-        choice = AI_File.parse_YN(choice)
+        choice = self.AI_File.parse_YN("Do you agree to help the railroad? (yes/no): ")
         if choice == "yes":
             print("You agree to aid the foreman in keeping the line safe.")
             self.Tquest = "iron_tracks"
-            self.iron_stage = 1
+            self.set_flag("iron_tracks", "stage", 1)
             print("They give you a reward of 10 gold and a box of ammo cartridges.")
             self.gold += 10
             self.loot_drop("ammo cartridge")
-            self.iron_bonus += 2
+            current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+            self.set_flag("iron_tracks", "bonus", current_bonus + 2)
         else:
             print("You shake your head. The railroad men mutter that you're missing an opportunity.")
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage1(self):
         print("The railroad foreman storms into town.")
@@ -3367,7 +4167,8 @@ class Player:
                 print("You sneak up and catch the bandits off guard, taking them down silently.")
                 self.gold += 15
                 self.loot_drop("ammo cartridge")
-                self.iron_bonus += 2
+                current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                self.set_flag("iron_tracks", "bonus", current_bonus + 2)
                 self.trail_skill += 1
             else:
                 print("The bandits spot you! A fight breaks out.")
@@ -3378,16 +4179,20 @@ class Player:
                     print("You defeat the bandits and recover the supplies.")
                     self.gold += 20
                     self.loot_drop("ammo cartridge")
-                    self.iron_bonus += 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus + 1)
                 else:
                     print("You retreat to save yourself.")
                     self.Tquest = "None"
-                    self.iron_bonus -= 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 1)
         else:
             print("The foreman scowls. 'Fine, I'll find someone else.'")
-            self.iron_bonus -= 2
-        self.iron_stage = 2
+            current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+            self.set_flag("iron_tracks", "bonus", current_bonus - 2)
+        self.set_flag("iron_tracks", "stage", 2)
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage2(self):
         print("Night falls. You hear shouting at the new train depot!")
@@ -3400,7 +4205,7 @@ class Player:
             print("You sneak into the depot and spot saboteurs planting dynamite.")
             if self.perform_stat_check(self.shadow_skill, base_target=16) == True:
                 print("You catch one saboteur alive. He blurts out about a coming train heist.")
-                self.iron_stage = 3
+                self.set_flag("iron_tracks", "stage", 3)
             else:
                 print("The saboteurs notice you! A fight breaks out.")
                 combat = Combat(self)
@@ -3409,18 +4214,20 @@ class Player:
                 if escape == False:
                     if self.Health > 0:
                         print("You stop the sabotage, but the plot deepens.")
-                        self.iron_stage = 3
+                        self.set_flag("iron_tracks", "stage", 3)
                     else:
                         print("You fall at the depot. The railroad effort is doomed.")
                         self.Tquest = "None"
                 else:
                     print("You flee, unable to stop the saboteurs.")
-                    self.iron_bonus -= 1
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 1)
         else:
             print("You ignore the commotion. In the morning, the depot lies in ruins.")
             self.Hostility += 1
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage3(self):
         bonus_used = False
@@ -3440,12 +4247,13 @@ class Player:
             print("The supply carriage holds a wealth of ammo, you won't be short of it this fight!")
             time.sleep(2,)
             print("As the train chugs along, 7 mounted bandits ride up, firing their pistols at the train!")
-            if self.iron_bonus >= 2:
+            if int(self.get_flag("iron_tracks", "bonus", 0) or 0) >= 2:
                 print("You may spend two bonus points you have gained to gain a temporary boost!")
                 print("Will you spend them now?")
                 choice = input(": ").strip()
                 if choice.lower() == "yes":
-                    self.iron_bonus -= 2
+                    current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                    self.set_flag("iron_tracks", "bonus", current_bonus - 2)
                     self.MaxHealth += 20
                     self.Health += 20
                     bonus_used = True
@@ -3479,57 +4287,59 @@ class Player:
                     if mounted_bandits <= 0:
                         print("No mounted bandits left to shoot at!")
                         continue
+                        
                     print("Which weapon would you like to use?")
                     print("1) Rifle")
                     print("2) Shotgun")
-                    print("3) Revolver")
+                    print("3) Pistol / Revolver")
                     weapon_choice = input(": ").strip()
+                    
                     if weapon_choice not in ["1", "2", "3"]:
                         print("Invalid choice. You lose your chance to shoot!")
                         continue
-                    if weapon_choice == "1" and any(item in self.weapons["rifle"] for item in self.itemsinventory):
-                        print("You fire your rifle from the rooftop!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider drops, his horse veering off!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["rifle"] for item in self.itemsinventory) == False:
-                                print("You have no rifle!")
-                                print("A shot grazes you. -8hp")
+                        
+                    if weapon_choice == "1":
+                        if self.get_inventory_matches("rifle"):
+                            print("You fire your rifle from the rooftop!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("A rider drops, his horse veering off!")
+                                mounted_bandits -= 1
+                            else:
+                                print("You miss! A shot grazes you. -8hp")
                                 self.Health -= 8
-                                continue
-                            print("You miss! A shot grazes you. -8hp")
+                        else:
+                            print("You have no loaded rifle!")
+                            print("A shot grazes you. -8hp")
                             self.Health -= 8
-                    elif weapon_choice == "2" and any(item in self.weapons["shotgun"] for item in self.itemsinventory):
-                        print("You blast your shotgun downward at the riders!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("A rider is blown clean off his saddle!")
-                            mounted_bandits -= 1
-                        else:
-                            if any(item in self.weapons["shotgun"] for item in self.itemsinventory) == False:
-                                print("You have no shotgun!")
-                                print("A shot grazes your arm. -6hp")
+                            
+                    elif weapon_choice == "2":
+                        if self.get_inventory_matches("shotgun"):
+                            print("You blast your shotgun downward at the riders!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("A rider is blown clean off his saddle!")
+                                mounted_bandits -= 1
+                            else:
+                                print("Pellets scatter wide. A return shot hits your arm! -6hp")
                                 self.Health -= 6
-                                continue
-                            print("Pellets scatter wide. A return shot hits your arm! -6hp")
-                            self.Health -= 6
-                    elif weapon_choice == "3" and any(item in self.weapons["revolver"] for item in self.itemsinventory):
-                        print("You fire your revolver rapidly!")
-                        if self.perform_stat_check(self.trail_skill, base_target=12) == True:
-                            print("One rider tumbles off his horse!")
-                            mounted_bandits -= 1
                         else:
-                            if any(item in self.weapons["revolver"] for item in self.itemsinventory) == False:
-                                print("You have no revolver!")
-                                print("A rider's bullet clips you. -5hp")
-                                self.Health -= 5
-                                continue
+                            print("You have no loaded shotgun!")
+                            print("A shot grazes your arm. -6hp")
+                            self.Health -= 6
+                            
+                    elif weapon_choice == "3":
+                        if self.get_inventory_matches("revolver"):
+                            print("You fire your revolver rapidly!")
+                            if self.perform_stat_check(self.trail_skill, base_target=12) == True:
+                                print("One rider tumbles off his horse!")
+                                mounted_bandits -= 1
                             else:
                                 print("You miss under pressure. A rider's bullet clips you! -5hp")
                                 self.Health -= 5
-                    else:
-                        print("You have no gun! The riders fire at you mercilessly. -10 hp")
-                        self.Health -= 10
+                        else:
+                            print("You have no loaded revolver!")
+                            print("A rider's bullet clips you. -5hp")
+                            self.Health -= 5
+                            
                     time.sleep(2)
 
                 # --- Option 2: Defend inside cars ---
@@ -3539,7 +4349,9 @@ class Player:
                         continue
 
                     print("You rush into the passenger car where bandits terrorize civilians!")
-                    if any(item in self.weapons["melee"] for item in self.itemsinventory):
+                    
+                    # Using the helper function for melee checks too!
+                    if self.get_inventory_matches("melee"): 
                         if self.perform_stat_check(self.Speed, base_target=11) == True:
                             print("You slash a bandit and throw him out the window!")
                             bandits_in_car -= 1
@@ -3616,9 +4428,11 @@ class Player:
                         print("You collapse on the train floor. The bandits overrun it.")
                         print("A passenger revives you, but the bandits have already left with the loot.")
                         self.Health = 20
-                        self.iron_bonus -= 2
+                        current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                        self.set_flag("iron_tracks", "bonus", current_bonus - 2)
                     else:
-                        self.iron_bonus -= 1
+                        current_bonus = int(self.get_flag("iron_tracks", "bonus", 0) or 0)
+                        self.set_flag("iron_tracks", "bonus", current_bonus - 1)
                         print("The car burns around you.")
                         print("The bandits have already taken everything of value.")
                     if bonus_used == True:
@@ -3635,7 +4449,7 @@ class Player:
                 print("You helped save the railroad! The foreman rewards you handsomely. +35 gold")
                 self.gold += 35
                 self.loot_drop(random.choice(self.rare_loot))
-                self.iron_stage = 4
+                self.set_flag("iron_tracks", "stage", 4)
             if bonus_used == True:
                 self.MaxHealth -= 20
 
@@ -3644,6 +4458,7 @@ class Player:
             self.Hostility += 2
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage4(self):
         if self.Health < 90:
@@ -3662,7 +4477,7 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You save the bridge! The train can continue.")
-                self.iron_stage = 5
+                self.set_flag("iron_tracks", "stage", 5)
             else:
                 print("You fall. The bridge collapses. The railroad halts here forever.")
                 self.Tquest = "None"
@@ -3671,6 +4486,7 @@ class Player:
             self.Hostility += 2
             self.Tquest = "None"
         time.sleep(2,)
+        self.quest_today = True
 
     def encounter_iron_stage5(self):
         if self.Health < 90:
@@ -3691,7 +4507,7 @@ class Player:
             combat.Attack()
             if self.Health > 0:
                 print("You defeat Dynamite Dave in a blazing showdown!")
-                if self.iron_bonus <= 0:
+                if int(self.get_flag("iron_tracks", "bonus", 0) or 0) <= 0:
                     print("")
                 self.gold += 70
                 self.loot_drop("winchester rifle")
@@ -3713,8 +4529,9 @@ class Player:
 
         # Quest complete
         self.Tquest = "None"
-        self.iron_stage = None
+        self.set_flag("iron_tracks", "stage", 0)
         self.quests_done.append("iron_tracks")
+        self.quest_today = True
 
     def coyote_camp_quest(self):
         print("You arrive at Coyote Camp and find a group of bandits plotting a robbery!")
@@ -3726,8 +4543,6 @@ class Player:
             self.loot_drop("gold nugget")
             self.loot_drop("pistol_ammo")
 
-# In Western_Sim.py, as a new method in the Player class
-
     def run_final_mission(self):
         print("\nYou arrive at Devil's Canyon. The river roars below.")
         print("The US Marshal points. 'He's barricaded at the far end. We need to clear the pass!'")
@@ -3736,7 +4551,7 @@ class Player:
         # --- Part 1: The Canyon Battle ---
         print("\nThe Marshal's men give you covering fire. You move up to take out the warlord's lieutenants.")
         self.damage_modifier += 15
-        self.player_effects.append("Steel Wall")
+        self.add_effect("Steel Wall")
         combat = Combat(self)
         combat.FindAttacker("warlord_lieutenant")
         combat.Attack()
@@ -3758,8 +4573,7 @@ class Player:
         print("Sneak along the riverbank to get closer (Shadow Skill Check)")
         
         boarded = False
-        choice = input("Choice (swim, rope, or sneak: ").strip()
-        choice =  AI_File.parse_choice((["swim", "rope", "sneak"]), choice, USE_OLLAMA)
+        choice =  self.AI_File.parse_choice((["swim", "rope", "sneak"]), "Choice (swim, rope, or sneak: ")
         if choice == "swim":
             if self.perform_stat_check(self.strength_skill, base_target=15):
                 print("You dive into the churning water and power through the current, climbing aboard!")
@@ -3816,8 +4630,6 @@ class Player:
             
             # --- Part 3: The Final Minigame ---
             self.coffee_mill_showdown() # Call the final minigame function
-    
-# In Western_Sim.py, as another new method in the Player class
 
     def coffee_mill_showdown(self):
         self.change_music("The Last Stand.mp3", -1)
@@ -3835,24 +4647,40 @@ class Player:
             extra_damage += 5
         if self.perform_stat_check(self.shadow_skill, base_target=15):
             print("You search the deck and find some extra ammo for the Coffee Mill!")
-            ammo += 20
+            ammo += 30
         if self.perform_stat_check(self.strength_skill, base_target=15):
             print("You manage to jury-rig a cooling system to prevent overheating!")
             gun_overheat_ever = False
 
         print("\n--- FINAL SHOWDOWN ---")
         turn = "player"
+        heal = 50
+        crew = 20
+        support = 20
+        if self.Health < self.MaxHealth:
+            self.Health = min(self.Health + heal, self.MaxHealth)
+            print(f"You take a deep breath and steel yourself. +{heal} Health.")
+
         while boss_health > 0 and self.Health > 0 and ship_integrity > 0:
             if turn == "player":
                 print("\n--- YOUR TURN ---")
                 print(f"Your Health: {self.Health} | Warlord: {boss_health} | Ship Integrity: {ship_integrity}")
                 print(f"Coffee Mill Ammo: {ammo}")
+
+                if support >= 16:
+                    support_bonus = 5
+                elif support >= 11:
+                    support_bonus = 2
+                else:
+                    support_bonus = 0
+                ammo += support_bonus
                 if ammo < 1:
                     self.play_sound("no_ammo_coffee")
                     print("You're out of ammo! You must reload.")
                     ammo += 50
                     print(f"Coffee Mill Ammo: {ammo}")
                     time.sleep(4,)
+                    turn = 'enemy'
                     continue
                 if gun_overheated:
                     print("The gun is overheated! You must let it cool or take cover!")
@@ -3873,6 +4701,8 @@ class Player:
                     print("1) Fire a long burst at the Warlord (High Damage, risks overheat)")
                     print("2) Fire a short, accurate burst (Low Damage, safe)")
                     print("3) Spray the deck to clear out his guards (Damages ship)")
+                    if "bandage" in self.itemsinventory:
+                        print("4) Use a bandage to heal yourself (+25 Health)")
                 
                 choice = input("Action: ").strip()
 
@@ -3914,39 +4744,129 @@ class Player:
                     turn = 'enemy'
                     time.sleep(4,)
                     continue
+                elif choice == "4":
+                    self.Health = min(self.MaxHealth, self.Health + 25)
+                    self.itemsinventory["bandage"] -= 1
+                    print("You duck and apply a bandage. +25 Health.")
+                    turn = 'enemy'
+                    time.sleep(4,)
+                    continue
 
             else:
                 
                 # --- Boss Turn ---
                 if boss_health <= 0:
                     break # Player wins
-
-                print("\n--- WARLORD'S TURN ---")
+                
                 boss_action = random.randint(1, 3)
-                
-                if boss_action == 1:
-                    dmg = random.randint(15, 20)
-                    self.Health -= dmg
-                    print(f"The Warlord snipes you from the cabin! -{dmg} Health.")
-                    turn = 'player'
-                    time.sleep(2,)
-
-                
-                elif boss_action == 2:
-                    print("The Warlord orders his men to fire a cannon at the cliff!")
-                    print("The Marshal and his men are forced to take cover!")
-                    turn = 'player'
-                    time.sleep(2,)
+                print("\n--- WARLORD'S TURN ---")
+                if crew >= 16:
+                    if boss_action == 1:
+                        dmg = random.randint(15, 25)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
 
                     
-                elif boss_action == 3:
-                    print("The Warlord yells, 'Scuttle the ship! Blow it all to hell!'")
-                    ship_integrity -= 20
-                    print("Explosions rock the boat! -20 Ship Integrity.")
-                    turn = 'player'
-                    time.sleep(2,)
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 5)
+                        turn = 'player'
+                        time.sleep(2,)
 
+                        
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 20
+                        print("Explosions rock the boat! -20 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
 
+                elif crew >= 11:
+                    if boss_action == 1:
+                        dmg = random.randint(15, 20)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        turn = 'player'
+                        support = max(0, support - 3)
+                        time.sleep(2,)
+
+                        
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 10
+                        print("Explosions rock the boat! -10 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                elif crew >= 6:
+                    if boss_action == 1:
+                        dmg = random.randint(10, 15)
+                        self.Health -= dmg
+                        print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 1)
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 2:
+                        print("The Warlord orders his men to fire a cannon at the cliff!")
+                        print("The Marshal and his men are forced to take cover!")
+                        support = max(0, support - 1)
+                        turn = 'player'
+                        time.sleep(2,)
+
+                    elif boss_action == 3:
+                        print("The Warlord yells, 'Scuttle the ship!'")
+                        ship_integrity -= 5
+                        print("Explosions rock the boat! -10 Ship Integrity.")
+                        turn = 'player'
+                        time.sleep(2,)
+                else:
+                    rn = random.randint(1, 2)
+                    if rn == 1:
+                        print("Warloard is demoralized! He hesitates this turn.")
+                    else:
+                        if boss_action == 1:
+                            dmg = random.randint(10, 15)
+                            self.Health -= dmg
+                            print(f"The Warlord sends the crew to confront you! -{dmg} Health.")
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 2:
+                            print("The Warlord orders his men to fire a cannon at the cliff!")
+                            print("The Marshal and his men are forced to take cover!")
+                            support = max(0, support - 1)
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 2:
+                            print("The Warlord orders his men to fire a cannon at the cliff!")
+                            print("The Marshal and his men are forced to take cover!")
+                            support = max(0, support - 1)
+                            turn = 'player'
+                            time.sleep(2,)
+
+                        elif boss_action == 3:
+                            print("The Warlord yells, 'Scuttle the ship!'")
+                            ship_integrity -= 5
+                            print("Explosions rock the boat! -10 Ship Integrity.")
+                            turn = 'player'
 
             # --- Check Lose Conditions ---
             if self.Health <= 0:
@@ -3976,201 +4896,187 @@ class Player:
         print("Playtesters: Deric R Cheke, Dax Cheke, Jessica Cheke, Silas Cheke, Shai Mckerley, Carson Templeton")
         print("Other contributors: ChatGPT, Gemini AI, Ollama AI")
         print("\n--- THANKS FOR PLAYING! ---")
-        
-        pygame.mixer.music.stop()
         exit()
 
-    #Generic Game Stuff
-
     def change_music(self, filename, loop):
-        music_path = os.path.join(os.path.dirname(__file__), filename)
-        if self.music == False:
-            return
-        else:
-            try:
-                pygame.mixer.music.load(music_path)
-                pygame.mixer.music.play(loop)
-            except pygame.error as e:
-                print(f"Could not play {filename}: {e}")
+        self.AI_File.change_music(filename, loop)
 
     def play_sound(self, filename):
-        try:
-            full_path = os.path.join(os.path.dirname(__file__), filename)
-            sound = pygame.mixer.Sound(full_path)
-            sound.play()
-        except pygame.error as e:
-            print(f"Error playing sound: {e}")
+        self.AI_File.play_sound(filename)
 
     def weapon_sound(self, weapon):
-        if weapon in [
-            "rifle", "winchester rifle", "henry rifle",
-            "carbine rifle", "sharps rifle", "lever-action rifle"]:
-            self.play_sound("rifle_shot.mp3")
-            self.play_sound("rifle_prime.mp3")
-        elif weapon in ["shotgun", "double barrel shotgun", "sawed-off shotgun"]:
-            self.play_sound("shotgun.mp3")
-        elif weapon in [
-            "revolver", "colt pistol", "remington pistol",
-            "derringer pistol", "colt navy revolver"]:
-            self.play_sound("revolver_shot.mp3")
+        self.AI_File.weapon_sound(weapon)
 
     def enemy_sound(self, name):
         if name == "rattlesnake":
-            self.play_sound("rattle_snake.mp3")
+            self.AI_File.play_sound("rattle_snake.mp3")
 
-    def weapon_ability(self, weapon):
-        # Get the weapon's data from the loaded weapons_data
-        weapon_info = weapons_data.get(weapon)
-
-        # Exit if the weapon doesn't exist or has no defined ability
-        if not weapon_info:
-            return
-        
+    def weapon_ability(self, base_weapon, exact_name): # <-- Added exact_name parameter
+        weapon_info = weapons_data.get(base_weapon)
+        if not weapon_info: return
         ability = weapon_info.get('ability', 'none')
-        
-        if ability == 'none':
-            return
+        if ability == 'none': return
 
-        # Use a match statement to handle the different abilities
         match ability:
             case "dual wield":
-                # Logic for revolver, colt pistol
-                if self.itemsinventory[weapon] >= 2:
-                    if self.itemsinventory.get("pistol_ammo", 0) > 1:
-                        print(f"You pull out both {weapon}s and fire!")
-                        self.itemsinventory["pistol_ammo"] -= 1 # Only consumes 1 extra ammo for the 2nd gun
+                # Count ALL items that contain the base weapon string (e.g., all revolvers)
+                total_owned = sum(qty for item, qty in self.itemsinventory.items() if base_weapon in item)
+                
+                if total_owned >= 2:
+                    # Remember: 1 ammo was already used by the main attack
+                    if self.itemsinventory.get("pistol_ammo", 0) >= 1:
+                        print(f"You pull out a second {base_weapon} and fire!")
+                        self.itemsinventory["pistol_ammo"] -= 1
+                        if self.itemsinventory["pistol_ammo"] <= 0:
+                            del self.itemsinventory["pistol_ammo"]
+                            
                         self.dmg_modifier_multiply = 2
                         self.play_sound("revolver_shot.mp3")
-                        time.sleep(1,)
+                        time.sleep(1)
 
             case "steady aim":
-                # Logic for winchester rifle, henry rifle
                 print("You steady your aim...")
                 if random.randint(1, 4) == 1:
                     print("A solid hit!")
                     self.dmg_modifier_multiply = 1.5
 
             case "multi-shot":
-                # Logic for remington pistol, derringer pistol
-                print("Would you like to fire multiple shots? yes/no")
-                choice = input(": ").lower().strip()
-                choice = AI_File.parse_YN(choice)
-                if choice == "yes":
-                    print("You fire multiple shots")
-                    # Note: The main combat loop already consumed 1 ammo. This consumes 2 *additional* ammo.
-                    if self.itemsinventory.get("pistol_ammo", 0) >= 2:
-                        Random = random.randint(0, 2)
-                        self.itemsinventory["pistol_ammo"] -= 2
-                        for i in range(Random):
+                current_ammo = self.itemsinventory.get("pistol_ammo", 0)
+                # Only ask if they actually have extra ammo left
+                if current_ammo >= 1: 
+                    print("Would you like to fan the hammer for multiple shots? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
+                    if choice == "yes":
+                        # Determine extra shots, capped by remaining ammo
+                        extra_shots = random.randint(1, 3)
+                        actual_shots = min(extra_shots, current_ammo)
+                        
+                        print(f"You fire {actual_shots} extra shots!")
+                        for _ in range(actual_shots):
                             self.play_sound("revolver_shot.mp3")
-                            self.damage_modifier += 15
-                            time.sleep(1,)
-                    else:
-                        print("You do not have enough ammo.")
-                        time.sleep(2,)
+                            self.itemsinventory["pistol_ammo"] -= 1
+                            self.damage_modifier += 20
+                            time.sleep(0.5)
+                            
+                        # Cleanup dictionary if empty
+                        if self.itemsinventory["pistol_ammo"] <= 0:
+                            del self.itemsinventory["pistol_ammo"]
 
             case "double barrel":
-                # Logic for double barrel shotgun
-                print("Double Barrel! Fire both barrels? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
-                # Note: The main combat loop already consumed 1 ammo. This consumes 1 *additional* ammo.
-                if choice == "yes" and self.itemsinventory.get("shotgun_ammo", 0) >= 1:
-                    self.itemsinventory["shotgun_ammo"] -= 1 # Consume the second barrel's shell
-                    print("You fire both barrels in a devastating volley!")
-                    self.dmg_modifier_multiply = 2
-                    self.play_sound("shotgun.mp3")
-                    time.sleep(1,)
-                    print("The kickback bruises your arm.")
-                    self.Health -= 5
-                else:
+                current_ammo = self.itemsinventory.get("shotgun_ammo", 0)
+                if current_ammo >= 1:
+                    print("Double Barrel! Fire both barrels? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
                     if choice == "yes":
-                        print("You don't have enough ammo for a double shot.")
-                    else:
-                        print("You decide not to use the double shot.")
+                        self.itemsinventory["shotgun_ammo"] -= 1
+                        if self.itemsinventory["shotgun_ammo"] <= 0:
+                            del self.itemsinventory["shotgun_ammo"]
+                            
+                        print("You fire both barrels in a devastating volley!")
+                        self.dmg_modifier_multiply = 2
+                        self.play_sound("shotgun.mp3")
+                        time.sleep(1)
+                        print("The kickback bruises your arm. -5 Health.")
+                        self.Health -= 5
 
             case "throw":
-                # Logic for tomahawk
-                print("Throw your tomahawk for extra damage? (yes/no)")
-                choice = input(": ").strip().lower()
-                choice = AI_File.parse_YN(choice)
+                print(f"Throw your {exact_name} for extra damage? (It will be lost!) (yes/no)")
+                choice = self.AI_File.parse_YN(": ")
                 if choice == "yes":
-                    if self.itemsinventory.get("tomahawk", 0) > 0:
-                        self.itemsinventory["tomahawk"] -= 1
-                        if self.itemsinventory["tomahawk"] <= 0:
-                            del self.itemsinventory["tomahawk"]
-                        print("You hurl your tomahawk—deadly accuracy!")
+                    # Deletes the EXACT item they have equipped (e.g., "rusty tomahawk")
+                    if self.itemsinventory.get(exact_name, 0) > 0:
+                        self.itemsinventory[exact_name] -= 1
+                        if self.itemsinventory[exact_name] <= 0:
+                            del self.itemsinventory[exact_name]
+                            
+                        print(f"You hurl your {exact_name}—deadly accuracy!")
                         self.play_sound("tomahawk.mp3")
                         self.dmg_modifier_multiply = 2
                     else:
-                        print("No tomahawks left!")
+                        print("You fumble and can't find it to throw!")
                 else:
-                    print("You keep your tomahawk ready for melee.")
+                    print(f"You keep your {exact_name} ready for melee.")
+
             case "quick draw":
-                print("Would you like to attempt a quick draw follow-up shot? (yes/no)")
-                choice = self.AI_File.parse_YN(input(": ").strip().lower())
-                if choice == "yes":
-                    if self.itemsinventory.get("rifle_ammo", 0) >= 1:
-                        if random.randint(1, 2) == 1: # 50% chance for a bonus hit
+                current_ammo = self.itemsinventory.get("rifle_ammo", 0)
+                if current_ammo >= 1:
+                    print("Would you like to attempt a quick draw follow-up shot? (yes/no)")
+                    choice = self.AI_File.parse_YN(": ")
+                    
+                    if choice == "yes":
+                        self.itemsinventory["rifle_ammo"] -= 1
+                        if self.itemsinventory["rifle_ammo"] <= 0:
+                            del self.itemsinventory["rifle_ammo"]
+                            
+                        if random.randint(1, 2) == 1:
                             self.dmg_modifier_multiply += 0.75 
                             self.play_sound("rifle_shot.mp3")
                             print("The quick draw is successful! The follow-up shot hit for 75% damage.")
                         else:
                             print("The follow-up shot misses!")
-                        self.itemsinventory["rifle_ammo"] -= 1 # Consume extra ammo
-                        if self.itemsinventory["rifle_ammo"] <= 0:
-                            del self.itemsinventory["rifle_ammo"]
-                    else:
-                        print("You don't have enough rifle ammo for a quick draw.")
-                return
 
             case "precision shot":
-                # Logic for sharps rifle
                 print("You take a steady breath for a precision shot…")
                 if random.randint(1, 4) == 1:
                     print("Bullseye! Your shot hits extra savage.")
                     self.dmg_modifier_multiply = 2
 
             case "precise strike":
-                # Logic for cavalry saber
-                print("You slash with your saber, aiming for weak points.")
+                print("You slash with your weapon, aiming for weak points.")
                 self.dmg_modifier_multiply = 1.5
-            
+
             case _:
-                # Fallback for any other defined ability
                 pass
 
     def donate_supplies(self):
+        
         if not self.itemsinventory:
             print("You have nothing to donate.")
             return
 
         while True:
-            print("\nChoose an item to donate (or 0 to finish):")
-            for i,(item,qty) in enumerate(self.itemsinventory.items(),1):
-                print(f"{i}) {item} x{qty}")
-            print("0) Done donating")
-            choice = input("Choice: ").strip()
-            if choice == "0":
-                break
-            if not choice.isdigit() or not (1 <= int(choice) <= len(self.itemsinventory)):
-                print("Invalid.")
-                continue
+            print("\nChoose an item to donate (or 'Done donating'):")
+            
+            # Create the list of choices for the UI
+            item_list = list(self.itemsinventory.keys())
+            display_choices = []
+            
+            # Print the list to the console (like you did before)
+            for item, qty in self.itemsinventory.items():
+                print(f"{item} x{qty}")
+                display_choices.append(item) # Add the item name
+            
+            print("Done donating")
+            display_choices.append("Done donating") # Add the exit option
 
-            item = list(self.itemsinventory.keys())[int(choice)-1]
+            # --- FIX 1: Replaced input() with parse_choice ---
+            # This will show buttons for each item and "Done donating"
+            choice = self.AI_File.parse_choice(display_choices, "Choose item:")
+            
+            if choice == "done donating":
+                break
+
+            # 'choice' is now the item *name* (e.g., "bread")
+            item = choice
             max_q = self.itemsinventory[item]
-            num = input(f"How many {item}? (1–{max_q}): ").strip()
-            if not num.isdigit() or not (1 <= int(num) <= max_q):
+            
+            # --- FIX 2: Replaced input() with ask_free_text ---
+            num_str = input(f"How many {item}? (1-{max_q}): ")
+            
+            if not num_str.isdigit() or not (1 <= int(num_str) <= max_q):
                 print("Invalid quantity.")
                 continue
-            num = int(num)
+            
+            num = int(num_str)
 
             # determine bonus per unit
             if item in self.common_loot:      bonus = 0.5
             elif item in self.uncommon_loot:  bonus = 1
             elif item in self.rare_loot:      bonus = 3
             elif item in self.ultra_rare_loot: bonus = 6
-            else:                   bonus = 0.5
+            else:                           bonus = 0.5
 
             self.town_defense_bonus += bonus * num
             self.itemsinventory[item] -= num
@@ -4178,148 +5084,97 @@ class Player:
                 del self.itemsinventory[item]
             print(f"Donated {num}×{item}: +{bonus*num} defense bonus.")
 
-        print(f"Total town defense bonus: {self.town_defense_bonus}")          
+        print(f"Total town defense bonus: {self.town_defense_bonus}")     
 
     def write_diary_entry(self):
-            # 1) Ask for tone once
-            print("\n Night falls. Time to write your diary.")
-            tone = self.select_tone()
+        # 1) Ask for tone once
+        print("\n Night falls. Time to write your diary.")
+        tone = self.select_tone()
+        
+        # --- Calculate Activity Score ---
+        activity_score = 1 
+        
+        if self.day_memory["encounter"]:
+            activity_score += 1
+        
+        if self.day_memory["loot"]:
+            activity_score += 1
+        
+        # --- AI Generation Logic ---
+        if self.AI_File.use_ai:
+            game_state = self.generate_game_state()
+            generated_entry = self.AI_File.generate_diary_entry(
+                game_state, 
+                self.Health, 
+                self.MaxHealth, 
+                self.day_memory, 
+                tone
+            )
             
-            # --- START FIX: Calculate Activity Score ---
-            # We will calculate an "activity score" to make the bonus
-            # system fair for both AI and template users.
-            # This score is what the bonus milestones will track, NOT the number of lines.
-            activity_score = 1 # Base score for writing in the diary
-            
+            lines = [generated_entry]
+            activity_score += 1 
+
+        else:
+            # --- Template Logic ---
+            lines = []
+            lines.append(f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}.")
+
             if self.day_memory["encounter"]:
-                activity_score += 1
-            
+                lines.append(f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}.")
+
             if self.day_memory["loot"]:
-                activity_score += 1
-            
-            custom_line_added = False # Flag for numerical mode
-            # --- END FIX ---
-            
-            if USE_OLLAMA:
-                # Use the new AI function to generate and print the entry
-                game_state = self.generate_game_state()
-                # The AI_File is self.AI_File
-                generated_entry = self.AI_File.generate_diary_entry(
-                    game_state, 
-                    self.Health, 
-                    self.MaxHealth, 
-                    self.day_memory, 
-                    tone
-                )
-                
-                # Save the generated entry
-                # We save it as a list with one item to match the old format
-                lines = [generated_entry]
-                
-                # AI mode gets a bonus point to simulate the "custom line" option
-                activity_score += 1 
+                lines.append(f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime.")
 
-            else:
-                # --- This is your ORIGINAL template-based code ---
-                lines = []
-
-                # Health line
-                lines.append(
-                    f"I only have {self.Health} health left, {self.health_tone_phrase(tone)}."
-                )
-
-                # Combat line
-                if self.day_memory["encounter"]:
-                    lines.append(
-                        f"I fought {self.day_memory['encounter']} today, {self.combat_tone_phrase(tone)}."
-                    )
-
-                # Loot line
-                if self.day_memory["loot"]:
-                    lines.append(
-                        f"Found {self.day_memory['loot']} on the way, {self.loot_tone_phrase(tone)} could be useful sometime."
-                    )
-
-                add = input("\nWould you like to add your own diary line? (yes/no) ").strip().lower()
-                if add == 'yes':
-                    custom = input("Enter your custom diary line: ").strip()
-                    if custom:
-                        lines.append(custom)
-                        custom_line_added = True # Set flag
-                        
-                # --- START FIX: Add score for custom line ---
-                if custom_line_added:
-                    activity_score += 1
-                # --- END FIX ---
-
-                # Cap lines at 4 (was 3, but health+encounter+loot+custom = 4)
-                lines = lines[:4]
-
-                # Display
-                print("\n— Your diary entry —")
-                for l in lines:
-                    print("  " + l)
+            lines = lines[:4]
 
 
-            # Save it
-            self.diary_entries.append({
-                "Day": self.Day,
-                "Tone": tone,
-                "Entry": lines,
-                "Activity": activity_score # --- FIX: Save the new activity score ---
-            })
-
-            diary_milestones = {
-                10:  ("Hopeful Spirit", "Max health +5"),
-                20:  ("Sharpened Mind", "Shadow skill +1"),
-                35:  ("Strong Constitution", "Hunger reduced by 2."),
-                50: ("Frontier Wisdom", "Travel speed +1"),
-                75: ("Iron Will", "Max health increased by 10."),
-                }
+        print("\n— Your diary entry —")
+        for l in lines:
+            print("  " + l)
 
 
-            # Reset for next day (Same as before)
-            self.day_memory = {k: None for k in self.day_memory}
-            
-            # --- START FIX: Change bonus check to use Activity Score ---
-            # Passive bonus check
-            # OLD: entry_count = sum(len(entry["Entry"]) for entry in self.diary_entries)
-            # NEW:
-            entry_count = sum(entry.get("Activity", 1) for entry in self.diary_entries)
-            # We use .get("Activity", 1) as a fallback for old save files
-            # that don't have the "Activity" key, so they are counted as 1.
-            # --- END FIX ---
-            
-            for milestone, (title, bonus) in diary_milestones.items():
-                bonus = f"day_{self.Day}_bonus"
-                if entry_count >= milestone and title not in self.diary_bonuses:
-                    print(f"\nAs you close your journal, you feel a change within you…")
-                    
-                    print(f"[Diary Bonus] {title}: {bonus}")
-                    self.diary_bonuses.append(title)
+        # Save the entry
+        self.diary_entries.append({
+            "Day": self.Day,
+            "Tone": tone,
+            "Entry": lines,
+            "Activity": activity_score 
+        })
 
-                    # Apply effects
-                    if title == "Hopeful Spirit":
-                        self.MaxHealth += 5
-                    elif title == "Sharpened Mind":
-                        self.shadow_skill += 1
-                    elif title == "Strong Constitution":
-                        self.Hunger -= 2
-                    elif title == "Frontier Wisdom":
-                        self.travelspeed += 1
-                    elif title == "Iron Will":
-                        self.MaxHealth += 10
+        # Check Bonuses (Rest of code remains the same)
+        diary_milestones = {
+            10:  ("Hopeful Spirit", "Max health +5"),
+            20:  ("Sharpened Mind", "Shadow skill +1"),
+            35:  ("Strong Constitution", "Hunger reduced by 2."),
+            50: ("Frontier Wisdom", "Travel speed +1"),
+            75: ("Iron Will", "Max health increased by 10."),
+        }
+
+        self.day_memory = {k: None for k in self.day_memory}
+        
+        entry_count = sum(entry.get("Activity", 1) for entry in self.diary_entries)
+        
+        for milestone, (title, bonus) in diary_milestones.items():
+            if entry_count >= milestone and title not in self.diary_bonuses:
+                print(f"\nAs you close your journal, you feel a change within you…")
+                print(f"[Diary Bonus] {title}: {bonus}")
+                self.diary_bonuses.append(title)
+
+                if title == "Hopeful Spirit": self.MaxHealth += 5
+                elif title == "Sharpened Mind": self.shadow_skill += 1
+                elif title == "Strong Constitution": self.Hunger -= 2
+                elif title == "Frontier Wisdom": self.travelspeed += 1
+                elif title == "Iron Will": self.MaxHealth += 10
 
     def select_tone(self):
         tones = ["witty", "serious", "nervous", "hopeful"]
-        print("Choose a tone for tonight's diary:")
-        for i, t in enumerate(tones, 1):
-            print(f"{i}) {t.capitalize()}")
-        while True:
-            choice = input(": ").strip()
-            if choice.isdigit() and 1 <= int(choice) <= len(tones):
-                return tones[int(choice) - 1]
-            print("Invalid choice. Try again.")
+        prompt = "Choose a tone for tonight's diary:"
+        selected_tone = self.AI_File.parse_choice(
+            available_choices=tones,
+            player_prompt=prompt,
+        )
+
+        return selected_tone
 
     def health_tone_phrase(self, tone):
         options = {
@@ -4461,6 +5316,312 @@ class Player:
 
         time.sleep(2)
 
+    def get_inventory_matches(self, category):
+            """
+            A master helper to find items by category or keyword.
+            Categories: 'weapons', 'melee', 'firearms', 'revolver', 'rifle', 'shotgun',
+            or any specific string like 'rope'.
+            """
+            matches = []
+            
+            # 1. Weapon Categories
+            if category in ["weapons", "firearms", "melee", "revolver", "rifle", "shotgun"]:
+                # Combine all weapon types from your internal weapons dict
+                all_base_firearms = self.weapons["revolver"] + self.weapons["rifle"] + self.weapons["shotgun"]
+                all_base_melee = self.weapons["melee"]
+                
+                target_list = []
+                if category == "weapons": target_list = all_base_firearms + all_base_melee
+                elif category == "firearms": target_list = all_base_firearms
+                elif category == "melee": target_list = all_base_melee
+                elif category == "revolver": target_list = self.weapons["revolver"]
+                elif category == "rifle": target_list = self.weapons["rifle"]
+                elif category == "shotgun": target_list = self.weapons["shotgun"]
+                
+                for inv_item in self.itemsinventory:
+                    # STRICT FILTER: Immediately skip any item that is ammo
+                    if "ammo" in inv_item.lower():
+                        continue
+                        
+                    # Find the best matching base weapon
+                    possible_bases = [b for b in target_list if b in inv_item]
+                    
+                    if possible_bases:
+                        best_base = max(possible_bases, key=len) # Grab the most specific match
+                        
+                        # Melee weapons don't need ammo; always add them
+                        if best_base in all_base_melee:
+                            matches.append(inv_item)
+                            
+                        # Firearms must pass the ammo check
+                        elif best_base in all_base_firearms:
+                            info = weapons_data.get(best_base)
+                            if info:
+                                ammo_type = info['ammo']
+                                # Only add the firearm to the list if ammo is 1 or greater
+                                if self.itemsinventory.get(ammo_type, 0) > 0:
+                                    matches.append(inv_item)
+            
+            # 2. Specific Keyword (e.g., 'rope', 'bread')
+            else:
+                for inv_item in self.itemsinventory:
+                    if category.lower() in inv_item.lower():
+                        # If the player is searching for "rifle", don't return "rifle_ammo"
+                        # But if they specifically search for "ammo", let it through.
+                        if "ammo" not in category.lower() and "ammo" in inv_item.lower():
+                            continue
+                            
+                        matches.append(inv_item)
+                        
+            return matches
+
+    def process_quest_triggers(self, trigger_location, is_menu_option=False):
+        """
+        The Master Quest Handler.
+        trigger_location: "arrive_town", "leave_town", "saloon", "sheriff", etc.
+        is_menu_option: 
+            - False: Runs the quest immediately (Auto-trigger). 
+            - True: Returns the quest details so you can add it as a button.
+        """
+        
+        # 1. Identify valid quests based on Trigger + Condition
+        valid_quests = []
+        for quest in self.QUEST_DATABASE:
+            if quest["trigger"] == trigger_location:
+                # Check the specific condition lambda defined in database
+                if quest["condition"](self):
+                    valid_quests.append(quest)
+
+        # If no quests match, return appropriately
+        if not valid_quests:
+            return None if is_menu_option else False
+
+        # 2. Handle "Auto" Triggers (Arrival / Leave)
+        if not is_menu_option:
+            # Check double-dip prevention for town arrival events
+            if trigger_location == "arrive_town" and self.town_event_occurred:
+                return False 
+
+            # Execute the first valid quest found
+            active_quest = valid_quests[0]
+            print(f"\n[!] {active_quest['description']}") # Optional flavor text
+            
+            # Dynamically call the function
+            method_to_call = getattr(self, active_quest["function"])
+            method_to_call()
+            
+            # Mark that an event happened in this town
+            self.town_event_occurred = True 
+            return True
+
+        # 3. Handle "Menu" Triggers (Saloon / Sheriff)
+        else:
+            # Return the list of valid quests so the Menu can create buttons
+            return valid_quests
+
+    def get_flag(self, quest_id, key, default=None):
+            """Safely gets a value from quest_flags."""
+            if quest_id not in self.quest_flags:
+                return default
+            return self.quest_flags[quest_id].get(key, default)
+
+    def set_flag(self, quest_id, key, value):
+        """Safely sets a value in quest_flags."""
+        if quest_id not in self.quest_flags:
+            self.quest_flags[quest_id] = {}
+        self.quest_flags[quest_id][key] = value
+
+    def _normalize_effect_store(self, store):
+        if isinstance(store, dict):
+            normalized = {}
+            for name, value in store.items():
+                if isinstance(value, dict):
+                    stacks = int(value.get("stacks", 1) or 1)
+                    duration = value.get("duration", None)
+                    meta = value.get("meta", {})
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    normalized[name] = {"stacks": stacks, "duration": duration, "meta": meta}
+                elif isinstance(value, int):
+                    normalized[name] = {"stacks": value, "duration": None, "meta": {}}
+                else:
+                    normalized[name] = {"stacks": 1, "duration": None, "meta": {}}
+            return normalized
+        if isinstance(store, list):
+            normalized = {}
+            for name in store:
+                if not isinstance(name, str):
+                    continue
+                entry = normalized.get(name, {"stacks": 0, "duration": None, "meta": {}})
+                entry["stacks"] += 1
+                normalized[name] = entry
+            return normalized
+        return {}
+
+    def normalize_effects(self):
+        self.player_effects = self._normalize_effect_store(self.player_effects)
+        self.enemy_effects = self._normalize_effect_store(self.enemy_effects)
+
+    def _get_effect_store(self, target):
+        if target == "enemy":
+            return self.enemy_effects
+        return self.player_effects
+
+    def _set_effect_store(self, target, store):
+        if target == "enemy":
+            self.enemy_effects = store
+        else:
+            self.player_effects = store
+
+    def add_effect(self, name, target="player", stacks=1, duration=None, meta=None):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name, {"stacks": 0, "duration": duration, "meta": {}})
+        entry["stacks"] += stacks
+        if duration is not None:
+            if entry["duration"] is None:
+                entry["duration"] = duration
+            else:
+                entry["duration"] = max(entry["duration"], duration)
+        if meta:
+            meta_store = entry.get("meta")
+            if not isinstance(meta_store, dict):
+                meta_store = {}
+            meta_store.update(meta)
+            entry["meta"] = meta_store
+        store[name] = entry
+
+    def has_effect(self, name, target="player"):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name)
+        return bool(entry) and entry.get("stacks", 0) > 0
+
+    def consume_effect(self, name, target="player", stacks=1):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        entry = store.get(name)
+        if not entry:
+            return False
+        entry["stacks"] -= stacks
+        if entry["stacks"] <= 0:
+            del store[name]
+        else:
+            store[name] = entry
+        return True
+
+    def remove_effect(self, name, target="player"):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        if name in store:
+            del store[name]
+
+    def tick_effects(self, target="player", ticks=1):
+        store = self._get_effect_store(target)
+        if not isinstance(store, dict):
+            store = self._normalize_effect_store(store)
+            self._set_effect_store(target, store)
+        expired = []
+        for name, entry in store.items():
+            duration = entry.get("duration", None)
+            if duration is None:
+                continue
+            entry["duration"] = duration - ticks
+            if entry["duration"] <= 0:
+                expired.append(name)
+            else:
+                store[name] = entry
+        for name in expired:
+            del store[name]
+
+    def run_showcase_mode(self):
+        self.winter_mode = False
+        self.AI_File.outbox.put({'type': 'set_theme', 'theme': 'default'})
+        self.change_music("Town.mp3", -1)
+
+        print("\n")
+        print("     WELCOME TO THE SHOWCASE MODE     ")
+        print("")
+        print("This is a curated tour of the game's core features.")
+        print("Let's get you geared up...")
+        time.sleep(2)
+
+        # 1. Buff Stats & Grant Elite Gear
+        print("\n[Feature 1: Dynamic Inventory & Stat System]")
+        self.gold = 5000
+        self.MaxHealth = 200
+        self.Health = 200
+        self.shadow_skill = 10
+        self.strength_skill = 10
+        self.trail_skill = 10
+        self.current_town_name = "Recruiter's Ridge"
+        
+        self.add_item("winchester rifle")
+        self.add_item("chain mail")
+        self.add_item("vendetta badge")
+        self.add_item("bourbon roast")
+        self.itemsinventory["rifle_ammo"] = 50
+        self.itemsinventory["pistol_ammo"] = 50
+        
+        print("Granted 5000 Gold, maxed-out skills, and elite gear.")
+        self.AI_File.update_stats_display(self)
+        self.Statcheck()
+        
+        # 2. Showcase LLM Store Integration
+        print("\n")
+        print("[Feature 2: LLM-Powered NPC Trading]")
+        print("")
+        print("We've maxed out the Gunsmith's inventory for you.")
+        print("Try chatting with him before buying!")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to visit the Gunsmith:")
+        
+        self.TownUpgrades["gunsmith"]["level"] = 4 
+        self.Gunsmiths() 
+
+        # 3. Showcase Free-Form Conversational AI
+        print("\n")
+        print("[Feature 3: Open-Ended LLM Roleplay]")
+        print("")
+        print("You head over to the Saloon. Wyatt Earp is sitting in the corner.")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to talk to Wyatt:")
+        
+        # Call the new conversation method
+        game_state_str = self.generate_game_state()
+        event_str = "Sitting at a poker table in the Oriental Saloon. Morgan Earp was recently murdered."
+        self.AI_File.narrate_conversation(game_state_str, event_str, "Wyatt Earp", self.Hostility)
+
+        # 4. Showcase Turn-Based Combat
+        print("\n")
+        print("[Feature 4: Advanced Turn-Based Combat]")
+        print("")
+        print("As you leave the Saloon, you are ambushed! Time to test your weapons.")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to fight:")
+        
+        combat = Combat(self)
+        combat.FindAttacker("bandit leader")
+        combat.Attack()
+
+        if self.Health <= 0:
+            return # Let the normal Death() flow happen if they somehow lose
+
+        # 5. Showcase the Finale
+        print("\n")
+        print("[Feature 5: Cinematic Minigames & Final Boss]")
+        print("")
+        print("Transitioning directly to the Grand Finale...")
+        self.AI_File.parse_choice(["Continue"], "Press Enter to begin the final mission:")
+        
+        self.Health = self.MaxHealth # Heal them up for the boss
+        self.run_final_mission()
+        
 class Combat:
     def __init__(self, player):
         self.player = player
@@ -4511,10 +5672,10 @@ class Combat:
             "large": ["large hide", "large meat", "horn"],
             "bandit": ["revolver", "pistol_ammo", "bread", "rifle"],
             "townsperson": ["whiskey", "knife", "antivenom"],
-            "common": [random.choice(player.common_loot)],
-            "uncommon": [random.choice(player.uncommon_loot)],
-            "rare": [random.choice(player.rare_loot)],
-            "ultra_rare": [random.choice(player.ultra_rare_loot)],
+            "common": [random.choice(self.player.common_loot)],
+            "uncommon": [random.choice(self.player.uncommon_loot)],
+            "rare": [random.choice(self.player.rare_loot)],
+            "ultra_rare": [random.choice(self.player.ultra_rare_loot)],
         }
 
     def FindAttacker(self, RandomT):
@@ -4529,7 +5690,7 @@ class Combat:
 
     def Attack(self):
         escape = False
-        player.change_music("combat.mp3", -1)
+        self.player.change_music("combat.mp3", -1)
         self.player.day_memory["encounter"] = f"a {self.Enemy}"
         if "ammo belt" in self.player.itemsinventory:
             ability_auto_ammo_belt = True
@@ -4560,16 +5721,16 @@ class Combat:
 
         print(f"\nYou face off against a {self.Enemy.capitalize()}!")
         print(f"Enemy stats — Health: {enemy_health}, Damage: {enemy_damage}, Speed: {enemy_speed}")
-        player.enemy_sound(self.Enemy)
+        self.player.enemy_sound(self.Enemy)
         if self.EnemyCombatant.get("passive") == True:
             print(f"The {self.Enemy} appears to be passive.")
             print("You have the option to leave it alone, will you? Yes/No")
             Choice = input(": ").capitalize().strip()
             if Choice.lower() == "yes":
-                if player.invillage == True:
-                    player.change_music("Town.mp3", -1)
+                if self.player.invillage == True:
+                    self.player.change_music("Town.mp3", -1)
                 else:
-                    player.change_music("game_theme.mp3", -1)
+                    self.player.change_music("game_theme.mp3", -1)
                     print(f"You slowly back away from the {self.Enemy}.")
                 return
             else:
@@ -4590,108 +5751,150 @@ class Combat:
                 if turn == "player":
                     player_turn_complete = False
                     while not player_turn_complete:
-                        if "posse_help" in self.player.player_effects:
+                        if self.player.has_effect("posse_help"):
                             print("The Earp posse comes in, guns blazing!")
                             posse_damage = random.randint(70, 90)
                             print(f"They deal {posse_damage} damage to the {self.Enemy}!")
                             enemy_health -= posse_damage
-                            del self.player.player_effects["posse_help"]
+                            self.player.consume_effect("posse_help")
                         print("\n--- Your Turn ---")
-                        print("What will you do?")
-                        print("1. Attack")
-                        print("2. Use Item")
-                        print("3. Try to Retreat")
+                        available_choices = ["Attack", "Use Item", "Retreat"]
+                        prompt = "What will you do?"
 
-                        choice = input("Choose an action: ").strip()
+                        choice = self.player.AI_File.parse_choice(available_choices, prompt)
 
 
-                        if choice == "1":
+                        if choice == "attack":
                             player_turn_complete = True
-                            # Get list of owned weapons (weapons with known names)
-                            owned_weapons = [w for w in weapons_data if w in self.player.itemsinventory]
-                            if not owned_weapons:
-                                print("You don't have any weapons, so you fight with your fists!")
+                            
+
+                            owned_weapon_info = [] # List of dicts: {"display": "Rusty Revolver", "raw": "rusty revolver", "base": "revolver"}
+                            for inv_item in self.player.itemsinventory:
+                                # Find the best matching base weapon (longest match first to avoid 'revolver' matching 'colt revolver')
+                                possible_bases = [b for b in weapons_data if b in inv_item and "ammo" not in inv_item]
+                                if possible_bases:
+                                    best_base = max(possible_bases, key=len) # Get the most specific match
+                                    owned_weapon_info.append({
+                                        "display": inv_item.title(),
+                                        "raw": inv_item,
+                                        "base": best_base
+                                    })
+                                        
+                            if not owned_weapon_info:
+                                print("You don't have any weapons! You fight with your bare fists.")
                                 player_attack = random.randint(2, 5)
-                                player.play_sound("punch.mp3")
+                                self.player.play_sound("punch.mp3")
                             else:
                                 while True:
-                                    print("Choose a weapon:")
-                                    for i, weapon in enumerate(owned_weapons, start=1):
-                                        info = weapons_data[weapon]
-                                        dmg = info['damage']
+                                    # Use the raw inventory string for the choices to ensure matching works
+                                    button_choices = [w["raw"] for w in owned_weapon_info] + ["fists"]
+                                    
+                                    print("\n--- Choose your weapon ---")
+                                    for w in owned_weapon_info:
+                                        info = weapons_data[w["base"]]
                                         ammo_type = info['ammo']
-                                        ammo_info = ""
+                                        ammo_info = f" | Ammo: {self.player.itemsinventory.get(ammo_type, 0)}" if ammo_type != 'none' else " (Melee)"
+                                        print(f"- {w['display']}{ammo_info}")
+
+                                    weapon_choice = self.player.AI_File.parse_choice(button_choices, "Select weapon:")
+                                    
+                                    if weapon_choice == "fists":
+                                        player_attack = random.randint(2, 5)
+                                        self.player.play_sound("punch.mp3")
+                                        base_weapon = "fists" # Needed for later logic
+                                        break
+                                            
+                                    elif weapon_choice in self.player.itemsinventory:
+                                        exact_name = weapon_choice
+                                        # Retrieve the pre-calculated base weapon
+                                        w_data = next(w for w in owned_weapon_info if w["raw"] == exact_name)
+                                        base_weapon = w_data["base"]
+                                        info = weapons_data[base_weapon]
+                                        ammo_type = info['ammo']
+                                        
+                                        # --- 2. AMMO & ABILITY CHECK ---
                                         if ammo_type != 'none':
-                                            if ability_auto_ammo_belt:
-                                                self.player.itemsinventory[ammo_type] = self.player.itemsinventory.get(ammo_type, 0) + 1
-                                                print("Your ammo belt provides +1 ammo for your gun.")
-                                                ability_auto_ammo_belt = False
-                                            ammo_count = self.player.itemsinventory.get(ammo_type, 0)
-                                            ammo_info = f" | Ammo: {ammo_count}"
-                                        print(f"{i}. {weapon.capitalize()} (Damage: {dmg}){ammo_info}")
-                                    print(f"{len(owned_weapons) + 1}. Fists (No weapon)")
-
-                                    try:
-                                        weapon_choice = int(input("Choice: "))
-                                        if weapon_choice == len(owned_weapons) + 1:
-                                            player_attack = random.randint(2, 5)
-                                            print("You swing your fists!")
-                                            player.play_sound("punch.mp3")
-                                            break
-                                        elif 1 <= weapon_choice <= len(owned_weapons):
-                                            weapon = owned_weapons[weapon_choice - 1]
-                                            info = weapons_data[weapon]
-                                            ammo_type = info['ammo']
-                                            # check ammo
-                                            if ammo_type != 'none':
-                                                if self.player.itemsinventory.get(ammo_type, 0) < 1:
-                                                    print(f"You're out of {ammo_type}! Choose another weapon.")
-                                                    player.play_sound("blank_click.mp3")
-                                                    time.sleep(1)
-                                                    continue
-                                                else:
-                                                    self.player.itemsinventory[ammo_type] -= 1
-                                                    if self.player.itemsinventory[ammo_type] <= 0:
-                                                        del self.player.itemsinventory[ammo_type]
-                                                    ammo_left = self.player.itemsinventory.get(ammo_type, 0)
-                                                    player.weapon_ability(weapon)
-                                                    print(f"You fire the {weapon}. Ammo left: {ammo_left}")
-                                                    player.weapon_sound(weapon)
+                                            current_ammo = self.player.itemsinventory.get(ammo_type, 0)
+                                            if current_ammo < 1:
+                                                print(f"(!) You're out of {ammo_type.replace('_',' ')}! You can't fire the {exact_name.title()}.")
+                                                self.player.play_sound("blank_click.mp3")
+                                                # This continue is crucial; it prevents damage calculation and loops back to selection
+                                                continue 
                                             else:
-                                                if "sharpened_blade" in self.player.player_effects:
-                                                    print(f"Your blade is extra sharp, +10 damage!")
-                                                    player.damage_modifier += 10
-                                                    del self.player.player_effects["sharpened_blade"]
-                                                player.play_sound("knife.mp3")
-                                                player.weapon_ability(weapon)
-
-                                            # roll damage
-                                            dmg_range = info['damage']
-                                            player_attack = random.randint(*dmg_range)
-                                            player_attack = player_attack * player.dmg_modifier_multiply
-
-                                            break
+                                                # Deduct ammo and proceed
+                                                self.player.itemsinventory[ammo_type] -= 1
+                                                if self.player.itemsinventory[ammo_type] <= 0:
+                                                    del self.player.itemsinventory[ammo_type]
+                                                
+                                                # Ability and sound triggers
+                                                self.player.weapon_ability(base_weapon, exact_name)
+                                                self.player.weapon_sound(base_weapon)
                                         else:
-                                            print("Invalid selection.")
-                                    except ValueError:
-                                        print("Please enter a valid number.")
-                            player_attack += player.damage_modifier
-                            if self.EnemyCombatant.get("special") == "ghostly_form":
-                                if random.randint(1, 2) == 1:
-                                    print("Your attack passes harmlessly through the Phantom Gunslinger!")
-                                    continue
-                            enemy_health -= player_attack
-                            print(f"You hit the {self.Enemy} for {player_attack} damage!")
-                            player.damage_modifier = 0
-                            player.dmg_modifier_multiply = 1
-                            print(f"Your health is {self.player.Health}.")
-                            print(f"Enemy health is {enemy_health}.")
+                                            # Melee logic
+                                            if self.player.has_effect("sharpened_blade"):
+                                                print("The honed edge bites deep! +10 damage.")
+                                                self.player.damage_modifier += 10
+                                                self.player.consume_effect("sharpened_blade")
+                                            self.player.play_sound("knife.mp3")
+                                            self.player.weapon_ability(base_weapon, exact_name)
 
-                        elif choice == "2":
+                                        # --- 3. MODIFIER MATH ---
+                                        condition_mult = 1.0
+                                        trait_mult = 1.0
+                                        applied = []
+                                        
+                                        # Check Conditions
+                                        weapon_conditions = {"rusty": 0.75, "beat-up": 0.90, "well-oiled": 1.15, "masterwork": 1.50}
+                                        for cond, mult in weapon_conditions.items():
+                                            if cond in exact_name:
+                                                condition_mult = mult
+                                                applied.append(cond)
+                                                break
+                                        
+                                        # Check Traits
+                                        weapon_traits = {"cursed": 2.0, "outlaw's": 1.20, "engraved": 1.0}
+                                        for trait, mult in weapon_traits.items():
+                                            if trait in exact_name:
+                                                trait_mult = mult
+                                                applied.append(trait)
+                                                if "cursed" in trait:
+                                                    print("(!) The curse siphons your health! -5 HP.")
+                                                    self.player.Health -= 5
+                                                break
+
+                                        if applied:
+                                            print(f"[{', '.join(applied).title()}] Modifiers: x{condition_mult * trait_mult:.2f} damage.")
+
+                                        dmg_range = info['damage']
+                                        base_roll = random.randint(*dmg_range)
+                                        player_attack = int(base_roll * condition_mult * trait_mult * self.player.dmg_modifier_multiply)
+                                        break
+                            
+                            # --- 4. FINALIZE DAMAGE ---
+                            player_attack += self.player.damage_modifier
+                            
+                            if self.EnemyCombatant.get("special") == "ghostly_form" and random.randint(1, 2) == 1:
+                                print("Your attack passes through the phantom like mist!")
+                                player_attack = 0
+
+                            if player_attack > 0:
+                                enemy_health -= player_attack
+                                print(f"You dealt {player_attack} damage to the {self.Enemy}!")
+
+                            # Cleanup
+                            self.player.damage_modifier = 0
+                            self.player.dmg_modifier_multiply = 1
+                            
+                            # Check if Cursed self-damage killed the player
+                            if self.player.Health <= 0:
+                                self.player.Death("The cursed weapon claimed your soul.")
+                                return escape
+
+                        elif choice == "use item":
                             self.player.use_item(combat=True, enemy_name=self.Enemy, enemy_combatant=self.EnemyCombatant)
 
 
-                        elif choice == "3":
+                        elif choice == "retreat":
                             player_turn_complete = True
                             new_speed = self.player.Speed + escape_boost
                             if self.EnemyCombatant.get("bound", False) == True:
@@ -4703,11 +5906,11 @@ class Combat:
                                 escape_boost = 0
                                 self.player.Health = round(self.player.Health)
                                 self.player.Armor_Boost = 1
-                                player.dmg_modifier_multiply = 1
-                                if player.invillage == True:
-                                    player.change_music("Town.mp3", -1)
+                                self.player.dmg_modifier_multiply = 1
+                                if self.player.invillage == True:
+                                    self.player.change_music("Town.mp3", -1)
                                 else:
-                                    player.change_music("game_theme.mp3", -1)
+                                    self.player.change_music("game_theme.mp3", -1)
                                     
                                 return escape
                             else:
@@ -4725,12 +5928,12 @@ class Combat:
                     self.player.Health = round(self.player.Health)
                     self.player.Armor_Boost = 1
 
-                    player.dmg_modifier_multiply = 1
+                    self.player.dmg_modifier_multiply = 1
                     time.sleep(2,)
-                    if player.invillage == True:
-                        player.change_music("Town.mp3", -1)
+                    if self.player.invillage == True:
+                        self.player.change_music("Town.mp3", -1)
                     else:
-                        player.change_music("game_theme.mp3", -1)
+                        self.player.change_music("game_theme.mp3", -1)
                     return escape
                 # Enemy's turn
                 elif turn == "enemy":
@@ -4738,15 +5941,15 @@ class Combat:
                     print(f"\n--- {self.Enemy.capitalize()}'s Turn ---")
                     
                     # --- Status Effect Checks (EXISTING) ---
-                    if "stun" in self.player.enemy_effects:
+                    if self.player.has_effect("stun", target="enemy"):
                         stunned = True
-                        self.player.enemy_effects.remove("stun")
-                    if "hphalf" in self.player.enemy_effects:
+                        self.player.consume_effect("stun", target="enemy")
+                    if self.player.has_effect("hphalf", target="enemy"):
                         enemy_health -= enemy_health/2
-                        self.player.enemy_effects.remove("hphalf")
-                    if "+20HP" in self.player.enemy_effects:
+                        self.player.consume_effect("hphalf", target="enemy")
+                    if self.player.has_effect("+20HP", target="enemy"):
                         enemy_health += 20
-                        self.player.enemy_effects.remove("+20HP")
+                        self.player.consume_effect("+20HP", target="enemy")
                     if stunned == True and self.EnemyCombatant.get("special", None) != "alert":
                         print("The enemy is dazed, unable to attack.")
                         stunned = False
@@ -4853,7 +6056,7 @@ class Combat:
                         
                     # Apply damage using the (potentially modified) current_turn_damage
                     Nenemy_damage = current_turn_damage * self.player.Armor_Boost
-                    if "half_incoming_damage" in self.player.player_effects:
+                    if self.player.has_effect("half_incoming_damage"):
                         Nenemy_damage = Nenemy_damage / 2
                     self.player.Health -= Nenemy_damage
                     print(f"The {self.Enemy} strikes you for {Nenemy_damage} damage!")
@@ -4873,36 +6076,11 @@ class Combat:
                 self.player.Health = round(self.player.Health)
                 self.player.Armor_Boost = 1
 
-                player.dmg_modifier_multiply = 1
+                self.player.dmg_modifier_multiply = 1
                 time.sleep(2,)
-                if player.invillage == True:
-                    player.change_music("Town.mp3", -1)
+                if self.player.invillage == True:
+                    self.player.change_music("Town.mp3", -1)
                 else:
-                    player.change_music("game_theme.mp3", -1)
+                    self.player.change_music("game_theme.mp3", -1)
                 return escape
 
-player = Player()
-
-choice = input("Enter cheat code, or press enter to continue:").strip().upper()
-if choice == "DAX":
-    print("Correct")
-    player.gold += 15
-
-music_path = os.path.join(os.path.dirname(__file__), "game_theme.mp3")
-if not os.path.exists(music_path):
-    print("Music file not found!")
-else:
-    pygame.mixer.music.load(music_path)
-    pygame.mixer.music.set_volume(0.5)
-
-    print("Would you like music to play during the game? (yes/no)")
-    choice = input(": ").strip().lower()
-    choice = AI_File.parse_YN(choice)
-    if choice == "yes":
-        pygame.mixer.music.play(-1)
-    else:
-        player.music = False
-
-
-player.main_game_loop()
-pygame.mixer.music.stop()

@@ -1,7 +1,6 @@
 # In store.py
 import time
 import random
-
 class ShopItem:
     """A simple data class to hold item info."""
     def __init__(self, name, base_price, quantity):
@@ -10,12 +9,13 @@ class ShopItem:
         self.quantity = quantity
 
 class ShopSession:
-    def __init__(self, player, ai_file, store_name, inventory, use_ollama): # Added use_ollama
+    def __init__(self, player, ai_file, store_name, inventory, NPC): 
             self.player = player
             self.ai_file = ai_file
             self.store_name = store_name
             self.inventory = inventory # Dict of {'item_name': ShopItem}
-            self.use_ollama = use_ollama # Store the flag
+            self.NPC = NPC
+
 
     def _show_player_inventory(self):
         """Internal helper to show the player's inventory."""
@@ -62,12 +62,8 @@ class ShopSession:
             for i, (item_name, item_obj) in enumerate(self.inventory.items(), 1):
                 price = self._calculate_price(item_obj, action="buy")
                 
-                if not self.use_ollama:
-                    # Numerical mode: "1. Item - $Price | Stock: X"
-                    print(f"{i}. {item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
-                else:
-                    # Ollama (text) mode: "Item - $Price | Stock: X"
-                    print(f"{item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
+                # Button-friendly mode: "Item - $Price | Stock: X"
+                print(f"{item_obj.name.capitalize()} - ${price} | Stock: {item_obj.quantity}")
                     
                 item_list.append(item_name) # This list is just names, which is correct
                 
@@ -81,44 +77,38 @@ class ShopSession:
             print(f"The owner walks over and greets you.")
             game_state = self.player.generate_game_state()
             event = f"The player walks into the {self.store_name}, and is greeted by the owner."
-            NpC = "store owner"
-            leave = self.ai_file.narrate_shop(game_state, event, NpC, self.use_ollama)
+            leave = self.ai_file.narrate_shop(game_state, event, self.NPC, True, self.store_name)
             if leave == 'leave':
                 return
         
         while True:
-            item_list = self._display_wares() # This now prints a numbered list if use_ollama is False
+            # We only need to call this ONCE per loop
+            item_list = self._display_wares() 
 
-            # --- START FIX ---
             # Define actions in the order they should be numbered
-            # We want "Inventory" then "Leave"
-            actions = ['inventory', 'leave'] 
+            actions = ['inventory', 'leave'] # <-- KEEP THIS LINE
             
-            if not self.use_ollama:
-                # Print the numbered options for actions
-                print("\nOptions:")
-                base_num = len(item_list) # Start numbering after the items
-                print(f"{base_num + 1}. Inventory")
-                print(f"{base_num + 2}. Leave")
-                print("\nEnter a number (e.g., '1' for the item, or '1 10' for quantity 10):")
-            else:
-                # Print the text-based prompt for Ollama
-                print("\nWhat would you like to buy?")
-                print("You can 'leave' or look at your 'inventory' at any time.")
-            
-            choice1 = input(": ").strip()
+            # Print the button-friendly options
+            print("\nOptions:")
+            print(f"Inventory")
+            print(f"Leave")
 
             # The complete_list must match the printed number order
             complete_list = item_list + actions
-            parsed = self.ai_file.parse_purchase(complete_list, choice1, use_ollama=self.use_ollama)
-            choice = parsed.get('choice')
-            # --- END FIX ---
             
+            # *** FIX is here ***
+            # 1. Store the dictionary from the parser
+            parsed_dict = self.ai_file.parse_purchase(complete_list, ": ")
+            
+            # 2. Get the string 'choice' and 'quantity' from the dictionary
+            choice = parsed_dict.get('choice')
+            raw_quantity = parsed_dict.get('quantity', '1')
+            # *** End of Fix ***
+
             if not choice:
                 print("Invalid input, please try again.")
                 continue
 
-            raw_quantity = parsed.get('quantity', '1')
             amount = int(raw_quantity) if raw_quantity.isdigit() and int(raw_quantity) > 0 else 1
             
             if choice == 'leave':
@@ -142,9 +132,9 @@ class ShopSession:
             
             total_cost = adjusted_price * amount
             
+            # This print statement now needs to use 'choice' (the string), not the dict
             print(f"I understood you want to buy {amount} x {choice.capitalize()} for ${total_cost}.")
-            confirm = input("Confirm purchase? (yes/no): ").lower()
-            yn_choice = self.ai_file.parse_YN(confirm)
+            yn_choice = self.ai_file.parse_YN("Confirm purchase? (yes/no): ")
             
             if yn_choice != "yes":
                 print("Purchase cancelled.")
@@ -167,26 +157,18 @@ class ShopSession:
         print("You walk into the trading post. The trader greets you.")
         time.sleep(2)
 
-        # --- START FIX ---
         # Define the choices the parser will use
         available_choices = ["sell", "swap", "leave"]
         
         while True:
             print("\n--- Trading Post ---")
-            if not self.use_ollama:
-                # Numerical prompt
-                print("1. Sell items")
-                print("2. Swap items")
-                print("3. Leave")
-            else:
-                # Text prompt
-                print("You can 'sell' items, 'swap' items, or 'leave'.")
+            # Button-friendly prompt
+            print("Sell items")
+            print("Swap items")
+            print("Leave")
 
-            raw_input = input("What would you like to do? ").strip()
-            
             # Use the AI_Control parser
-            choice = self.ai_file.parse_choice(available_choices, raw_input, self.use_ollama)
-            # --- END FIX ---
+            choice = self.ai_file.parse_choice(available_choices, "What would you like to do? ")
 
             if choice == "sell": # Replaced "1"
                 # --- Sell logic ---
@@ -202,6 +184,7 @@ class ShopSession:
                     item_obj = ShopItem(item, price, qty) # Create a temp ShopItem
                     sell_price = self._calculate_price(item_obj, action="sell")
                     
+                    # This part still uses numbers because it uses the old input()
                     print(f"{idx}. {item} (x{qty}) - Sell Price: ${sell_price}")
                     sellable_items.append(item)
 
@@ -251,9 +234,8 @@ class ShopSession:
             
             elif choice == "leave": # Replaced "3"
                 break
+                
+            # *** FIX is here ***
             else:
                 # This 'else' now catches the "none" or "help" fallback from parse_choice
-                if not self.use_ollama:
-                    print("Invalid number. Please try again.")
-                else:
-                    print("I'm not sure what you mean. Try 'sell', 'swap', or 'leave'.")
+                print("Invalid choice. Please try again.")

@@ -1,622 +1,440 @@
-from httpx import stream
-import ollama, json
+import json
+import os
+import time
+import traceback
 from textwrap import dedent
+from groq import Groq 
+from groq.types.chat import ChatCompletionMessageParam # <-- ADD THIS LINE
 
-
+class SessionEnded(Exception):
+    """Raised when the server ends a session and input is unblocked."""
+    pass
+class GameLoadedException(BaseException): # <--- Changed from Exception
+    """Raised to break the current input loop and reload the game state."""
+    pass
 
 class AI_Control:
-    def __init__(self,):
+    def __init__(self, outbox_queue, inbox_queue):
         self.action = None
-
-    def parse_choice(self, available_choices, player_text, use_ollama):
-        safe_fallback = "none"
-        if "leave" in available_choices:
-            safe_fallback = "leave"
-        if use_ollama:
-            prompt = dedent(f"""
-        You are the choice parser for a text RPG.
-        The player may only choose from these choices now: {", ".join(available_choices)}.
-        Convert the player's input into JSON with one of these actions.
-        Return ONLY JSON. Do not invent other actions.
-        Return ONLY JSON in the form:
-        {{"choice": "<one of the choices>"}}
-        """)    
-            
-            # --- START FIX ---
-            # Define a smart, safe fallback action.
-            # If "leave" is a valid choice, use it. Otherwise, use "none".
-            safe_fallback = "none"
-            if "leave" in available_choices:
-                safe_fallback = "leave"
-            # --- END FIX ---
-
-            try:
-                response = ollama.chat(
-                    model="phi3",
-                    format="json",
-                    options={"temperature": 0},   # deterministic & faster
-                    messages=[
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": player_text}
-                    ]
-                )
-                
-                # This is your original try/except, now nested
-                try:
-                    parsed = json.loads(response['message']['content'])
-                    answer = parsed.get("choice", safe_fallback).lower() # Use safe_fallback
-                    if answer not in (available_choices):
-                        answer = safe_fallback  # Enforce valid fallback
-                    return answer.strip().lower()
-                except json.JSONDecodeError:
-                    return safe_fallback # Return the safe string
-                    
-            except Exception as e: # This catches network errors
-                print(f"[AI_Control Error in parse_choice]: {e}")
-                print(f"[AI_Control]: Falling back to default '{safe_fallback}' action.")
-                return safe_fallback # Return the safe string
-        else:
-            print("\nChoose an option:")
-            for i, choice_text in enumerate(available_choices, 1):
-                print(f"{i}. {choice_text.capitalize()}")
-
-            # The 'player_text' variable holds the user's raw input (which should be a number here)
-            choice_input = player_text # Use the input directly
-
-            try:
-                choice_num = int(choice_input)
-                if 1 <= choice_num <= len(available_choices):
-                    # Adjust index (user enters 1, list index is 0)
-                    return available_choices[choice_num - 1].lower()
-                else:
-                    print("Invalid number.")
-                    return safe_fallback
-            except ValueError:
-                # Still allow direct name match as a fallback if they typed text
-                if choice_input.lower() in available_choices:
-                    return choice_input.lower()
-                print("Please enter a valid number corresponding to the choice.")
-                return safe_fallback
-
-    def parse_YN(self, player_text: str) -> str:
-        """
-        Parse yes/no answers robustly without using LLMs.
-        Always returns 'yes' or 'no'.
-        """
-        yes_words = {"yes", "y", "yeah", "yep", "sure", "ok", "okay", "affirmative", "of course", "certainly"}
-        no_words  = {"no", "n", "nope", "nah", "negative", "never"}
-
-        text_lower = player_text.strip().lower()
-
-        # Direct check first (most common)
-        if text_lower in yes_words:
-            return "yes"
-        if text_lower in no_words:
-            return "no"
-
-        # Split input into words and check
-        words_in_text = set(text_lower.split())
-
-        # Check if any word from the input is in our 'yes' set
-        if not words_in_text.isdisjoint(yes_words):
-            return "yes"
-
-        # Check if any word from the input is in our 'no' set
-        if not words_in_text.isdisjoint(no_words):
-            return "no"
-
-        # Fallback default
-        return "no"
-
-    def parse_purchase(self, items: list, player_text, use_ollama):
-        if use_ollama:
-            # --- START FIX ---
-            # The 'items' list passed from store.py NOW CONTAINS 'inventory' and 'leave'
-            # So we don't need to add "leave" again.
-            shop_items = items 
-            
-            prompt = dedent(f"""
-        You are the action parser for a text RPG.
-        The player is trying to purchase an item. The available items are: {", ".join(shop_items)}.
-        Convert the player's input into JSON **with exactly two keys**:
-        1. "choice" -> must be exactly one of the items (case-insensitive).
-        2. "quantity" -> must always be present as a string representing an integer.
-        - If the player does not specify a number, use "1" as the default.
-        - If the player's choice is "leave", use "0" as the quantity.
-        - If the player's choice is "inventory", use "0" as the quantity.
-        Return ONLY JSON. No explanations or extra text.
-
-        Example outputs:
-        {{"choice": "rifle", "quantity": "1"}}
-        {{"choice": "pistol_ammo", "quantity": "3"}}
-        {{"choice": "inventory", "quantity": "0"}}
-        {{"choice": "leave", "quantity": "0"}}
-        """)
-            # --- END FIX ---
-
-            response = ollama.chat(
-                model="phi3",
-                format="json",
-                options={"temperature": 0},   # deterministic & faster
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": player_text}
-                ]
-            )
-            
-            try:
-                # 1. Try to parse the LLM's response
-                parsed_data = json.loads(response['message']['content'])
-
-                # 2. Basic structure check
-                if not isinstance(parsed_data, dict):
-                    raise ValueError("LLM did not return a dictionary.")
-
-                # 3. Get 'choice', with a fallback
-                choice = parsed_data.get("choice", "leave").lower()
-
-                # 4. Get 'quantity' raw value, with a "1" default if key is missing
-                quantity_raw = parsed_data.get("quantity", "1")
-
-                # 5. Validate 'choice'
-                valid_choices = [item.lower() for item in shop_items]
-                if choice not in valid_choices:
-                    choice = "leave" # Fallback to "leave" if choice is invalid
-
-                # 6. Handle the "leave" and "inventory" cases explicitly
-                if choice == "leave" or choice == "inventory":
-                    quantity_final = "0"
-                else:
-                    # 7. VALIDATION PATCH: Validate 'quantity' for non-action choices
-                    
-                    # Convert if it's an int (e.g., 1 -> "1")
-                    if isinstance(quantity_raw, int):
-                        quantity_raw = str(quantity_raw)
-                        
-                    # Check if it's a string AND is a positive digit
-                    if isinstance(quantity_raw, str) and quantity_raw.isdigit() and int(quantity_raw) > 0:
-                        quantity_final = quantity_raw
-                    else:
-                        # This is a "weird" value (e.g., "two", "0", "", "-5", "a bunch")
-                        # Default to "1" as requested
-                        quantity_final = "1" 
-
-                # 8. Success: create and return the clean action
-                self.action = {"choice": choice, "quantity": quantity_final}
-                return self.action
-
-            except (json.JSONDecodeError, ValueError, TypeError, KeyError):
-                # 9. Catch-all fallback for bad JSON or validation errors
-                # Return a consistent, safe default that matches the expected format
-                self.action = {"choice": "leave", "quantity": "0"} 
-                return self.action
-        else:
-            # --- Numerical Fallback Logic ---
-            safe_fallback = {"choice": "leave", "quantity": "0"}
-            
-            # The 'player_text' variable holds the user's raw input
-            # E.g., "1" or "1 10" or "bread 5"
-            choice_input = player_text.strip().lower()
-
-            if not choice_input:
-                # User just hit enter
-                return safe_fallback
-
-            # --- START NEW PARSING LOGIC ---
-            parts = choice_input.split()
-            item_identifier = parts[0]  # This is "1" or "bread"
-            quantity_str = "1"          # Default quantity
-
-            if len(parts) > 1:
-                # User provided a quantity, e.g., "1 10"
-                if parts[1].isdigit() and int(parts[1]) > 0:
-                    quantity_str = parts[1]
-                # (If it's not a valid number, we just ignore it and use the default "1")
-            
-            # --- END NEW PARSING LOGIC ---
-
-            try:
-                # --- Try parsing the identifier as a NUMBER ---
-                choice_num = int(item_identifier)
-
-                if 1 <= choice_num <= len(items):
-                    selected_item_name = items[choice_num - 1].lower() # Get 'item1', 'inventory', or 'leave'
-
-                    if selected_item_name == "leave":
-                        return safe_fallback
-                    
-                    if selected_item_name == "inventory":
-                        return {"choice": "inventory", "quantity": "0"}
-                    
-                    # It's an item. Return it with the parsed quantity.
-                    self.action = {"choice": selected_item_name, "quantity": quantity_str}
-                    return self.action
-                else:
-                    # This handles numbers outside the printed range
-                    print("Invalid number.")
-                    return safe_fallback
-
-            except ValueError:
-                # --- Identifier was NOT a number, try it as a NAME ---
-                
-                # Check if they typed an item name directly
-                if item_identifier in items:
-                    selected_item_name = item_identifier
-                    
-                    # Double-check it's not an action
-                    if selected_item_name == "leave":
-                        return safe_fallback
-                    if selected_item_name == "inventory":
-                        return {"choice": "inventory", "quantity": "0"}
-                        
-                    # It's an item. Return it with the parsed quantity.
-                    self.action = {"choice": selected_item_name, "quantity": quantity_str}
-                    return self.action
-                
-                # Handle 'leave' or 'inventory' by name
-                if item_identifier == "leave":
-                    return safe_fallback
-                if item_identifier == "inventory":
-                    return {"choice": "inventory", "quantity": "0"}
-
-                # If input is neither a valid number nor item name
-                print("Please enter the number or name of your choice.")
-                return safe_fallback
-            # --- End Numerical Fallback Logic ---
-
-    def parse_action(self, player_text: str, available_actions: list, use_ollama):
+        self.outbox = outbox_queue # The "mailbox" to send commands TO the browser
+        self.inbox = inbox_queue   # The "mailbox" to receive answers FROM the browser
+        self.use_ai = False
+        self.original_sleep = time.sleep
         
-        if use_ollama:
-            # --- START FIX ---
-            # Give the AI a "help" option and better instructions
-            ai_choices = available_actions + ["help"]
-            
-            prompt = dedent(f"""
-            You are an action parser for a text RPG.
-            The player's input is: "{player_text}"
-            
-            You must choose the **closest match** from this list of actions: {ai_choices}
-            - If the player's input is "travel", the closest match is "travel road".
-            - If the player's input is unclear, or you cannot find a good match, default to "help".
+        # We can safely initialize the Groq client here.
+        # The library conflicts are gone.
+        try:
+            self.groq_api_key = os.environ.get("GROQ_API_KEY")
+            if not self.groq_api_key:
+                print("[WARNING] GROQ_API_KEY not found in .env file. AI features will be disabled.")
+                self.groq_client = None
+            else:
+                self.groq_client = Groq(api_key=self.groq_api_key)
+                self.use_ai = True
+                print("[Groq client initialized. AI features enabled.]")
+        except Exception as e:
+            print(f"Failed to initialize Groq client: {e}")
+            print("Falling back to numerical-only mode.")
+            self.groq_client = None
 
-            Return ONLY JSON in this format:
-            {{"action": "<one_of_the_choices_from_the_list>"}}
-            """)
-            # --- END FIX ---
+    # --- CORE I/O (Output) FUNCTIONS ---
 
-            response = ollama.chat(
-                model="phi3",
-                format="json",
-                options={"temperature": 0},   # deterministic & faster
+    def print_to_client(self, *args, **kwargs):
+        """ Replaces 'print()'. Puts a 'game_message' command in the outbox. """
+        message = " ".join(map(str, args))
+        self.outbox.put({'type': 'game_message', 'text': message})
+
+    def play_sound(self, filename, loop=False):
+        """ Puts a 'play_sound' command in the outbox. """
+        self.outbox.put({
+            'type': 'play_sound',
+            'file': f'static/audio/{filename}',
+            'loop': loop
+        })
+
+    def change_music(self, filename, loop=-1):
+        """ Puts a 'change_music' command in the outbox. """
+        self.outbox.put({
+            'type': 'change_music',
+            'file': f'static/audio/{filename}',
+            'loop': True if loop == -1 else False
+        })
+        
+    def weapon_sound(self, weapon):
+        """ Tells the client to play a weapon sound. """
+        if "rifle" in weapon: 
+            self.play_sound("rifle_shot.mp3")
+            self.play_sound("rifle_prime.mp3")
+        elif "revolver" in weapon or "pistol" in weapon: self.play_sound("revolver_shot.mp3")
+        elif "shotgun" in weapon: self.play_sound("shotgun.mp3")
+        elif "knife" in weapon or "saber" in weapon: self.play_sound("knife.mp3")
+        elif "tomahawk" in weapon: self.play_sound("tomahawk.mp3")
+        else: self.play_sound("punch.mp3")
+
+    def enemy_sound(self, name):
+        """ Tells the client to play an enemy sound. """
+        if "wolf" in name: self.play_sound("wolf_howl.mp3")
+        elif "snake" in name or "viper" in name or "cobra" in name: self.play_sound("rattle_snake.mp3")
+        
+    def update_stats_display(self, player_obj):
+        """ Puts an 'update_stats' command in the outbox. """
+        try:
+            self.outbox.put({
+                'type': 'update_stats',
+                'payload': {
+                    'health': player_obj.Health,
+                    'max_health': player_obj.MaxHealth,
+                    'hunger': player_obj.Hunger,
+                    'gold': player_obj.gold,
+                    'day': player_obj.Day,
+                    'time': f"{player_obj.Time}:00",
+                    'location': player_obj.current_town_name if player_obj.invillage else "On the Trail",
+                    'difficulty': player_obj.difficulty.capitalize(),
+                    'heat': getattr(player_obj, 'Heat', 100),
+                    'max_heat': getattr(player_obj, 'MaxHeat', 100),
+                }
+            })
+        except Exception as e:
+            print(f"[Stat Update Error]: {e}") 
+
+    # --- CORE I/O (Input) FUNCTIONS ---
+    def set_theme(self, theme_name):
+            """ Tells the browser to swap the CSS theme ('default', 'winter', 'night', 'rain'). """
+            self.outbox.put({
+                'type': 'set_theme',
+                'theme': theme_name
+            })
+
+    def update_statuses(self, status_list):
+        """ 
+        Tells the browser to show status pills. 
+        Expects a list of dictionaries, e.g.:
+        [{'id': 'poison', 'text': 'Poisoned', 'type': 'negative'}]
+        """
+        self.outbox.put({
+            'type': 'update_statuses',
+            'statuses': status_list
+        })
+    def patched_input(self, prompt=""):
+        """
+        This replaces builtins.input.
+        It sends the prompt to the client (via the print patch)
+        and then requests text input.
+        """
+        # The prompt is automatically sent by the print() patch
+        # that 'input()' triggers.
+        # We just need to ask the browser for a text box.
+        return self._get_web_input(prompt, input_type='text')
+
+    def _get_web_input(self, prompt, choices=None, input_type='choice'):
+        """
+        This is the new "master input" function.
+        1. It puts a question (e.g., 'ask_for_choice') in the outbox.
+        2. It PAUSES and waits for a response to appear in the inbox.
+        3. It returns the response.
+        """
+        if input_type == 'choice':
+            self.outbox.put({
+                'type': 'ask_for_choice', 
+                'prompt': prompt, 
+                'choices': choices
+            })
+        elif input_type == 'text':
+            # Ask the browser to show a text box.
+            self.outbox.put({
+                'type': 'ask_for_text', 
+                'prompt': prompt
+            })
+        
+        # This is the magic:
+        # The game thread will sleep here until the /send_response route
+        # puts an item in the inbox.
+        response = self.inbox.get() 
+        if isinstance(response, dict) and response.get("_session_end"):
+            raise SessionEnded("Session ended by server.")
+        if response == "_LOAD_GAME_":
+            raise GameLoadedException("Game loaded from save.")
+        return response
+
+    def _call_groq(self, system_prompt, user_prompt, is_json=True):
+        """ Helper function to call the Groq API. """
+        if not self.use_ai or self.groq_client is None:
+            return None 
+        
+        try:
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant", 
                 messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": player_text} # The AI will now see the input twice, reinforcing it
-                ]
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"} if is_json else None,
+                temperature=0.2
             )
+            return response.choices[0].message.content
+        except Exception as e:
+            traceback.print_exc() # <--- ADD THIS LINE
+            self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
+            return None
 
-            try:
-                parsed = json.loads(response['message']['content'])
-                action = parsed.get("action", "").lower()
-                
-                # --- START FIX ---
-                # Check against the list the AI was given
-                if action not in ai_choices:
-                    action = "help"  # fallback
-                # --- END FIX ---
+    # --- PARSER FUNCTIONS (These are identical to your file) ---
 
-                self.action = {"action": action}
-            except (json.JSONDecodeError, KeyError, TypeError):
-                self.action = {"action": "help"}
+    def parse_choice(self, available_choices, player_prompt):
+        raw_text = self._get_web_input(player_prompt, choices=available_choices, input_type='choice')
+        if raw_text in available_choices: return raw_text.lower()
+        else: return "leave" if "leave" in available_choices else "none"
 
-            return self.action
+    def parse_YN(self, player_prompt) -> str:
+        raw_text = self._get_web_input(player_prompt, choices=["Yes", "No"], input_type='choice')
+        return "yes" if raw_text.lower() == "yes" else "no"
+
+    def parse_purchase(self, items: list, player_prompt):
+        item_choice = self._get_web_input(player_prompt, choices=items, input_type='choice')
+        if item_choice == "leave": return {"choice": "leave", "quantity": "0"}
+        if item_choice == "inventory": return {"choice": "inventory", "quantity": "0"}
+        quantity_str = self._get_web_input(f"How many {item_choice}?", input_type='text')
+        if quantity_str.isdigit() and int(quantity_str) > 0: final_quantity = quantity_str
         else:
-            # --- Numerical Fallback Logic ---
-            # This function NO LONGER prints the list.
-            # Printing is now handled by TakeActionsChose in Western_Sim.py
-            safe_fallback = {"action": "help"} # 'help' will cause TakeActionsChose to reprint the list
+            self.print_to_client(f"Invalid quantity '{quantity_str}'. Defaulting to 1.")
+            final_quantity = "1"
+        return {"choice": item_choice, "quantity": final_quantity}
 
-            # The 'player_text' variable holds the user's raw input (which should be a number here)
-            choice_input = player_text # Use the input directly
+    def parse_action(self, player_prompt, available_actions: list):
+        raw_text = self._get_web_input(player_prompt, choices=available_actions, input_type='choice')
+        if raw_text in available_actions: return {"action": raw_text}
+        else: return {"action": "help"}
 
-            try:
-                choice_num = int(choice_input)
-                # Map numbers to actions (adjust index)
-                if 1 <= choice_num <= len(available_actions):
-                    action = available_actions[choice_num - 1].lower()
-                    self.action = {"action": action}
-                    return self.action
-                elif choice_num == len(available_actions) + 1: # Check for Help number
-                    self.action = {"action": "help"}
-                    return self.action
-                else:
-                    print("Invalid number.") # Keep error message
-                    return safe_fallback # Return 'help' to trigger a list reprint
-            except ValueError:
-                # Still allow direct name match as a fallback if they typed text
-                if choice_input.lower() in available_actions:
-                    self.action = {"action": choice_input.lower()}
-                    return self.action
-                elif choice_input.lower() == "help":
-                    self.action = {"action": "help"}
-                    return self.action
-                
-                # Only print error if it's not an empty string (e.g., just pressing Enter)
-                if choice_input: 
-                    print("Please enter a valid number or 'help'.") 
-                return safe_fallback # Return 'help' to trigger a list reprint
-            # --- End Numerical Fallback Logic ---
-
-    def parse_dialogue_player(self, player_dialogue, choices: list, use_ollama):
-        """
-        Parses player dialogue input against a list of specific dialogue actions.
-        Uses Ollama if use_ollama is True, otherwise uses numerical input.
-        Defaults to 'talk' if unclear or on error.
-        Returns a dictionary like {"action": "chosen_action"}.
-        """
-        safe_fallback_action = "talk" # Define the fallback action
-
-        if use_ollama:
-            # --- Ollama Logic ---
-            prompt = dedent(f"""
-            You are a dialogue parser for a game.
-            The player is speaking to an NPC.
-            You must choose one of the following actions based on the player's input: {", ".join(choices)}.
-
-            Return ONLY valid JSON in this format:
-            {{"action": "<one_of_choices>"}}
-
-            If the player is not clear which action they want, default to:
-            {{"action": "{safe_fallback_action}"}}
-            """)
-
-            try:
-                response = ollama.chat(
-                    model="phi3",
-                    format="json",
-                    options={"temperature": 0},   # deterministic & faster
-                    messages=[
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": player_dialogue}
-                    ]
-                )
-                try:
-                    parsed_action = json.loads(response['message']['content'])
-                    # Validate the action returned by the AI
-                    if parsed_action.get("action") not in choices:
-                        print(f"[AI Warning: AI returned invalid action '{parsed_action.get('action')}'. Falling back.]")
-                        self.action = {"action": safe_fallback_action}
-                    else:
-                        self.action = parsed_action # Use the valid AI response
-
-                    return self.action
-                except json.JSONDecodeError:
-                    print("[AI Error: Could not parse dialogue response. Falling back.]")
-                    self.action = {"action": safe_fallback_action}
-                    return self.action # Use the safe fallback
-
-            except Exception as e:
-                print(f"[AI_Control Error in parse_dialogue_player]: {e}")
-                print(f"[AI_Control]: Ollama call failed. Falling back to '{safe_fallback_action}'.")
-                self.action = {"action": safe_fallback_action}
-                return self.action
-            # --- End Ollama Logic ---
-
-        else:
-            # --- Numerical Fallback Logic ---
-            print("\nChoose a dialogue option:")
-            for i, choice_text in enumerate(choices, 1):
-                print(f"{i}. {choice_text.capitalize()}")
-
-            # The 'player_dialogue' variable holds the user's raw input (number expected)
-            choice_input = player_dialogue
-
-            try:
-                choice_num = int(choice_input)
-                if 1 <= choice_num <= len(choices):
-                    # Adjust index
-                    chosen_action = choices[choice_num - 1].lower()
-                    self.action = {"action": chosen_action}
-                    return self.action
-                else:
-                    print("Invalid number.")
-                    self.action = {"action": safe_fallback_action}
-                    return self.action
-            except ValueError:
-                # Allow direct name match as fallback
-                if choice_input.lower() in choices:
-                    self.action = {"action": choice_input.lower()}
-                    return self.action
-                print("Please enter a valid number corresponding to the dialogue choice.")
-                self.action = {"action": safe_fallback_action}
-                return self.action
-            # --- End Numerical Fallback Logic ---
-
-    def narrate_shop(self, game_state, event, NPC, use_ollama):
-        if use_ollama:
-            # Create a dynamic prompt
-
-            base_prompt = [{"role": "system", "content": dedent(f"""
+    def narrate_shop(self, game_state, event, NPC, use_ollama, store_name):
+        # This function now supports a full, back-and-forth conversation.
+        
+        # We check self.use_ai (which is true if Groq is loaded)
+        if self.use_ai and self.groq_client: 
+            # --- Setup Conversation ---
+            base_prompt = dedent(f"""
             You are an NPC for a western text RPG.
-            The world state is: {game_state}.
-            Event: {event}.
-            You are {NPC}.
-            Stay in character, answer very briefly in dialogue style.
-            1-2 sentences max.
+            The world state is: {game_state}. Event: {event}. You are {NPC}.
+            You are the owner of {store_name}.
+            Stay in character, answer very briefly in dialogue style (1-2 sentences).
             Make sure you respond with the correct hostility.
-        """)}
-    ]
-            dialogue_history = []
             
-            # --- START FIX ---
+            CRITICAL RULES FOR TRADING:
+            1. NEVER list specific items, weapons, or prices. You do not know your exact mechanical inventory.
+            2. Refer to your goods broadly based on your store type (e.g., "I've got plenty of supplies," "Finest firearms in town," "Need provisions?").
+            3. If the player seems interested in shopping or asks what you have, naturally invite them to "take a look," ask to "see my wares," or tell you they want to "buy" something.
+            
+            Do NOT greet the player, just respond to what they say.
+            If the player just enters your shop, you should greet them.
+            """)
+            
+            # This will store the conversation history
+            dialogue_history: list[ChatCompletionMessageParam] = [
+                {"role": "system", "content": base_prompt}
+            ]
+            
             # Define keywords that trigger actions
             leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya"}
             buy_words = {"buy", "shop", "wares", "see wares", "trade", "show me", "what do you have", "see what you have", "purchase"}
-            # --- END FIX ---
 
-            leave = False
             count = 0
-            while leave == False:
-                prompt = [base_prompt[0]]
-                prompt.extend(dialogue_history[-3:])
+            
+            # --- First Message from AI ---
+            try:
+                # This is the "user" action that starts the conversation
+                # FIX: We append the dictionary literal directly to satisfy Pylance
+                dialogue_history.append({"role": "user", "content": f"The player walks into {store_name}."})
+
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=dialogue_history, # Send system prompt + user action
+                    response_format=None,
+                    temperature=0.2
+                )
+                # FIX: Check for None before calling .strip()
+                raw_content = response.choices[0].message.content
+                narration = raw_content.strip() if raw_content else "Welcome in."
                 
-                # --- Add outer try/except for network errors ---
-                try:
-                    response_stream = ollama.chat(
-                        model="llama3:8b",
-                        messages=prompt,
-                        stream=True)
-                except Exception as e:
-                    print(f"[AI_Control Error in narrate_shop]: {e}")
-                    print(f"{NPC}: Sorry, lost my train of thought. What was I sayin'?")
-                    # Safely exit the conversation on AI failure
-                    return 'leave' 
-                # --- End outer try/except ---
+            except Exception as e:
+                traceback.print_exc() # <--- ADD THIS LINE
+                self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
+                narration = "Welcome to the shop. Take a look."
+
+            # Send the AI's first greeting
+            self.print_to_client(f"{NPC}: {narration}")
+            # FIX: We append the dictionary literal directly
+            dialogue_history.append({"role": "assistant", "content": narration})
+
+            # --- Start Conversation Loop ---
+            while count < 4: # Allow up to 4 exchanges
+                count += 1
                 
-                narration = ""
+                # --- Get Player's Text Input from Web UI ---
+                player_input = self._get_web_input("You: ", input_type='text')
+                player_lower = player_input.lower().strip()
 
-                for chunk in response_stream:
-                    # Ollama yields dicts with incremental content
-                    token = chunk["message"]["content"]
-                    print(token, end="", flush=True)   # print as it arrives
-                    narration += token
-                
-
-                dialogue_history.append({"role": "assistant", "content": narration})
-
-                    
-                player_input = input("You: ").strip()
-                player_lower = player_input.lower() # Get a lowercase version
-
-                # --- START FIX ---
                 # 1. Check for LEAVE intent
-                # We use 'any' to check if any of the player's words are in our leave_words set
                 if any(word in player_lower.split() for word in leave_words) or player_lower in leave_words:
-                    print(f"{NPC}: Safe travels, stranger.")
-                    return 'leave' # Correctly return 'leave'
+                    self.print_to_client(f"{NPC}: Safe travels, stranger.")
+                    return 'leave'
 
                 # 2. Check for BUY intent
-                # We use 'any' to check if the player's input contains any of our buy_words
                 if any(phrase in player_lower for phrase in buy_words):
-                    print(f"{NPC}: Here is what I've got:")
-                    return 'buy' # Correctly return 'buy'
-                # --- END FIX ---
+                    self.print_to_client(f"{NPC}: Here is what I've got:")
+                    return 'buy'
 
-                # 3. If not leaving or buying, it's just talk.
+                # 3. If not leaving/buying, continue conversation
+                # FIX: We append the dictionary literal directly
                 dialogue_history.append({"role": "user", "content": player_input})
                 
-                # The loop will now repeat, and the AI will respond to the player's last statement.
-                count = count + 1    
-                if count > 3:
-                    print(f"{NPC}: Well, if you're not buying, I gotta get back to work.")
-                if count > 4:
-                    print(f"{NPC}: Safe travels, stranger.")
-                    leave = True
-                    return 'leave'   
-        else:
-            # --- Numerical Fallback Logic ---
-            # Simple, direct approach for non-AI mode
-            print(f"\n{NPC}: Welcome to the shop. Take a look.")
-            # Automatically proceed to showing wares in numerical mode.
-            # The ShopSession loop will handle buying/leaving from there.
+                try:
+                    # Send the last 5 messages (system + 2 pairs)
+                    response = self.groq_client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=dialogue_history[-5:], 
+                        response_format=None,
+                        temperature=0.2
+                    )
+                    # FIX: Check for None before calling .strip()
+                    raw_content = response.choices[0].message.content
+                    narration = raw_content.strip() if raw_content else "Sorry, lost my train of thought."
+
+                except Exception as e:
+                    traceback.print_exc() # <--- ADD THIS LINE
+                    self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]") # <--- CHANGE THIS LINE
+                    narration = "Sorry, lost my train of thought."
+                
+                # Send the AI's reply
+                self.print_to_client(f"{NPC}: {narration}")
+                # FIX: We append the dictionary literal directly
+                dialogue_history.append({"role": "assistant", "content": narration})
+                
+            # If loop finishes, default to showing the shop
+            self.print_to_client(f"{NPC}: Well, if you're not buyin', I've got work to do. Here's what I have.")
             return 'buy'
-            # --- End Numerical Fallback Logic ---
 
-    def narrate_dialogue_once(self, game_state, event, NPC, use_ollama):
-        if use_ollama:
-            # Create a dynamic prompt
-
-            prompt = [{"role": "system", "content": dedent(f"""
-            You are an NPC for a western text RPG.
-            The world state is: {game_state}.
-            Event: {event}.
-            You are {NPC}.
-            Stay in character, answer very briefly in dialogue style.
-            1-2 sentences max.
-            Make sure you respond with the correct hostility.
-        """)}
-    ]
-
-
-            response_stream = ollama.chat(
-                model="llama3:8b",
-                messages=prompt,
-                stream=True)
-                
-                
-            narration = ""
-
-            for chunk in response_stream:
-                # Ollama yields dicts with incremental content
-                token = chunk["message"]["content"]
-                print(token, end="", flush=True)   # print as it arrives
-                narration += token
-            player_input = input("You: ").strip()
-            choice = self.parse_YN(player_input)
-            if choice == 'yes':
-                return 'yes'
-            else:
-                return 'no'
         else:
             # --- Numerical Fallback Logic ---
-            # Print a direct question based on the event context
-            print(f"\n{NPC}: {event} (yes/no?)")
-            player_input = input("You: ").strip()
-            choice = self.parse_YN(player_input) # Use reliable Y/N parser
-            return choice # Return 'yes' or 'no'
-            # --- End Numerical Fallback Logic ---
+            self.print_to_client(f"\n{NPC}: Welcome to the shop. Take a look.")
+            # This forces a "Continue" button press to pause the screen
+            self.parse_choice(["Continue"], "")
+            return 'buy'
+
+    def narrate_dialogue_once(self, game_state, event, NPC):
+        if self.use_ai:
+            prompt = dedent(f"""
+            You are an NPC for a western text RPG.
+            The world state is: {game_state}. Event: {event}. You are {NPC}.
+            Stay in character. Ask the player a simple yes/no question based on the event.
+            1-2 sentences max.
+            """)
+            question = self._call_groq(prompt, "Ask the player the question.", is_json=False)
+            if question: self.print_to_client(f"{NPC}: {question}")
+            else: self.print_to_client(f"{NPC}: {event} (yes/no?)")
+        else:
+            self.print_to_client(f"\n{NPC}: {event} (yes/no?)")
+        return self.parse_YN("")
             
     def generate_diary_entry(self, game_state, player_health, max_health, day_memory, tone):
-        """
-        Uses Ollama to generate a creative diary entry based on the day's events.
-        """
-        fallback_entry = "Another day done. The trail is long." # Safe fallback
-        
-        # --- Build Context ---
-        # Handle empty day_memory items gracefully
+        fallback_entry = "Another day done. The trail is long." 
+        if not self.use_ai: return fallback_entry
         encounter_desc = day_memory.get('encounter') or "nothing special"
         loot_desc = day_memory.get('loot') or "nothing of note"
-
         prompt_content = dedent(f"""
         You are the personal diary of a western adventurer.
-        You must write a very brief diary entry (2-3 sentences max) for the end of the day.
-        You MUST write in a {tone} tone.
-        Do NOT use "Dear Diary". Do NOT sign off.
-
-        --- Context for the entry ---
-        World State: {game_state}
+        Write a 2-3 sentence diary entry in a {tone} tone.
+        Do NOT use "Dear Diary" or sign off.
+        Context:
         Health: {player_health} / {max_health}
-        Today's Encounter: {encounter_desc}
-        Today's Loot: {loot_desc}
+        Encounter: {encounter_desc}
+        Loot: {loot_desc}
+        """)
+        full_entry = self._call_groq(prompt_content, "Write the diary entry.", is_json=False)
+        if not full_entry: full_entry = fallback_entry
+        return full_entry.strip()
+
+    def narrate_conversation(self, game_state, event, NPC, player_hostility):
+        """A free-form conversation loop with an NPC."""
+        if not self.use_ai or not self.groq_client:
+            self.print_to_client(f"\n{NPC}: I don't have much to say right now.")
+            self.parse_choice(["Continue"], "")
+            return
+            
+        base_prompt = dedent(f"""
+        You are an NPC in a gritty, authentic 1880s Western text RPG.
+
+        [CONTEXT]
+        Current World State: {game_state}
+        Current Event/Location: {event}
+        Your Identity: {NPC}
+        Player's Hostility Level: {player_hostility} (0 = Friendly, 3+ = Hated/Wanted)
+
+        [YOUR PERSONALITY & KNOWLEDGE]
+        - You only know what a person in your position would naturally know in the 1880s.
+        - If the player asks about modern concepts, act confused or interpret them through a 19th-century lens.
+        - React appropriately to the Player's Hostility Level (e.g., be warm if it's 0, guarded or aggressive if it's high).
+
+        [CONVERSATION RULES]
+        1. Stay strictly in character as {NPC}. Use period-appropriate phrasing, but keep it highly readable.
+        2. Keep responses brief and punchy (1-3 sentences). This is a rapid back-and-forth dialogue.
+        3. NEVER act as the narrator. You are a participant in the scene. 
+        4. Do not offer quests, items, or mechanical game benefits unless explicitly told to in the Context.
+        5. If the player says goodbye, threatens you, or ends the chat, respond appropriately so the game can transition.
+
+        The player approaches you. Await their first words, or give a brief, in-character opening greeting if this is the start of the interaction.
         """)
 
-        prompt_messages = [
-            {"role": "system", "content": prompt_content}
+        # This will store the conversation history
+        dialogue_history: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": base_prompt}
         ]
+        
+        leave_words = {"bye", "leave", "exit", "goodbye", "farewell", "see ya", "done", "quit"}
 
+        # --- First Message from AI ---
         try:
-            response_stream = ollama.chat(
-                model="llama3:8b",
-                messages=prompt_messages,
-                stream=True
+            dialogue_history.append({"role": "user", "content": f"The player approaches {NPC}."})
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=dialogue_history,
+                temperature=0.4 # Slightly higher than the shop for more varied roleplay
             )
+            raw_content = response.choices[0].message.content
+            narration = raw_content.strip() if raw_content else "Hello."
             
-            full_entry = ""
-            print("\n— Your diary entry —")
-            for chunk in response_stream:
-                token = chunk["message"]["content"]
-                print(token, end="", flush=True) # Print as it arrives
-                full_entry += token
-            
-            print() # Newline after streaming
-            
-            # Return the full entry, stripping any leading/trailing whitespace
-            return full_entry.strip()
-
         except Exception as e:
-            print(f"[AI_Control Error in generate_diary_entry]: {e}")
-            print(f"[AI_Control]: Falling back to default diary entry.")
-            # Print the fallback so the user sees *something*
-            print("\n— Your diary entry —")
-            print(fallback_entry)
-            return fallback_entry
+            traceback.print_exc()
+            self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]")
+            narration = "Greetings."
 
+        self.print_to_client(f"\n{NPC}: {narration}")
+        dialogue_history.append({"role": "assistant", "content": narration})
+
+        # --- Start Conversation Loop ---
+        while True:
+            player_input = self._get_web_input("You: ", input_type='text')
+            player_lower = player_input.lower().strip()
+
+            # Check for LEAVE intent
+            if any(word in player_lower.split() for word in leave_words) or player_lower in leave_words:
+                self.print_to_client(f"{NPC}: See you around.")
+                break
+
+            # Continue conversation
+            dialogue_history.append({"role": "user", "content": player_input})
+            
+            try:
+                # Keep the last 7 messages for slightly deeper context memory in free-chat
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=dialogue_history[-7:], 
+                    temperature=0.4
+                )
+                raw_content = response.choices[0].message.content
+                narration = raw_content.strip() if raw_content else "..."
+
+            except Exception as e:
+                traceback.print_exc()
+                self.print_to_client(f"[Groq API Error: {type(e).__name__} - {e}]")
+                narration = "..."
+            
+            self.print_to_client(f"{NPC}: {narration}")
+            dialogue_history.append({"role": "assistant", "content": narration})

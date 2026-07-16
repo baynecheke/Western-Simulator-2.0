@@ -1,0 +1,260 @@
+[33mcommit 4090b84ee8929dd8b08842ff2a9f31089bed012c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mWeb_App[m[33m)[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Nov 3 20:17:55 2025 -0500
+
+    Remove sensitive GROQ_API_KEY from environment configuration
+
+[33mcommit 41645110aaa88f326678e0a44e1e7d395906bd8f[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Nov 3 20:08:57 2025 -0500
+
+    craziness
+
+[33mcommit 927a8aba6bac02118bc9e8d6d73b81013dc81808[m[33m ([m[1;31morigin/Web_App[m[33m)[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Nov 3 17:18:56 2025 -0500
+
+    Refactor input prompts to standardize user interaction and improve readability
+
+[33mcommit 9be74f74614d5a85eafdb65b1e799c9822fec672[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Nov 3 16:15:33 2025 -0500
+
+    Moved all input into Ai_Control_File
+
+[33mcommit 588cdeac2e77bbddc3a535836097bafa94b451e3[m
+Merge: e95810b 560b29d
+Author: baynecheke <51100443+baynecheke@users.noreply.github.com>
+Date:   Mon Nov 3 16:02:19 2025 -0500
+
+    Merge pull request #1 from baynecheke/New_AI-data
+    
+    remove speech to text
+
+[33mcommit 560b29de8df53999bea36f7d7b94be05a0c76993[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Nov 3 16:01:42 2025 -0500
+
+    remove speech to text
+
+[33mcommit e95810b054be7385f080b7ac1ba12ec9f5474c1a[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Thu Oct 30 13:08:19 2025 -0400
+
+    epic noss fight
+
+[33mcommit 187749f1c51deff28b129797189bb84af23ac34c[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Thu Oct 30 11:58:18 2025 -0400
+
+    sounds
+
+[33mcommit c3967b058138154149c95a48ae47bd32371cc58c[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Thu Oct 30 11:39:24 2025 -0400
+
+    coffee mill
+
+[33mcommit c6b2b3232d844e8cd3e64f42e3a8620df450ee6c[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Wed Oct 29 13:40:53 2025 -0400
+
+    changes
+
+[33mcommit 5c1a199ffa3a72d72d3eb00c1ddd9f76fc7b73ca[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Wed Oct 29 13:35:58 2025 -0400
+
+    earpy boy
+
+[33mcommit 560b0dc2ecdd5ecd929d239b124083f45ce6dcc1[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Wed Oct 29 13:23:42 2025 -0400
+
+    fixed exe
+
+[33mcommit f28ffe42814c72b63947b95cea1ed4716a72e88f[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 20:54:44 2025 -0400
+
+    weapons
+
+[33mcommit 313a6c98f89cf8238214b5cc713ca5c06e43d79a[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 19:56:55 2025 -0400
+
+    balancing
+
+[33mcommit 36e794a019791cce164b57670190f8e88df9c189[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 19:53:04 2025 -0400
+
+    Refactor combat attack logic to handle escape scenarios and reward distribution
+
+[33mcommit 1b9946d86e2803f60e09bac2f07b0eec18d7cdc5[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 19:49:43 2025 -0400
+
+    bandage patch
+
+[33mcommit 0178c538b56b6ea3734a42d90d9e222ae26ecc83[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 19:41:06 2025 -0400
+
+    hunger
+
+[33mcommit f463905dcb2a2cb6f60aa59df209a4377f1b741e[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 16:23:50 2025 -0400
+
+    Enhance diary entry system with activity scoring and memory tracking
+
+[33mcommit 74ca28ba6037be946f77a9847a3b294dca552d59[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 15:19:13 2025 -0400
+
+    Implement AI-generated diary entries when using Ollama
+
+[33mcommit c57fce6d95167e3f35f8c4386a0f47570a8b60fa[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 15:11:44 2025 -0400
+
+    stuff organisation
+
+[33mcommit 78e854d97bd5f817303b3f3dd59a6ec8fa53e087[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 15:07:44 2025 -0400
+
+    moved stuff
+
+[33mcommit 596cb46351d44cba6703c1b119aee67d30952793[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 15:05:18 2025 -0400
+
+    earp
+
+[33mcommit 70897bbb8f120f471da444b3db4a129441461f2a[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 12:28:45 2025 -0400
+
+    Updated credits
+
+[33mcommit 2fbfa5d4ff2593d3c97e15fea770c79f8e6e1bdc[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 11:44:36 2025 -0400
+
+    lots of edits
+
+[33mcommit 761424b23a9319f4ffb92a2c27ee366864075100[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Mon Oct 27 11:18:57 2025 -0400
+
+    Enhance player encounters: add healing mechanics, adjust combat dynamics, and introduce new enemy types
+
+[33mcommit 712d9b93523b612ac669e1d2ddeec71ff99d52b1[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:55:24 2025 -0400
+
+    Enhance dialogue handling: add keywords for purchasing and implement exit prompts after multiple interactions
+
+[33mcommit 01c2f1253413d27adf58011eac3ea77d78668584[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:50:17 2025 -0400
+
+    removed
+
+[33mcommit 1b2b930e9e4f78119325f23b2ab4f985001da5c7[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:49:07 2025 -0400
+
+    Update compiled Python bytecode files for AI_Control_File and store
+
+[33mcommit 7efc867d7b8af4f257f4fc507e0342aa2bc10dc2[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:48:47 2025 -0400
+
+    asdf
+
+[33mcommit 73616f1a8746d1302cc700c98fa0c449655c5a9c[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:47:56 2025 -0400
+
+    Refactor Bank investment logic: streamline building upgrade process and improve user prompts
+
+[33mcommit a0882d3a55630e505acd1929f7d33237b0ee0c41[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:22:07 2025 -0400
+
+    blacksmith
+
+[33mcommit 9849cbfee26440c014ae49aa58da511d1fa5f89c[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:19:42 2025 -0400
+
+    removed some files
+
+[33mcommit d9b3d847e4886f976842b01b8569b746d9546175[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 15:19:01 2025 -0400
+
+    Add quick draw action for player and introduce carbine rifle with quick draw ability
+
+[33mcommit 2bf16c3f66e2bfe08d33adb3b37c859ee47de07e[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sun Oct 26 08:22:32 2025 -0400
+
+    Enhance Player Class: Add player name, current town tracking, and dynamic action updates based on location
+
+[33mcommit 686a2d4379a7bd2315bf2f4e1075598205165514[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sat Oct 25 19:51:43 2025 -0400
+
+    barkeeper
+
+[33mcommit 06405c1ac3395e53d6c00fd7d4230feec4df4e36[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sat Oct 25 19:03:45 2025 -0400
+
+    fixed some quests
+
+[33mcommit bc2af954f47a808a5dcadcee4f9f3a279297e5e2[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Sat Oct 25 19:00:42 2025 -0400
+
+    Enhance player mechanics: track towns visited, update wandering trader inventory, and adjust combat interactions
+
+[33mcommit aa586ae98b721034ba8095fee97fa0d01987dd56[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 15:53:36 2025 -0400
+
+    Refactor player actions in town; add quest options and enhance event interactionsfixed earp coming out all the time
+
+[33mcommit 20d05889c7a1a251bd98f03ef6788db26ab27f05[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 15:36:29 2025 -0400
+
+    Adjust gold earnings for player actions and restore health after defeating bandits
+
+[33mcommit 1b21d1213fd648d180e8427d4369945d1c2c6dd0[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 15:33:25 2025 -0400
+
+    added more townspeople quests are available
+
+[33mcommit daedad1da5202d09debc2d919d6ad629ef420b32[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 15:31:21 2025 -0400
+
+    Add vendetta badge item and Earp posse summon mechanic; enhance combat interactions
+
+[33mcommit 40f35e97ac2e982a8f33ff703c651f8d0b6bad72[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 15:08:00 2025 -0400
+
+    Update save file for player Bayne; increase gold, adjust inventory items, and modify health and quest details
+
+[33mcommit 0ea289f5697f5bb795dc037031d2de326936c0c1[m
+Author: baynecheke <baynecheke@gmail.com>
+Date:   Fri Oct 24 14:52:14 2025 -0400
+
+    Enhance enemy behavior randomness and adjust com
